@@ -1,0 +1,116 @@
+/* General page styling */
+.main-page {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: #f9f9f9;
+        color: #333;
+    }
+
+  /* Page container */
+  .approval-main {
+    /* max-width: 1200px; */
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+  }
+  
+  /* Page title */
+  .approval-main h2 {
+    /* text-align: center; */
+    color: #333;
+    margin-bottom: 20px;
+  }
+  
+  /* Table styling */
+  .approval-main table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 16px;
+  }
+  
+  .approval-main table thead {
+    background-color: #007BFF;
+    color: white;
+  }
+  
+  .approval-main table th,
+  table td {
+    text-align: left;
+    padding: 12px;
+    border: 1px solid #ddd;
+  }
+  
+  .approval-main table tr:nth-child(even) {
+    background-color: #f2f2f2;
+  }
+  
+  .approval-main table tr:hover {
+    background-color: #f1f1f1;
+    cursor: pointer;
+  }
+  
+  /* Status column color coding */
+  .approval-main td:nth-child(7) {
+    font-weight: bold;
+  }
+  
+  .approval-main td:nth-child(7):contains("Approved") {
+    color: green;
+   
+  }
+  
+  .approval-main td:nth-child(7):contains("Rejected") {
+    color: red;
+  }
+  
+  /* Button styling */
+  .approval-main button {
+    padding: 10px 15px;
+    font-size: 14px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+  }
+  
+  .approval-main button:hover {
+    transform: scale(1.05);
+  }
+  
+  /* Accept button */
+  .approval-main button:first-of-type {
+    background-color: #28a745;
+    color: white;
+    margin-right: 10px;
+  }
+  
+  .approval-main button:first-of-type:hover {
+    background-color: #218838;
+  }
+  
+  /* Reject button */
+  .approval-main button:last-of-type {
+    background-color: #dc3545;
+    color: white;
+  }
+  
+  .approval-main button:last-of-type:hover {
+    background-color: #c82333;
+  }
+  
+  /* Responsive design */
+  @media screen and (max-width: 768px) {
+    .approval-main table {
+      font-size: 14px;
+    }
+  
+    .approval-main  button {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+  }
+  

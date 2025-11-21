@@ -1,0 +1,73 @@
+/* Cardone.css */
+
+.card-template {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #fff;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden; /* Prevents content overflow */
+  box-sizing: border-box; /* Includes padding in width and height */
+}
+
+.card-template h3 {
+  margin: 0 0 12px 0;
+  font-size: 1.2rem;
+  color: #333;
+  white-space: nowrap; /* Prevents title text from wrapping */
+  overflow: hidden; /* Hides overflow text */
+  text-overflow: ellipsis; /* Adds "..." for truncated text */
+}
+
+.card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px; /* Adds spacing between items */
+  width: 100%; /* Ensures content spans the card width */
+  max-height: 300px; /* Limit card content height */
+  overflow-y: auto; /* Adds scroll if content exceeds height */
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* Adds spacing between stat items */
+  width: 100%;
+}
+
+.stat-item {
+  font-size: 0.9rem;
+  color: #555;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.chart {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: auto;
+}
+
+.circle-chart {
+  display: flex;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+.chart-segment {
+  display: block;
+  height: 100%;
+  transition: flex 0.3s ease-in-out;
+}
+
+  

@@ -1,0 +1,194 @@
+/* Parallax Background */
+.parallax {
+  /* Background image */
+  background-image: url("../../assets/cloudcomputing.png");
+  
+  /* Height and width for the background */
+  min-height: 1200px; /* You can adjust the minimum height as per your requirements */
+  width: 100%; /* Ensures the background takes up the full width of the container */
+  
+  /* Background properties */
+  background-attachment: fixed; /* Keeps the background fixed during scrolling */
+  background-position: center; /* Centers the background image */
+  background-repeat: no-repeat; /* Prevents repeating the background */
+  background-size: cover; /* Ensures the background covers the entire container */
+  
+  /* Flexbox to center content */
+  display: flex;
+  justify-content: center; /* Centers the content horizontally */
+  align-items: center; /* Centers the content vertically */
+  
+  /* Text styling */
+  color: white; /* Sets the text color to white */
+  text-align: center; /* Centers the text */
+  font-family: roboto; 
+}
+
+  #login-section {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; /* Full height of viewport */
+    background-color: #e8e8e8;
+    position: relative;
+    overflow: auto; /* Enable scrolling if content exceeds */
+    padding: 20px;
+  }
+  
+  .login-animate-container {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+    animation: waveIn 2s ease-out forwards;
+    animation-delay: 1s;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0px 5px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+
+/* Wave animation */
+@keyframes waveIn {
+  0% {
+    opacity: 0;
+    transform: translateX(100%) scale(0.8);
+  }
+  40% {
+    opacity: 0.5;
+    transform: translateX(50%) scale(1.05);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(10%) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.about-section {
+  padding: 20px;
+  text-align: center;
+  color: white; /* Text color */
+  background-color: transparent; /* Transparent background */
+}
+
+h1 {
+  font-family: SF Pro Display, Helvetica Neue, sans-serif;/* A stylish and unique font */
+  font-size: 4rem; /* Larger size for emphasis */
+  color: rgb(37,56,72); /* Eye-catching color (tomato) */
+  text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+  letter-spacing: 2px; /* Spaced letters for elegance */
+  margin: 20px 0;
+  animation: fadeInTitle 1.5s ease-in-out;
+}
+/* Professional style adjustments */
+#login-section {
+  background: linear-gradient(135deg, #f6f6f6, #d0d0d0);
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0px 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.login-animate-container {
+  padding: 30px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0px 5px 20px rgba(0, 0, 0, 0.2);
+}
+  /* Content inside the parallax section */
+  .parallax-content {
+    background: rgba(0, 0, 0, 0.5); /* Add a dark overlay for better text visibility */
+    padding: 20px;
+    border-radius: 10px;
+   
+  }
+
+  .parallax-content h1 {
+    font-size: 3rem;
+    color: #fff;
+  }
+  
+  p {
+    font-size: 1.2rem;
+  }
+  
+  .parallax h2 {
+    margin-top: 40px;
+    font-size: 2rem;
+    color: #333;
+  }
+  /* Disable parallax scrolling for tablets and phones with widths below 1024px */
+@media only screen and (max-width: 1024px) {
+    .parallax {
+      background-attachment: scroll;
+    }
+  }
+  
+  /* Optionally, customize for smaller devices below 768px */
+  @media only screen and (max-width: 768px) {
+    .parallax {
+      background-attachment: scroll;
+      background-size: cover; /* Ensure it still looks good */
+    }
+  }
+  @media only screen and (max-width: 1366px) {
+    .parallax {
+      min-height: 1200px; /* Adjust for smaller laptop screens */
+      background-attachment: scroll; /* Disable parallax for performance */
+    }
+  }
+
+  .first button {
+    background: none;
+    border: none;
+    cursor: pointer;
+  }
+  
+ .first button img {
+    width: 80px;
+    height: 80px;
+  }
+  element.style {
+    width: 80px;
+    height: 80px;
+  }
+
+  .login-section {
+    
+    transition: all 0.5s ease-in-out;
+  }
+  
+  .login-section.register {
+   
+    animation: slideInRight 0.5s ease-in-out;
+  }
+  
+  .login-section.forgotPassword {
+   
+    animation: slideInLeft 0.5s ease-in-out;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideInLeft {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }

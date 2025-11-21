@@ -1,0 +1,331 @@
+.dashboard-container-open {
+  padding: 10px;
+  background-color: #ebe7e1;
+  /* height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden; */
+}
+
+.dashboard-header-open {
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.dashboard-header-open h1 {
+  color: #333;
+  font-size: 24px;
+  margin: 0;
+}
+
+.dashboard-grid-open {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); /* Default for larger screens: 3 equal columns */
+  grid-gap: 10px;
+}
+
+.dashboard-card-open {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.dashboard-card-open h2 {
+  color: #333;
+  margin-top: 0;
+}
+
+.dashboard-card-open p {
+  color: #666;
+}
+
+.dashboard-card-open ul {
+  list-style-type: none;
+  padding: 0;
+  text-align: left;
+}
+
+.dashboard-card-open ul li {
+  margin-bottom: 8px;
+}
+/* First card */
+
+.first-card span {
+  font-size: 50px;
+  margin-right: 0;
+}
+
+.first-card h2 {
+  color: #333;
+  margin-bottom: 50px;
+}
+.first-card p {
+  font-size: 30px;
+  color: #666;
+}
+
+/* Circle Container */
+.circle-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto;
+}
+
+.progress-ring {
+  transform: rotate(-90deg);
+}
+
+.progress-ring__background,
+.progress-ring__circle {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.progress-ring__background {
+  stroke: #e6e6e6;
+}
+
+.progress-ring__circle {
+  stroke: #1b8ae6; /* Adjust color as needed */
+  stroke-dasharray: 314; /* Circumference of the circle (2 * π * r) */
+  stroke-dashoffset: 314; /* Fully hidden */
+  transition: stroke-dashoffset 0.5s ease-in-out;
+}
+
+.circle-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Second card */
+
+.second-card .open-section {
+  text-align: start;
+}
+.open-stats {
+  font-size: 14px;
+  line-height: 1.6;
+}
+.open-stats .open-stat {
+  margin-bottom: 16px;
+}
+
+.open-stats .open-stat p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.open-bar {
+  background-color: #ddd;
+  height: 10px;
+  border-radius: 4px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.open-bar-filled {
+  height: 100%;
+  display: block;
+}
+
+/* Third card */
+
+.open-projects {
+  display: flex;
+}
+.open-projects h2 {
+  font-size: 40px;
+}
+.open-projects span {
+  color: #666;
+}
+
+/* Fourth card */
+
+.images-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+}
+
+.images-info {
+  text-align: left;
+  background-color: #f8f9fa;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  width: 150px;
+}
+
+.images-info h3 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.images-info p {
+  font-size: 16px;
+  margin: 5px 0;
+}
+
+/* Media Queries for responsiveness */
+
+/* Extra small devices (phones, 600px and down) */
+@media only screen and (max-width: 600px) {
+  .dashboard-grid-open {
+    grid-template-columns: 1fr; /* Single column layout */
+  }
+
+  .dashboard-header-open h1 {
+    font-size: 20px;
+  }
+
+  .first-card span {
+    font-size: 40px;
+  }
+
+  .first-card p {
+    font-size: 24px;
+  }
+
+  .circle-container {
+    width: 100px;
+    height: 100px;
+  }
+
+  .circle-text {
+    font-size: 20px;
+  }
+
+  .open-projects h2 {
+    font-size: 30px;
+  }
+
+  .images-container {
+    flex-direction: column; /* Stack images info vertically */
+    align-items: center;
+  }
+
+  .images-info {
+    width: 100%; /* Full width for stacked items */
+    margin-bottom: 10px; /* Add some space between stacked cards */
+  }
+}
+
+/* Small devices (portrait tablets and large phones, 601px and up to 767px) */
+@media only screen and (min-width: 601px) and (max-width: 767px) {
+  .dashboard-grid-open {
+    grid-template-columns: 1fr; /* Single column layout for better readability */
+  }
+
+  .dashboard-header-open h1 {
+    font-size: 22px;
+  }
+
+  .first-card span {
+    font-size: 45px;
+  }
+
+  .first-card p {
+    font-size: 26px;
+  }
+
+  .circle-container {
+    width: 110px;
+    height: 110px;
+  }
+
+  .circle-text {
+    font-size: 22px;
+  }
+
+  .open-projects h2 {
+    font-size: 35px;
+  }
+
+  .images-container {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .images-info {
+    width: 80%; /* Slightly less than full width */
+    margin-bottom: 15px;
+  }
+}
+
+/* Medium devices (landscape tablets, 768px and up to 1023px) */
+@media only screen and (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-grid-open {
+    grid-template-columns: repeat(2, 1fr); /* Two equal columns */
+  }
+
+  .dashboard-header-open h1 {
+    font-size: 28px;
+  }
+
+  .first-card span {
+    font-size: 55px;
+  }
+
+  .first-card p {
+    font-size: 32px;
+  }
+
+  .open-projects h2 {
+    font-size: 45px;
+  }
+
+  .images-container {
+    flex-wrap: wrap; /* Allow items to wrap to next line */
+    justify-content: space-around; /* Distribute space evenly */
+  }
+
+  .images-info {
+    width: 45%; /* Two columns for images info */
+    margin-bottom: 20px;
+  }
+}
+
+/* Large devices (laptops/desktops, 1024px and up) */
+@media only screen and (min-width: 1024px) {
+  .dashboard-grid-open {
+    grid-template-columns: repeat(3, 1fr); /* Three equal columns */
+  }
+
+  .dashboard-header-open h1 {
+    font-size: 32px; /* Slightly larger for desktop */
+  }
+
+  .first-card span {
+    font-size: 60px;
+  }
+
+  .first-card p {
+    font-size: 35px;
+  }
+
+  .open-projects h2 {
+    font-size: 50px;
+  }
+
+  .images-container {
+    justify-content: space-between; /* Original spacing */
+    flex-wrap: nowrap; /* No wrapping */
+  }
+
+  .images-info {
+    width: 150px; /* Original width */
+    margin-bottom: 0;
+  }
+}
