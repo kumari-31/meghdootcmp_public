@@ -1,1 +1,0 @@
-import{I as i,J as p}from"./index-2bfsmLg4.js";var r={exports:{}};(function(s,u){(function(a,o){s.exports=o()})(i,function(){return function(a,o,n){o.prototype.isToday=function(){var t="YYYY-MM-DD",e=n();return this.format(t)===e.format(t)}}})})(r);var f=r.exports;const m=p(f);export{m as i};
