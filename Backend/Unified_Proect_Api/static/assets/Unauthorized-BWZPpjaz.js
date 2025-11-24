@@ -1,0 +1,1 @@
+import{j as s}from"./index-2bfsmLg4.js";const o=()=>s.jsxs("div",{children:[s.jsx("h1",{children:"Unauthorized"}),s.jsx("p",{children:"You do not have permission to access this page."})]});export{o as default};

@@ -1,0 +1,1517 @@
+POST http://127.0.0.1:8000/api/signup 
+Content-Type: application/json
+
+{ "username": "rahulvg", "password": "rahul1234!", "email": "rahul@gmail.com" }
+
+###
+
+POST http://127.0.0.1:8000/api/v2/login/
+Content-Type: application/json
+
+{ "username": "cHRlamFzQGNkYWMuaW4=",  "otp": "831846"}
+
+
+### Encoded login (REST Client)
+POST http://127.0.0.1:8000/api/v2/login/
+Content-Type: application/json
+
+{
+  "username": "cHRlamFzQGNkYWMuaW4=",
+  "password": "Um9vdDEyMzQjJA=="
+}
+
+###
+GET http://127.0.0.1:8000/api/volume-types/ 
+Content-Type: application/json
+Cookie: sessionid=MDSID=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzNjMxNzk1LCJpYXQiOjE3NjM2MzA4OTUsImp0aSI6IjRmMzBkYjlhNGI4MTRmODNiYzM3N2FhNWQ2YmFiNzU0IiwidXNlcl9pZCI6MywiZW1haWwiOiJwdGVqYXNAY2RhYy5pbiIsImZpcnN0X25hbWUiOiJNciBUZWphcyBKaXRlbmRyYSBQYXRpbCIsInJvbGUiOiJFTVBMT1lFRSIsImVtcGxveWVlX2lkIjoiMzQ2ODE0In0.udtffvtVq583AArg-muCFHmn0ovLtOjk6mWzaCCn9RE; expires=Thu, 20 Nov 2025 09:43:15 GMT; HttpOnly; Max-Age=900; Path=/; SameSite=Lax,MDAUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2MzYzMjA5NSwiaWF0IjoxNzYzNjMwODk1LCJqdGkiOiIwN2ZjNWViODkxNjk0NTJhYWI4OWVlYmFmZTgwNGY1YiIsInVzZXJfaWQiOjMsImVtYWlsIjoicHRlamFzQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXIgVGVqYXMgSml0ZW5kcmEgUGF0aWwiLCJyb2xlIjoiRU1QTE9ZRUUiLCJlbXBsb3llZV9pZCI6IjM0NjgxNCJ9.opWyx_CYr6aHWLGQfoQN0Io977pkp8Zm084Sod1cFwU; expires=Thu, 20 Nov 2025 09:48:15 GMT; HttpOnly; Max-Age=1200; Path=/; SameSite=Lax,UD=%7B%22username%22%3A%20%22ptejas%40cdac.in%22%2C%20%22email%22%3A%20%22ptejas%40cdac.in%22%2C%20%22role%22%3A%20%22EMPLOYEE%22%2C%20%22employee_id%22%3A%20%22346814%22%7D; expires=Thu, 20 Nov 2025 09:48:15 GMT; Max-Age=1200; Path=/; SameSite=Lax
+
+
+###
+POST http://127.0.0.1:8000/api/create-volume-type/
+Content-Type: application/json
+Cookie: sessionid=MDSID=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzNjMwMzA3LCJpYXQiOjE3NjM2Mjk0MDcsImp0aSI6IjAyN2NhMTRiM2U1YTQ1YjFiNTA2Mzg2YzNjNjA4ZDRhIiwidXNlcl9pZCI6MywiZW1haWwiOiJwdGVqYXNAY2RhYy5pbiIsImZpcnN0X25hbWUiOiJNciBUZWphcyBKaXRlbmRyYSBQYXRpbCIsInJvbGUiOiJFTVBMT1lFRSIsImVtcGxveWVlX2lkIjoiMzQ2ODE0In0.5yrTO0G5M8S8V9rBhVmTfiDcR5WtdkZsZbUpohu-jsk; expires=Thu, 20 Nov 2025 09:18:27 GMT; HttpOnly; Max-Age=900; Path=/; SameSite=Lax,MDAUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2MzYzMDYwNywiaWF0IjoxNzYzNjI5NDA3LCJqdGkiOiJkMjc0NGEyYWM3NTU0ZDExODgxZmI5MDdhMjc0MWVhYyIsInVzZXJfaWQiOjMsImVtYWlsIjoicHRlamFzQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXIgVGVqYXMgSml0ZW5kcmEgUGF0aWwiLCJyb2xlIjoiRU1QTE9ZRUUiLCJlbXBsb3llZV9pZCI6IjM0NjgxNCJ9.ZyklZ4VJnGnI5QhkeF6CSmR7BjRnRjFevO5wLhv5_rI; expires=Thu, 20 Nov 2025 09:23:27 GMT; HttpOnly; Max-Age=1200; Path=/; SameSite=Lax,UD=%7B%22username%22%3A%20%22ptejas%40cdac.in%22%2C%20%22email%22%3A%20%22ptejas%40cdac.in%22%2C%20%22role%22%3A%20%22EMPLOYEE%22%2C%20%22employee_id%22%3A%20%22346814%22%7D; expires=Thu, 20 Nov 2025 09:23:27 GMT; Max-Age=1200; Path=/; SameSite=Lax
+
+{
+  "name": "fast-ssd",
+  "description": "Optimized SSD storage"
+}
+
+###
+PUT http://127.0.0.1:8000/api/update-volume-type/b6fc0b51-cd11-4c24-9b47-c55f16290c60/
+Content-Type: application/json
+Cookie: sessionid=MDSID=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzNjMwMzA3LCJpYXQiOjE3NjM2Mjk0MDcsImp0aSI6IjAyN2NhMTRiM2U1YTQ1YjFiNTA2Mzg2YzNjNjA4ZDRhIiwidXNlcl9pZCI6MywiZW1haWwiOiJwdGVqYXNAY2RhYy5pbiIsImZpcnN0X25hbWUiOiJNciBUZWphcyBKaXRlbmRyYSBQYXRpbCIsInJvbGUiOiJFTVBMT1lFRSIsImVtcGxveWVlX2lkIjoiMzQ2ODE0In0.5yrTO0G5M8S8V9rBhVmTfiDcR5WtdkZsZbUpohu-jsk; expires=Thu, 20 Nov 2025 09:18:27 GMT; HttpOnly; Max-Age=900; Path=/; SameSite=Lax,MDAUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2MzYzMDYwNywiaWF0IjoxNzYzNjI5NDA3LCJqdGkiOiJkMjc0NGEyYWM3NTU0ZDExODgxZmI5MDdhMjc0MWVhYyIsInVzZXJfaWQiOjMsImVtYWlsIjoicHRlamFzQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXIgVGVqYXMgSml0ZW5kcmEgUGF0aWwiLCJyb2xlIjoiRU1QTE9ZRUUiLCJlbXBsb3llZV9pZCI6IjM0NjgxNCJ9.ZyklZ4VJnGnI5QhkeF6CSmR7BjRnRjFevO5wLhv5_rI; expires=Thu, 20 Nov 2025 09:23:27 GMT; HttpOnly; Max-Age=1200; Path=/; SameSite=Lax,UD=%7B%22username%22%3A%20%22ptejas%40cdac.in%22%2C%20%22email%22%3A%20%22ptejas%40cdac.in%22%2C%20%22role%22%3A%20%22EMPLOYEE%22%2C%20%22employee_id%22%3A%20%22346814%22%7D; expires=Thu, 20 Nov 2025 09:23:27 GMT; Max-Age=1200; Path=/; SameSite=Lax
+
+{
+  "name": "fast-ssd-updated2",
+  "description": "Updated SSD description"
+}
+
+###
+DELETE http://127.0.0.1:8000/api/delete-volume-type/b6fc0b51-cd11-4c24-9b47-c55f16290c60/
+Cookie: sessionid=MDSID=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzYzNjIzNTAzLCJpYXQiOjE3NjM2MjI2MDMsImp0aSI6IjZlNTgxMGFjMTI3NTQzNzdhYjNhMzFjMzJhOTAxMmNlIiwidXNlcl9pZCI6MywiZW1haWwiOiJwdGVqYXNAY2RhYy5pbiIsImZpcnN0X25hbWUiOiJNciBUZWphcyBKaXRlbmRyYSBQYXRpbCIsInJvbGUiOiJFTVBMT1lFRSIsImVtcGxveWVlX2lkIjoiMzQ2ODE0In0.GvgWTah4ss0qmOg_aECd84MEpXETkpS_hZDaYVsNjHQ; expires=Thu, 20 Nov 2025 07:25:03 GMT; HttpOnly; Max-Age=900; Path=/; SameSite=Lax,MDAUTH=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2MzYyMzgwMywiaWF0IjoxNzYzNjIyNjAzLCJqdGkiOiJkNWQ4ZDRjZDY1NjA0OTYwOWQ5OGQ3OTY5ZDMwZDVhNyIsInVzZXJfaWQiOjMsImVtYWlsIjoicHRlamFzQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXIgVGVqYXMgSml0ZW5kcmEgUGF0aWwiLCJyb2xlIjoiRU1QTE9ZRUUiLCJlbXBsb3llZV9pZCI6IjM0NjgxNCJ9.81hSzM9C6YfetviuIs_Z6XFSJtI8mraIj3Il535PGeg; expires=Thu, 20 Nov 2025 07:30:03 GMT; HttpOnly; Max-Age=1200; Path=/; SameSite=Lax,UD=%7B%22username%22%3A%20%22ptejas%40cdac.in%22%2C%20%22email%22%3A%20%22ptejas%40cdac.in%22%2C%20%22role%22%3A%20%22EMPLOYEE%22%2C%20%22employee_id%22%3A%20%22346814%22%7D; expires=Thu, 20 Nov 2025 07:30:03 GMT; Max-Age=1200; Path=/; SameSite=Lax
+
+
+### 
+
+POST http://127.0.0.1:8000/api/k8s/deploy/nginx-ha/
+Content-Type: application/json
+Cookie: sessionid=eeyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc2MzAzNDkxNiwiaWF0IjoxNzYzMDMzNzE2LCJqdGkiOiI4NjA0MTRjM2FlMzY0MTI1YTNlN2ZlYmI1ODljOTZjOSIsInVzZXJfaWQiOjMsImVtYWlsIjoicHRlamFzQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXIgVGVqYXMgSml0ZW5kcmEgUGF0aWwiLCJyb2xlIjoiRU1QTE9ZRUUiLCJlbXBsb3llZV9pZCI6IjM0NjgxNCJ9.dMfa6RSncNxbSOlW7o75AjhMK88sHtDmcFuW8hivbaU
+
+{ "namespace": "default","replicas": 2,"deployment_name": "nginx-ha161"}
+
+
+###
+GET http://127.0.0.1:8000/api/test_token 
+Content-Type: application/json 
+Authorization: Token f311c82300987e5775bc1e6ab0de4b1a577a95dd
+
+
+### Test CombinedFormView (POST)
+POST http://127.0.0.1:8000/api/combined-form/
+Content-Type: application/json
+Authorization: Token 75dc9ec16991d941b9e0468730e2c2c20fb79db7
+{
+  "registration": {
+    "full_name": "John Doe",
+    "organization": "Test Org",
+    "designation": "Developer",
+    "email": "johndoe@example.com",
+    "phone_number": "1234567890",
+    "password": "Password123",
+    "confirm_password": "Password123",
+    "vdi_required": true,
+    "image": "image-id-123",
+    "flavor": "flavor-id-456",
+    "login_enable_date": "2024-09-29",
+    "login_disable_date": "2024-12-29",
+    "login_enable_time": "09:00:00",
+    "login_disable_time": "18:00:00",
+    "storage_required": 50,
+    "additional_storage": 20
+  },
+  "vm_info": {
+    "vm_name": "ExampleVM",
+    "vm_id": "vm-12345",
+    "shutoff_status": false,
+    "host_name": "host1",
+    "instance_name": "instance1",
+    "vnc_display": "5901",
+    "username": "user1",
+    "ip": "192.168.0.1",
+    "vm_access_from_date": "2024-09-29",
+    "vm_access_to_date": "2024-12-29",
+    "vm_access_from_time": "09:00:00",
+    "vm_access_to_time": "18:00:00",
+    "requested_by": "admin",
+    "creation_status": "created",
+    "remarks": "VM created successfully",
+    "volume_id": "vol-123",
+    "data_volume_id": "data-vol-456"
+  }
+}
+
+
+### List all registrations
+GET http://127.0.0.1:8000/api/registration/
+Accept: application/json
+Content-Type: application/json
+Authorization: Token {{f5e829bf545d9485ecfa91a9b4e7bbc094e4aa90}
+
+### Create a new registration
+POST http://127.0.0.1:8000/api/registration/
+Accept: application/json
+Content-Type: application/json
+Authorization: Token {{f5e829bf545d9485ecfa91a9b4e7bbc094e4aa90}
+
+{
+  "full_name": "Rahulvg1",
+  "organization": "Tech Corp",
+  "designation": "Developer",
+  "email": "johndoe@example.com",
+  "phone_number": "1234567890",
+  "password": "password123",
+  "confirm_password": "password123",
+  "vdi_required": true,
+  "image": "ubuntu18.04",
+  "flavor": "medium",
+  "login_enable_date": "2024-09-30",
+  "login_disable_date": "2024-12-30",
+  "login_enable_time": "09:00",
+  "login_disable_time": "18:00",
+  "storage_required": false,
+  "additional_storage": ""
+}
+
+# ======================================================================================
+
+
+
+### POST Request - Create Registration
+POST http://127.0.0.1:8002/api/register
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzMzOTMzMDA1LCJpYXQiOjE3MzM5Mjk0MDUsImp0aSI6ImRiODQ4OTkxNmQ3OTRmOTI4ZjQ3N2JjZDc4MDY2Mzk1IiwidXNlcl9pZCI6MSwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIn0.EEY-nfuWSJU5u5cG-hCqYTFZZrV-tUre8iI2VMTL2yQ
+
+{
+    "full_name": "Dhaneesh D V",
+    "organization": "CDAC",
+    "designation": "Developer",
+    "email": "dhaneeshddd@gmail.com",
+    "phone_number": "7907716271",
+    "password": "password123",
+    "confirm_password": "password123",
+    "vdi_required": true,
+    "image": "cirros",
+    "flavor": "cirros",
+    "login_enable_date": "2024-10-03",
+    "login_disable_date": "2024-10-10",
+    "login_enable_time": "09:00:00",
+    "login_disable_time": "18:00:00",
+    "storage_required": false,
+    "additional_storage": 0
+}
+
+### GET Request - List Registrations (With Pagination)
+GET http://127.0.0.1:8002/api/register
+Content-Type: application/json
+
+### GET Request - List Registrations (With Pagination)
+GET http://127.0.0.1:8002/api/register?page3&page_size=3
+Content-Type: application/json
+
+### Update metadata for a specific flavor
+PUT http://127.0.0.1:8002/flavors/metadata/75716e4b-dd0a-49a9-bf8c-156901083478/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MzM3OTIzLCJpYXQiOjE3MzkzMzQzMjMsImp0aSI6ImQ1NThlMWMzNzQ4ZTQ3NTZhZGZjZGI0ZDUxYzhiMWU4IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.eXM4YGGC6Wn98zkp7N0GCBsbEqWSyh1tJCViFCyFjPE
+Content-Type: application/json
+
+{
+    "metadata": {
+        
+        "hw:tpm_model": "TIS"
+    }
+}
+
+       
+
+### GET Flavors List
+GET http://127.0.0.1:8002/api/flavors
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MjcwOTkxLCJpYXQiOjE3MzkyNjczOTEsImp0aSI6ImRkMGZlMzY2YjM0ZDRiNDg4OTYyMzMxMTI1MjZmODY4IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.izgIy1durEgIR_8yMrsUXbxoXiZ7BtTOVkhBSZyyazk
+
+
+
+### GET Flavors List with Query param
+GET http://127.0.0.1:8002/api/flavors/?name=ACTS
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MjU1Mjc0LCJpYXQiOjE3MzkyNTE2NzQsImp0aSI6IjRmZGVhNzI1MThjODRjMGY4ZTdjYTZiYzE3OWJjMWM1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.pvUzu39eFXdGlb1jKbJq6wIDmgMBFWCPBG27G0IFTOE
+
+
+
+### Create a Flavor
+POST http://127.0.0.1:8002/api/flavors/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM0NTExOTQ4LCJpYXQiOjE3MzQ1MDgzNDgsImp0aSI6ImU0NTYxZmY4MzQxYjRlNjE5MzE2OTM3YTcyOWMzMDJlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.r-s6-bd4XpCL3v8NaT62B3P8tyoRTdFBELC958EgXVQ
+
+
+{
+    "name": "Testing",
+    "vcpus": 1,
+    "ram": 2048,
+    "disk": 10
+}
+
+
+### Delete flavor
+
+DELETE http://127.0.0.1:8002/api/flavors/delete/
+Content-Type: application/json
+
+{
+    "flavor_id": "0df5c0b1-c4de-4542-bde5-9b06585354e3"
+}
+
+
+### GET image List
+GET http://127.0.0.1:8002/api/images/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM0Mzc0MzE1LCJpYXQiOjE3MzQzNzA3MTUsImp0aSI6ImQ1NWFkZjVmYzk1ZjQyZWNiM2RmYjYwYTc4Nzg0ZmNlIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIn0.upU7NX_7AJ9A14-z9fmNbw_HgrBiUyjv7Z5GzYHOD-8
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM0MDg4ODIxLCJpYXQiOjE3MzQwODUyMjEsImp0aSI6ImY4ZWZlYzZiNGFmZjQ5ODNiZTBiNjRkYTk0MjI5NmZlIiwidXNlcl9pZCI6NCwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIn0.5GIV3VuybVvqy4GZZg_emAWuMXZSHe5YHdvu39awEPE
+
+### GET Image with query param
+GET http://127.0.0.1:8002/api/images/?name=cirros
+Content-Type: application/json
+
+### Delete Image with query param
+DELETE http://127.0.0.1:8002/api/image/delete/097e0e50-2136-47c8-959b-52b2fb64fe9f/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1NTM0Nzk0LCJpYXQiOjE3MzU1MzExOTQsImp0aSI6IjllNzEwOWE3MzY1NzQ3ODg5MzlhMDFiYjEyNzJhYmFjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.8HJziDI2OEJuQvL_w9zvizirWn9_bDDS8X88WopvmWg
+
+
+
+
+###GET request to fetch the combined data from the API
+GET http://127.0.0.1:8002/api/combined-data/
+Content-Type: application/json
+
+
+
+
+###
+# GET request to fetch the combined data from the API
+
+GET http://127.0.0.1:8002/api/overview/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTYzODI1LCJpYXQiOjE3Mzc5NjAyMjUsImp0aSI6ImFmNjI2ODU4ZGI0NjQwNThiNzdjMjYxZDEyYWJkY2I0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.uVvTNv28y547QYaWvno6ECquciz50dzFnCLHaaxo8eM
+
+
+###
+# GET request to fetch the combined data from the API
+
+GET http://127.0.0.1:8002/api/overview1/?project_name=Ashoka
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MzU1Mjc3LCJpYXQiOjE3MzkzNTE2NzcsImp0aSI6ImNkYTk1MjFmYTc0MzQxNWU5NDJkMDdkYzRjYjIyODk5IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.2DN5EbQyRPcdJd8V09p9MIpOCICWelnumMFJdjJU-W4
+
+###Login API for Admin
+POST http://127.0.0.1:8002/api/v2/login/
+Content-Type: application/json
+
+# "username": "rakshana@cdac.in",
+{
+   "username": "admin",
+    "password": "Root1234#$"
+}
+
+
+###Login API for Employee
+POST http://127.0.0.1:8002/api/v2/login/
+Content-Type: application/json
+
+# "username": "rakshana@cdac.in",
+{
+   "username": "rakshana@cdac.in",
+    "password": "Root1234#$"
+}
+###Login API for Employee
+POST http://127.0.0.1:8002/api/v2/login/
+Content-Type: application/json
+
+# "username": "rakshana@cdac.in",
+{
+   "username": "ptejas@cdac.in",
+    "password": "cdac"
+}
+###Login API for FLA
+POST http://127.0.0.1:8002/api/v2/login/
+Content-Type: application/json
+
+{
+   "username": "prabhav@cdac.in",
+    "password": "Root1234#$"
+}
+###Login API for FLA
+POST http://127.0.0.1:8002/api/v2/login/
+Content-Type: application/json
+
+{
+   "username": "senthilb@cdac.in",
+    "password": "Root1234#$"
+}
+
+### refresh token
+POST  http://127.0.0.1:8002/api/token/refresh/
+Content-Type: application/json
+
+{
+    "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTczNDExMTgyMCwiaWF0IjoxNzM0MDI1NDIwLCJqdGkiOiIyNjJjOGY2YzYxZDM0ODJhYTNiMTYxY2RiZGJiMzA3NSIsInVzZXJfaWQiOjgsImVtYWlsIjoic2FuamFuYXBwQGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgU2FuamFuYSBQIFAifQ.r3nvLFTstz2TxAdiep3TNh7zAXQeL9lEWKKKM9yGiys"
+}
+
+### Get Employee Details API
+GET http://127.0.0.1:8002/api/employee-details/?employee_id=348063
+Content-Type: application/json
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM0MzI4MzUwLCJpYXQiOjE3MzQzMjQ3NTAsImp0aSI6IjIzNjlhOTk0YTBjYjRmNjE4ZGVjMzZmZWMxZDJlY2NkIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIn0.4dekLZIvAI982oe-fw7GhOPdaoBVAyNbMepaXXDcPZg
+
+
+### Create Employee
+POST http://127.0.0.1:8002/api/employees/
+Content-Type: application/json
+
+{
+    "name": "Ms Bhavana",
+    "employee_id": "348436",
+    "email": "bhavnas@cdac.in",
+    "group": "FOSS",
+    "fla_name": "Ms V A Prabha",
+    "fla_email": "prabhav@cdac.in",
+    "fla_employee_id": "101897"
+    
+}
+
+### Update employee on register
+# POST http://127.0.0.1:8002/employee/register/346838/
+POST http://127.0.0.1:8002/employee/register/102235/
+Content-Type: application/json
+
+{
+    "phone_number": "7907716228",
+    "password": "Root1234#$",
+    "confirm_password": "Root1234#$"
+}
+
+
+
+### List All Roles in OpenStack
+GET http://127.0.0.1:8002/api/roles/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjc5OTg1LCJpYXQiOjE3NDIyNzYzODUsImp0aSI6IjU5YTMzMDBkOWU0YTRiZjM4M2RmNjliZjM3ZGNhN2EzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.d63pPIq8AskQ7EYaZ1R0JCxdpCTE_BBkA2YD0UV-dvs
+Accept: application/json
+
+
+### Delete a Role in OpenStack
+DELETE http://127.0.0.1:8002/api/roles/e8cf9ef4f3f54098b9a1151e34a43db1/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjc5OTg1LCJpYXQiOjE3NDIyNzYzODUsImp0aSI6IjU5YTMzMDBkOWU0YTRiZjM4M2RmNjliZjM3ZGNhN2EzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.d63pPIq8AskQ7EYaZ1R0JCxdpCTE_BBkA2YD0UV-dvs
+Accept: application/json
+
+
+### Create a Role in OpenStack
+POST http://127.0.0.1:8002/api/create-roles/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjczOTQzLCJpYXQiOjE3NDIyNzAzNDMsImp0aSI6ImZkYjk0YjNhN2UyOTRjYjZhZjNkOWQ4OGYzZmRhOWI3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.iZZg8DkaiPX-4bPBxS49d-0OIoMUq05-00Sa8mPlZDo
+Content-Type: application/json
+
+{
+    "name": "rakshanav"
+}
+
+### Edit an Existing Role
+PUT http://127.0.0.1:8002/api/edit-roles/e8cf9ef4f3f54098b9a1151e34a43db1/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjc5OTg1LCJpYXQiOjE3NDIyNzYzODUsImp0aSI6IjU5YTMzMDBkOWU0YTRiZjM4M2RmNjliZjM3ZGNhN2EzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.d63pPIq8AskQ7EYaZ1R0JCxdpCTE_BBkA2YD0UV-dvs
+
+{
+    "name": "rakshanav"
+}
+
+
+### Check if VM name already exists
+GET http://127.0.0.1:8002/api/check-vm-name/?vm_name=raksh-Vm1
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzNTcxNTc3LCJpYXQiOjE3NDM1Njc5NzcsImp0aSI6IjBhZTVlMTE4ZjY2MTRmOTVhMGVhYTI0MjAzMjUzNzJjIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.vhF0LJlL5JNPUpHN3ukrV8PN9ZW8h_uGiyBBvPmcsM4
+
+
+### Get VM Details by Instance ID
+GET http://127.0.0.1:8002/api/vm/141664d7-3dc3-4b1d-98ae-5a965d037923/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMzAwNDM3LCJpYXQiOjE3NDIyOTY4MzcsImp0aSI6ImYyMjBkMTlmNGQyMzRjODQ5NmEzNzliMTJhYmNlMjQ2IiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.uiZH2FK9vHdkXflYg5D4sJ6pYY5xxFiDHOjqAaIo1g8
+Content-Type: application/json
+
+
+### Get Instance Details
+GET http://127.0.0.1:8002/api/instances/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjEyMTQ5LCJpYXQiOjE3NDIyMDg1NDksImp0aSI6ImJkMWYzMjg4MTQ1NzRjZmViNWNiYzNmZWJjZmMyOWZlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.YOk0KbmLzckpKupeOeXaKuKSctK5V5qdOBds6O9wt9Y
+
+### Get Instance Details
+GET http://127.0.0.1:8002/api/instances-details/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MzYzMDU5LCJpYXQiOjE3MzkzNTk0NTksImp0aSI6ImEyZWZkN2M4MTYzMDQ4ZWI4YzBkYjFiODgyODA4NjVmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.4CisPXqwMhkY5DbOtP-K592vCRHs8u6180wSezAMat8
+
+
+### Perform vm action
+POST http://127.0.0.1:8002/api/vm_action/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTYzODI1LCJpYXQiOjE3Mzc5NjAyMjUsImp0aSI6ImFmNjI2ODU4ZGI0NjQwNThiNzdjMjYxZDEyYWJkY2I0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.uVvTNv28y547QYaWvno6ECquciz50dzFnCLHaaxo8eM
+
+{
+    "instance_id": "ad0abc72-ae07-48cb-85d2-923fb87c5e86",
+    "action": "pause"
+}
+
+
+### Suspend Instance
+POST http://127.0.0.1:8000/api/vm_action/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTYzODI1LCJpYXQiOjE3Mzc5NjAyMjUsImp0aSI6ImFmNjI2ODU4ZGI0NjQwNThiNzdjMjYxZDEyYWJkY2I0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.uVvTNv28y547QYaWvno6ECquciz50dzFnCLHaaxo8eM
+
+{
+    "instance_id": "your-instance-id",
+    "action": "suspend"
+}
+
+### Soft Reboot Instance
+POST http://127.0.0.1:8000/api/vm_action/
+Content-Type: application/json
+
+{
+    "instance_id": "your-instance-id",
+    "action": "soft_reboot"
+}
+
+### Hard Reboot Instance
+POST http://127.0.0.1:8000/api/vm_action/
+Content-Type: application/json
+
+{
+    "instance_id": "your-instance-id",
+    "action": "hard_reboot"
+}
+
+### Shutoff Instance
+POST http://127.0.0.1:8002/api/vm_action/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTYzODI1LCJpYXQiOjE3Mzc5NjAyMjUsImp0aSI6ImFmNjI2ODU4ZGI0NjQwNThiNzdjMjYxZDEyYWJkY2I0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.uVvTNv28y547QYaWvno6ECquciz50dzFnCLHaaxo8eM
+
+{
+    "instance_ids": ["1f0ecaa8-c620-4e88-9107-8e6ec4a0adde"],
+    "action": "shutoff"
+}
+
+### Delete Instance
+POST http://127.0.0.1:8002/api/vm_action/
+Content-Type: application/json
+
+{
+    "instance_ids": "d0d99b11-7c61-4500-9386-30e1a2b662b9",
+    "action": "delete"
+}
+
+
+### Shutoff Multiple Instances
+POST http://127.0.0.1:8002/api/vm_action/
+Content-Type: application/json
+
+{
+    "instance_ids": ["31a0f70a-ba0d-4935-8ae6-730cd1f6a070", "0dacf8f8-cf74-4ba5-9f02-dafd2d27b303"],
+    "action": "shutoff"
+}
+
+### Start Multiple Instances
+POST http://127.0.0.1:8002/api/vm_action/
+Content-Type: application/json
+
+{
+    "instance_ids": ["31a0f70a-ba0d-4935-8ae6-730cd1f6a070", "0dacf8f8-cf74-4ba5-9f02-dafd2d27b303"],
+    "action": "start"
+}
+
+
+
+### Create a New User
+POST http://127.0.0.1:8002/api/users/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MTgzMTc0LCJpYXQiOjE3MzkxNzk1NzQsImp0aSI6Ijk3ZTRmOWEzZjdkYjRhNDNhZjJkNzcyZmFmNWFmNDc3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.3BTNPjT4bEcYtJ117t44k7CEflMtvv7Oq3UNSfZz-ns
+
+{
+    "username": "rakshanavgr",
+    "password": "rakshana",
+    "email": "newuser@example.com",
+    "project_id": "08cb7c55ec3a442196a3efb343b94fdb",
+    "role": "member"
+}
+
+### 1️⃣ List all users
+GET http://127.0.0.1:8002/api/users/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQwNTU2ODk4LCJpYXQiOjE3NDA1NTMyOTgsImp0aSI6IjQ2MWU1MDBjNzkyZDQ2NmJiMTI2YmNlNjA2OWI0YjkwIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.wpt2a9XBPa8kXqggFRHJdMyFL_9BoiHz9zmRw0RvvZo
+
+
+### 2️⃣ Delete a user
+DELETE http://127.0.0.1:8002/api/delete-users/2dc6cc4f3900431a929a85f0158ca48a/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MTgzMTc0LCJpYXQiOjE3MzkxNzk1NzQsImp0aSI6Ijk3ZTRmOWEzZjdkYjRhNDNhZjJkNzcyZmFmNWFmNDc3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.3BTNPjT4bEcYtJ117t44k7CEflMtvv7Oq3UNSfZz-ns
+
+
+### 3️⃣ Update a user
+PATCH http://127.0.0.1:8002/api/update-users/2dc6cc4f3900431a929a85f0158ca48a/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5MTgzMTc0LCJpYXQiOjE3MzkxNzk1NzQsImp0aSI6Ijk3ZTRmOWEzZjdkYjRhNDNhZjJkNzcyZmFmNWFmNDc3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.3BTNPjT4bEcYtJ117t44k7CEflMtvv7Oq3UNSfZz-ns
+
+{
+    "name": "Rakshana",
+    "email": "new_email@example.com",
+    "enabled": true
+}
+
+### Create a new network
+POST http://127.0.0.1:8002/api/networks/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1ODkzMDYwLCJpYXQiOjE3MzU4ODk0NjAsImp0aSI6IjgwMDQ0MjdhZjE2YzRmMzBhZWRlOTZhMzVlODA1MDFmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.35TlnML66UiJOV1R-d8O8Dpr_uiOB_2QmSohvzcAMlY
+
+{
+    "name": "test-network january",
+    "subnet_name": "jansubnet",
+    "network_address": "192.168.1.0/24",
+    "gateway_ip": "192.168.1.1"
+}
+### New API to Create a new network 
+POST http://127.0.0.1:8002/api/networks/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjkyMjgzLCJpYXQiOjE3NDIyODg2ODMsImp0aSI6IjMzYmE5Yzc5NTZjZTQzYTE5ZDk3MTNhMjA5MmEwODFmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.drZF6QEFUQQHQEdLDCkez1aMR2k-KJZWWPUtDdtVeQs
+
+{
+    "name": "TestNetwor2",
+    "project_id": "4e4b5450f3514da4af3c282d510d9f71",
+    "admin_state_up": true,
+    "shared": true,
+    "external": true,
+    "create_subnet": false
+}
+
+### Create a New Network
+POST http://127.0.0.1:8002/api/networks/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ5MDQwNzI5LCJpYXQiOjE3NDkwMzcxMjksImp0aSI6IjVkMTY0YTQwMGYxODQzYTM5NGI2YzdjZDJmYWZmMDJhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.8nkhNPdlufaTLMokFcR5y7s_Q_rXxoUchOVfMMnp76A
+
+{
+    "name": "my-local-network",           
+    "create_subnet": true,                
+    "subnet_name": "my-subnet",           
+    "network_address": "192.168.1.0/24",  
+    "gateway_ip": "192.168.1.1",         
+    "disable_gateway": false,             
+    "ip_version": 4,                     
+    "enable_dhcp": true,                 
+    "shared": false,                     
+    "external": false,                  
+    "admin_state_up": true              
+}
+
+# {
+#     "name": "TestNetwork4",
+#     "project_id": "4e4b5450f3514da4af3c282d510d9f71",
+#     "provider_network_type": "vlan",
+#     "physical_network": "physnet1",
+#     "segmentation_id": 49,
+#     "admin_state_up": true,
+#     "shared": false,
+#     "external": false,
+#     "create_subnet": false
+# }
+    
+    
+    
+#     "provider_network_type": "vxlan",
+#     "segmentation_id": 49,
+#     "admin_state_up": true,
+#     "shared": false,
+#     "external": false,
+#     "create_subnet": true,
+#     "subnet_name": "TestSubnet",
+#     "network_address": "192.168.10.0/24",
+#     "gateway_ip": "192.168.10.1",
+#     "disable_gateway": false,
+#     "ip_version": 4,
+#     "enable_dhcp": true
+# }
+
+
+### Create a new volume type
+POST http://127.0.0.1:8002/api/create-volume-type/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMDQ4NDk4LCJpYXQiOjE3NDMwNDQ4OTgsImp0aSI6IjRjMmFkNmM0NDQ4NjQ1MjdhNWQ5OTE1NDk2ZGY0ZmNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.U3K02QS5Ja5WFgtRUA8eM-5epyuLQ81T7ubQNQHX1jw
+Content-Type: application/json
+
+{
+    "name": "fast-volume",
+    "description": "High-performance SSD storage"
+}
+
+
+### Delete an existing volume type
+DELETE http://127.0.0.1:8002/api/delete-volume-type/fast-volume/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMDQ4NDk4LCJpYXQiOjE3NDMwNDQ4OTgsImp0aSI6IjRjMmFkNmM0NDQ4NjQ1MjdhNWQ5OTE1NDk2ZGY0ZmNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.U3K02QS5Ja5WFgtRUA8eM-5epyuLQ81T7ubQNQHX1jw
+
+# i have fields like name, choose project name,Provider network type like local in case if the type is flat then one field physical Network have to given or type is VXLAN then one field segmentation ID have to be given or type is VLAN then one field physical Network and Segmentation both have to given ,
+# enable admin status is checkbox  checked by default,shared checkbox,external network checkbox,create subnet by defaultly checked
+# subnet_name, network_address, gateway_ip,ip version,disable gateway checkbox
+# enable dhcp checked by default
+
+### Update network
+PUT http://127.0.0.1:8002/api/networks/edit/dbfa5174-39fc-4a50-98d6-06d997865d48/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM2NDA0NjY1LCJpYXQiOjE3MzY0MDEwNjUsImp0aSI6IjA3NWE3MTZlNmNiZjRkMjc5MThhY2JlNjE4YjA1NGUyIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.y-NCBXmwZyjbbO7UhE06174q12C7QARsH9mt0xcHe-0
+
+{
+  "network_name": "panimalar1",
+  "is_shared": false,
+  "subnet_name": "NewSubnet123",
+  "gateway_ip": "10.100.1.1",
+  "cidr": "10.100.1.0/24"
+}
+
+### Get details of a specific network by name else list all without query param ?name=
+GET http://127.0.0.1:8002/api/networks/
+# ?name=NetworkName100
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjkyMjgzLCJpYXQiOjE3NDIyODg2ODMsImp0aSI6IjMzYmE5Yzc5NTZjZTQzYTE5ZDk3MTNhMjA5MmEwODFmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.drZF6QEFUQQHQEdLDCkez1aMR2k-KJZWWPUtDdtVeQs
+
+### Delete a network by ID
+DELETE http://127.0.0.1:8002/api/networks/delete/0d467afd-693a-4b2d-a089-7cce6ddbdd67/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMjkxNjgxLCJpYXQiOjE3NDIyODgwODEsImp0aSI6ImYzZmMzZWEzYzJiOTQzYjM5MmRkNGI2OTI1MjU0OGVlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.rEbxP0qNzQ1DVnAnMAN6w-TYeXgaRVwlD2JsjG3xZp8
+
+### List volumes
+GET http://127.0.0.1:8002/api/volumes/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDI2MTEyLCJpYXQiOjE3NDQwMjI1MTIsImp0aSI6IjIxNGNmMjNjMjVlNzQyNDZhM2FlYjc2NzFlNDk5M2MzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.fyLsWmdmIn9-myArxhak2uRa4vrMKW3azvfJVcVM9kY
+
+
+### DELETE Volume by ID
+DELETE http://localhost:8002/api/delete-volume/a3500238-5062-4c6e-b154-ff2439144e66/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDI2MTEyLCJpYXQiOjE3NDQwMjI1MTIsImp0aSI6IjIxNGNmMjNjMjVlNzQyNDZhM2FlYjc2NzFlNDk5M2MzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.fyLsWmdmIn9-myArxhak2uRa4vrMKW3azvfJVcVM9kY
+Content-Type: application/json
+
+### Update volume status
+POST http://127.0.0.1:8002/api/update-volume-status/a3500238-5062-4c6e-b154-ff2439144e66/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDIxODgyLCJpYXQiOjE3NDQwMTgyODIsImp0aSI6ImZhZjk1NDllYjg2ZTQ5YWZiYzQwNTMyODMzN2Y2ZTU5IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.PEsmNO1s6KUaUSCNnrzQxzVeBI1BNo6YdExoSUHcnzA
+Content-Type: application/json
+
+{
+  "status": "error"
+}
+
+###
+
+### Get specific volume by name
+GET http://127.0.0.1:8002/api/volumes/?name=347997_raksh-Vm2_volume
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDI2MTEyLCJpYXQiOjE3NDQwMjI1MTIsImp0aSI6IjIxNGNmMjNjMjVlNzQyNDZhM2FlYjc2NzFlNDk5M2MzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.fyLsWmdmIn9-myArxhak2uRa4vrMKW3azvfJVcVM9kY
+Content-Type: application/json
+
+### Get Node wise VM List
+GET http://127.0.0.1:8002/api/list-nodes-vms/
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzNTgyODU1LCJpYXQiOjE3NDM1NzkyNTUsImp0aSI6IjEyMzZlYjQ2NTE3NTQyZTU5MTA5NmM1M2IwOWZiMzU0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.6QBllEBiRsDXDmxfVeJIjZac2QNk3jSRxt_k4mCh0F4
+
+
+
+
+### Get VM Requests by Employee ID
+GET http://127.0.0.1:8002/api/vmrequests/346814/
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzNTgyODU1LCJpYXQiOjE3NDM1NzkyNTUsImp0aSI6IjEyMzZlYjQ2NTE3NTQyZTU5MTA5NmM1M2IwOWZiMzU0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.6QBllEBiRsDXDmxfVeJIjZac2QNk3jSRxt_k4mCh0F4
+
+# GET http://127.0.0.1:8002/api/vmrequests/?size=50&page=1
+
+### Fetch all VM requests approved by fla
+GET http://127.0.0.1:8002/api/vmrequests/?approved_by_fla=true&size=50&page=1
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM4NjY1NTA4LCJpYXQiOjE3Mzg2NjE5MDgsImp0aSI6IjQ4YTI2MmY1ZTQ4ZTQ1ZTU4ZGJmNTk3ZWFiZDE0NmVhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.1__OiUlKp0SXjliczxaCYujM8a12xQkDIjmDRU97RWY
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTczNzg0LCJpYXQiOjE3Mzc5NzAxODQsImp0aSI6IjRmODJkNThmMmIxZDQ4YjFiMjg1ODFjMmYxMDYzZWIxIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.qk2p7wd98G-512OR8Evko3wLYfEGcyuTP7-eTAXDKQI
+# Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTc1MzU0LCJpYXQiOjE3Mzc5NzE3NTQsImp0aSI6ImY0ODQ5ODMyNmVjMjQyMTRhNDg5ZGFmMWY3Zjk0ODFkIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.TptjDaNHIRSTz33GUIW1RrPb8Lx9tvuhTVJ-ltuzbWE
+
+### get fla vms
+GET http://127.0.0.1:8002/api/vmrequests/fla
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MzU4OTM1LCJpYXQiOjE3NDQzNTUzMzUsImp0aSI6IjMxNmI2M2RmNmQ1YjRmOWE4Yzk3YmI2YWRjOTI1MDQxIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.zhSXmjT5JDFgGyhTORPCnQuWZ88LJ5ueRLU3m8dsBxQ
+# Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NjExODI1LCJpYXQiOjE3Mzc2MDgyMjUsImp0aSI6ImE2MTFhMWJkNTIxNDQwMzY4YmU4NTU0NGQwMWJlYzQ1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.At_JO3UwH0g2rgxAA2eVyRUTFa186UsYM6wrU3EbCuw
+### get fla vms
+
+
+GET http://127.0.0.1:8002/api/vmrequests/admin
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MzU5MDk2LCJpYXQiOjE3NDQzNTU0OTYsImp0aSI6ImI4ODJkYmFjNjg5MTRjYjg4YjA4ODkwYTUzNTRjMzQwIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.gEE6I2T5C3970UbhNSo0mK9NKHMCgRfMyocoFKu8oyw
+# Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NjExODI1LCJpYXQiOjE3Mzc2MDgyMjUsImp0aSI6ImE2MTFhMWJkNTIxNDQwMzY4YmU4NTU0NGQwMWJlYzQ1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.At_JO3UwH0g2rgxAA2eVyRUTFa186UsYM6wrU3EbCuw
+
+
+### get employee vm request
+GET http://127.0.0.1:8002/api/vmrequests/employee
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5NDQ1NjM3LCJpYXQiOjE3Mzk0NDIwMzcsImp0aSI6IjU3ZWFhYTVhMTliMDQyMjg4YmZjNWEzNzYzYTdkNTJiIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.FszyOdUAw1aheul2m0dJIYR0grkT6sShFn-eEPvwx_U
+
+
+### Add a new VM request
+POST http://127.0.0.1:8002/api/vmrequests/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NDY2OTEyLCJpYXQiOjE3NTQ0NjMzMTIsImp0aSI6ImU0M2M1MGQzNjE0ODRlOTU4OTU2NjU2NjkxOTU0Yzk0IiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.M-UeDB-kHNGICrZuq7gBLNuqfFCe2nWsxn780HPlD30
+
+{
+    "employee_id": "101897",
+    "name": "Ms V A Prabha",
+    "email": "prabhav@cdac.in",
+    "count_of_vms": 1,
+    "vm_name": "trya",
+    "purpose": "Development",
+    "purpose_of_request": "Requesting a VM for testing new software",
+    "designation": "Developer",
+    "project_name": "cloud",
+    "vdi_required": true,
+    "image": "cirros-test",
+    "flavor": "small",
+    "login_enable_date": "2025-01-23",
+    "login_disable_date": "2025-04-20",
+    "login_enable_time": "09:00",
+    "login_disable_time": "18:00",
+    "storage_required": false,
+    "additional_storage": "0"
+}
+
+# {
+#     "employee_id": "347997",
+#     "name": "Rakshana",
+#     "email": "rakshana@cdac.in",
+#     "count_of_vms": 2,
+#     "vm_name": "raksh-Vm4",
+#     "purpose": "Development",
+#     "purpose_of_request": "Requesting a VM for testing new software",
+#     "designation": "Developer",
+#     "project_name": "cloud",
+#     "vdi_required": true,
+#     "image": "cirros-test",
+#     "flavor": "small",
+#     "login_enable_date": "2025-01-23",
+#     "login_disable_date": "2025-02-23",
+#     "login_enable_time": "09:00",
+#     "login_disable_time": "18:00",
+#     "storage_required": false,
+#     "additional_storage": "0"
+
+# }
+
+
+### Update VM Request (Allowed if FLA status is Pending)
+PUT http://127.0.0.1:8002/api/vmrequests/update/62/
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM5NDQ0MzE0LCJpYXQiOjE3Mzk0NDA3MTQsImp0aSI6IjJhYjVjZDVmYmEzNzQ0NTg4ZjU0ZTQxZjgxOWU0MTE0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.njQE2Geouxwkk_w9i8-O_XbFtNMWYmkNiQ-ZkWO14zw
+Content-Type: application/json
+
+{
+     "employee_id": "347997",
+    "name": "Rakshana",
+    "email": "rakshana.cdac@gmail.com",
+    "vm_name": "test-vm-rakshana-5",
+    "purpose": "Development",
+    "purpose_of_request": "Requesting a VM for testing new software",
+    "designation": "Developer",
+    "project_name": "cloud",
+    "vdi_required": true,
+    "image": "Ubuntu-22.04",
+    "flavor": "small",
+    "login_enable_date": "2025-01-23",
+    "login_disable_date": "2025-02-23",
+    "login_enable_time": "09:00",
+    "login_disable_time": "18:00",
+    "storage_required": false,
+    "additional_storage": "0"
+}
+
+
+
+### Update status
+POST http://127.0.0.1:8002/api/vmrequest/status
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NDY3MDA3LCJpYXQiOjE3NTQ0NjM0MDcsImp0aSI6IjY3ZDAwYmE3ZTYzYzQ5NzM5MmY3ZjA0YmU0MGE2ZThjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.V1DFPZ1bQ_mfTAy0LAuT3dg2FXGDtDRGAi2AE1-xgyE
+# Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NDU1NzU4LCJpYXQiOjE3NTQ0NTIxNTgsImp0aSI6IjRhMTg0OWM2NTAzYTQwMDBiNjNhNjg5NWZhNjU5MWViIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.8qhta_xVjEdI665-CCQNL2niPGRX4vcgOeSdCQXsHVs
+
+{
+    "vm_request_id": 145,
+    "status": "Accepted"
+}
+
+
+### List All Approved VMs of current user
+GET http://127.0.0.1:8002/api/vmrequests/approved-vms/user
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMDUzODI5LCJpYXQiOjE3NDMwNTAyMjksImp0aSI6IjM5ODk3NDA2NTdiZDRmYjRhN2QyMDJlNGQ0ZTljMDVjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.8kYcqmj28dEmGmHUFhZF4s43vuD6Nqaq95fa-Kp0j3w
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMTkwNzUyLCJpYXQiOjE3NDIxODcxNTIsImp0aSI6ImQ0YThiOTE5Mzk5YTQxOGI5M2Q5Mzg2ZmM2OWNhMjYyIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.0-55XU-h7FwhxGJ4I-1R2Lol-IsBpbOiDMX_sF_gfcI
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMTk0NDAwLCJpYXQiOjE3NDIxOTA4MDAsImp0aSI6ImQ5YTA5NzgzNTVkOTQyYzhiN2M3YmQ0NWY4MzE2MTM3IiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.bQIavJZVcq7H9-qTzoL5wjWhCxvXhwQcEOErpl7WEMY
+
+
+
+#### admin password Root1234#$
+#### fla praba user created
+qjects
+GET http://127.0.0.1:8002/api/cdacprojects/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM4ODI3NTIzLCJpYXQiOjE3Mzg4MjM5MjMsImp0aSI6Ijk2MTA5NmY3ZDQ5NzRlNmU5YTI1ZDdlMDJmMjE1ZjNjIiwidXNlcl9pZCI6NywiZW1haWwiOiJzZW50aGlsYkBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1yIEIgU2VudGhpbCBLdW1hciIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMjIzNSJ9.Auf9q8D0OF8qm1FBBtPaIdGFA2cA9yDEJzOk_5ia_UE
+
+### Create a New Project
+POST http://127.0.0.1:8002/api/projects/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTgwNzYwLCJpYXQiOjE3Mzc5NzcxNjAsImp0aSI6IjdlZGY3OGY1YzNmZjRiYTBhZDczYzMyNzJkZTk0MjRmIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.KCOBT_CoZCSf5xCvllFMBeFxeT6QzHpuV52OlYeCy4I
+
+
+{
+    "project_name": "project_rakshana",
+    "description": "This is a new project",
+    "enabled": true
+}
+
+### Update Project API
+PUT http://127.0.0.1:8002/api/update-project/f9c4001193884e04be6d0023c645df94/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTc3NDk2LCJpYXQiOjE3Mzc5NzM4OTYsImp0aSI6ImMyMGQyOTg1Y2Y0MjRkZTRiYjkxZmViYzM3MWRjNWQxIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.lC8AvRZSklxee1_vCkrH25_QQlCsy14-SUO2qPYLbJw
+
+{
+  "name": "Updated Rakshana1",
+  "description": "This is an updated description for the project.",
+  "enabled": true
+}
+
+
+### Delete Project API
+DELETE http://127.0.0.1:8002/api/delete-project/dd9b351232b04e89a397622205bcbdc3/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3OTgwOTc5LCJpYXQiOjE3Mzc5NzczNzksImp0aSI6ImIxZTdkMDdhZGM1YzQyNDZhNjI5ZmUyYWRhYmE5OTRmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.OeQoU0x_Dt5Ngw3mFs_y2Bobg7dPX0gRShN1NjMd0cw
+
+### Get the list of OpenStack projects
+GET http://127.0.0.1:8002/api/openstack/projects/
+Content-Type: application/json
+Authorization: Bearer  eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjA4OTUzLCJpYXQiOjE3NDE2MDUzNTMsImp0aSI6IjlhNzAzYjM5OGFhODRjYmM4NTVkNDE5OTQ0N2ViZmM1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.fB544liHuGyaO1Y2piXjkOuoOT3VAght_j01Td7qAtg
+
+
+### Test project and user creation with a Valid VM Request ID 
+POST http://localhost:8002/api/project-user/1/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3Njk2MjM5LCJpYXQiOjE3Mzc2OTI2MzksImp0aSI6IjE5MjQ0M2NkYjdjMDQwM2U4YzM5YWYwYmIyMjE0YzMzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.rdKVEElrSePSHXnPdFtxft5ZdJ7OmIRKnwYGbIVKmcI
+
+
+### Create Router
+POST http://127.0.0.1:8002/api/create-router/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3Njk3ODIyLCJpYXQiOjE3Mzc2OTQyMjIsImp0aSI6IjM5ODg1ZTdhMGMxMjQxZWRhNzQwNGY4MTBlNTBhZGVlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qw7AvIFcx2LgSXxhLTyOTrax6NX0EUG5oYiAgkYBAJQ
+
+{
+    "name": "TestRouter8",
+    "admin_state_up": true,
+    "external_network_name": "demo_net",
+    "enable_snat": true
+
+}
+
+
+### List Routers
+GET http://127.0.0.1:8002/api/routers/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM2NDA1OTU0LCJpYXQiOjE3MzY0MDIzNTQsImp0aSI6IjU4NTNiNzNhNjZhNTRiYTY5NmMyZWRlMjg2YmExZDIzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.hphIY8dNQQYGFpOz8OBmK_XvxZ8vM4MPP0bfWKGn7QA
+
+### Test: Delete Router API - Success Case
+DELETE http://127.0.0.1:8002/api/delete-router/d6831f81-43b1-4ed3-9d88-090ccce028f6/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM2NDA1OTU0LCJpYXQiOjE3MzY0MDIzNTQsImp0aSI6IjU4NTNiNzNhNjZhNTRiYTY5NmMyZWRlMjg2YmExZDIzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.hphIY8dNQQYGFpOz8OBmK_XvxZ8vM4MPP0bfWKGn7QA
+
+
+### Update Router
+PUT http://127.0.0.1:8002/api/edit-router/f123c9fa-08c0-4ef7-b98f-2fe24eb20048/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3Njk3ODIyLCJpYXQiOjE3Mzc2OTQyMjIsImp0aSI6IjM5ODg1ZTdhMGMxMjQxZWRhNzQwNGY4MTBlNTBhZGVlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qw7AvIFcx2LgSXxhLTyOTrax6NX0EUG5oYiAgkYBAJQ
+
+{
+    "name": "Updated Router Name",
+    "admin_state_up": false
+}
+
+
+### Create snapshot
+POST http://127.0.0.1:8002/api/create-snapshot/ 
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyODgzMTIxLCJpYXQiOjE3NDI4Nzk1MjEsImp0aSI6IjI2ZWM3MDNmYjA0ZTQ2ODBiMjYyMWZjMzJkMWQ3Y2NkIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.OcS-E683apFqguavR9MqNPTLNz9JRZxT_-CPLKKWSOM
+
+{
+    "vm_id": "d95278b9-0763-4c85-8213-bd7dfedf2b68",
+    "snapshot_name": "cirros-snapshot"
+}
+
+
+### Get project usage statistics
+GET http://127.0.0.1:8002/api/project-usage/ 
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1NTUyODc2LCJpYXQiOjE3MzU1NDkyNzYsImp0aSI6IjZkMTg0OWJkMGEyOTQ3Mzc5ZTVkMGJkMDk3Mjc5ZTI4IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.d9c-Frb0tThwtWwcphBRSLDdyWWFfy52MEZ5eTieN40
+Content-Type: application/json
+
+### List all RBAC policies
+GET http://127.0.0.1:8002/api/rbac-policies/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NTQwMTI5LCJpYXQiOjE3Mzc1MzY1MjksImp0aSI6Ijc1YjY2OGE1ZTNkODQ3OWFhN2RlN2Q5YTgxODA4MThhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.WMT0TunWOx-HRcjdsYKY3QuQoEJ57O99MOEMGt2Ug-Y
+Content-Type: application/json
+
+
+
+### Create RBAC Policy
+POST http://localhost:8002/api/create-rbac-policy/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1NTYxMTU0LCJpYXQiOjE3MzU1NTc1NTQsImp0aSI6IjliYTA2ZGIwZWVkMTQ2OGI4ZjdhOWMxYzA4ZmRmMDU3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9._dpuv84HOaBgPQjTy4kPt6ws4t_EeNVos7TtApvCRzI
+
+{
+  "target_project_id": "eb6ab80212ee412fb889ef59cfb94a16",
+  "action": "access_as_shared", 
+  "network_id": "b36ed46e-9d81-48d9-9b8a-6dacb5d08e23"
+}
+
+### Update an RBAC Policy - PATCH Request
+PATCH http://127.0.0.1:8002/api/update-rbac-policy/dc7d8c02-2d46-4d4c-a605-c9f9e12752f8/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM1NjIzNzY3LCJpYXQiOjE3MzU2MjAxNjcsImp0aSI6ImFkMGZkYzk2ZmNjMzQzNjI4NDM0MTYxZDBhNGQ2MDFiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.PHTmhJsSvbv6LsevrmJKYU0ZdSeeC7PaRK0zbJ-zCVc
+
+{
+  "target_project_id": "5af09c8351f4461ab329ec81d70edcfe"
+}
+
+### DELETE RBAC Policy
+DELETE http://127.0.0.1:8002/api/rbac-policies/f8c2d718-3150-4335-902d-e52cdb793a2c/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM3NTQwMTI5LCJpYXQiOjE3Mzc1MzY1MjksImp0aSI6Ijc1YjY2OGE1ZTNkODQ3OWFhN2RlN2Q5YTgxODA4MThhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.WMT0TunWOx-HRcjdsYKY3QuQoEJ57O99MOEMGt2Ug-Y
+
+# Test Create Group with Members API
+
+### Create a group with multiple members
+POST http://127.0.0.1:8002/api/create-group-with-members/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDA4ODA0LCJpYXQiOjE3NDQwMDUyMDQsImp0aSI6ImNmNDQzNDAzNzljZjRjZGY4OTU3NmM4MjUxNzdjZTlhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Hv1mfHLHk1XE4oa8Nqcsj0crUgil1mdosLKAsgLTPl0
+
+
+{
+    "group_name": "Rakshana",
+    "description": "Working",
+    "member_ids": [
+        "f0ee752996044e80a1835c85209cd009"
+        
+    ]
+}
+
+
+### List Groups
+GET http://127.0.0.1:8002/api/list-group/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDA4ODA0LCJpYXQiOjE3NDQwMDUyMDQsImp0aSI6ImNmNDQzNDAzNzljZjRjZGY4OTU3NmM4MjUxNzdjZTlhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Hv1mfHLHk1XE4oa8Nqcsj0crUgil1mdosLKAsgLTPl0
+
+
+### List Members of a Group
+GET http://127.0.0.1:8002/api/groups/members/2022ba3b64054a75a687fe1607cbd6ec/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQwNTY0Mzc4LCJpYXQiOjE3NDA1NjA3NzgsImp0aSI6IjE4ZmE1N2U5NTBlNjRmMzFhMzVmYjFlNWFkM2YwNjNlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.OYxw0q6TxR-Xl4aXVdHYGUOYTpNrSjHOp1uCtuGGqDc
+
+
+### Update group name
+PUT http://127.0.0.1:8002/api/update-group/c6bd1ba2145041f895ef15aa35bab4a7/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDA4ODA0LCJpYXQiOjE3NDQwMDUyMDQsImp0aSI6ImNmNDQzNDAzNzljZjRjZGY4OTU3NmM4MjUxNzdjZTlhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Hv1mfHLHk1XE4oa8Nqcsj0crUgil1mdosLKAsgLTPl0
+Content-Type: application/json
+
+{
+  "name": "new-group-name",
+  "description": "Updated description for the group."
+}
+
+### Delete group
+DELETE http://127.0.0.1:8002/api/delete-group/c6bd1ba2145041f895ef15aa35bab4a7/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDA4ODA0LCJpYXQiOjE3NDQwMDUyMDQsImp0aSI6ImNmNDQzNDAzNzljZjRjZGY4OTU3NmM4MjUxNzdjZTlhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Hv1mfHLHk1XE4oa8Nqcsj0crUgil1mdosLKAsgLTPl0
+
+
+### Fetch Compute Services
+GET http://127.0.0.1:8002/api/compute-services/ HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyODgxODY5LCJpYXQiOjE3NDI4NzgyNjksImp0aSI6IjBkNTYwZmQ4MWRhYzQ4MTM5ZmNlNDAxMGY0NjkwZDZjIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.BVd3UhHmllFkUyNxUJw3aohDt_X1I7LpzJEayuWVn7w
+
+
+### Fetch Block Storage Services
+GET http://127.0.0.1:8002/api/block-storage-services/ HTTP/1.1
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyODgxODY5LCJpYXQiOjE3NDI4NzgyNjksImp0aSI6IjBkNTYwZmQ4MWRhYzQ4MTM5ZmNlNDAxMGY0NjkwZDZjIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.BVd3UhHmllFkUyNxUJw3aohDt_X1I7LpzJEayuWVn7w
+
+
+### Fetch Network Services
+GET http://127.0.0.1:8002/api/network-services/ HTTP/1.1
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNTkyNDkyLCJpYXQiOjE3NDE1ODg4OTIsImp0aSI6IjcyODc2YTFkOWE0MjRlZTNhZTAxOWY3ZDcyZDg0ODIyIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.LdpbXNfkeKMJoIYuYCdaRZ9PhL2l1YYXxpQtXIqBzhY
+
+
+### Get details of an image by ID
+GET http://127.0.0.1:8002/api/image/4d13cede-9797-451c-b62c-605f3828870f/
+Content-Type: application/json
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM4OTA3NDU3LCJpYXQiOjE3Mzg5MDM4NTcsImp0aSI6ImUyYmJkNTUwZmVkODRkMGJiNTJkODA4MmZhMzk1ZGFlIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.ZZ52wgVgI1SpkJkj0BYtLDlRSnukCK9vUlrt1-68VLs
+
+### Create a bootable volume from an image
+POST http://127.0.0.1:8002/api/image/image-123/
+Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzM4OTA3MDYzLCJpYXQiOjE3Mzg5MDM0NjMsImp0aSI6ImY2OGUxNTBmMDVjMTQ1NDI5Nzg1ODgzNjhhZjc5YThjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.a6_oJwaDsbq_YIX_Wt6nqfycE3_aesQNElksHvl-UGk
+Content-Type: application/json
+
+{
+    "name": "Ubuntu-Volume",
+    "type": "ssd",
+    "size": 20,
+    "availability_zone": "nova"
+}
+
+
+### Upload Image
+POST http://127.0.0.1:8002/api/create-image/
+Authorization: Token your-auth-token
+Content-Type: multipart/form-data
+{
+    file: image-file,
+    name: "image-name",
+}
+
+### List Images
+GET http://127.0.0.1:8002/api/list-images/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMTg2MDM1LCJpYXQiOjE3NDIxODI0MzUsImp0aSI6ImQ2MzVkZGFiYmUwZTRjYWU4YTAxZDk2ODMzZjM4YzlmIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.QZacWRvk-xVblslMEdZ6F6N6M4m08p4mZPnSBjT7K-M
+
+### Download Image (replace {image_id})
+GET http://127.0.0.1:8002/api/download-image/5d51de74-db97-4b81-b735-034c141b7cf8/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMTg2MDM1LCJpYXQiOjE3NDIxODI0MzUsImp0aSI6ImQ2MzVkZGFiYmUwZTRjYWU4YTAxZDk2ODMzZjM4YzlmIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.QZacWRvk-xVblslMEdZ6F6N6M4m08p4mZPnSBjT7K-M
+
+
+
+
+### 1️⃣ Get all Floating IPs
+GET http://127.0.0.1:8002/api/floating-ips/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNTg0ODg2LCJpYXQiOjE3NDE1ODEyODYsImp0aSI6Ijk4MDg0MjAwOTI5YTRiZmRiNWFmYzgwNDYxNmMzODJjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qGSjVSahyKEjUE3VRNMDRt07braSRpVu1GowFQLZzQ4
+Accept: application/json
+
+### 2️⃣ Create a new Floating IP
+POST http://127.0.0.1:8002/api/floating-ips/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNTg0ODg2LCJpYXQiOjE3NDE1ODEyODYsImp0aSI6Ijk4MDg0MjAwOTI5YTRiZmRiNWFmYzgwNDYxNmMzODJjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qGSjVSahyKEjUE3VRNMDRt07braSRpVu1GowFQLZzQ4
+
+{
+    "network_id": "2e12a152-4e4e-48be-90b7-1cb143241f41"
+}
+
+# ### 3️⃣ Associate a Floating IP with an Instance
+# POST http://127.0.0.1:8002/api/floating-ips/associate/
+# Content-Type: application/json
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQwNTUyMjU2LCJpYXQiOjE3NDA1NDg2NTYsImp0aSI6IjQ5NDVkNjE5NzBmMjQxOGU4YWQ4NzNlNDE2MjRlM2ZjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.sGcxIz5Ox5jNtKUt62NZwBrjSfKX50QB0A-ekqvjmsE
+
+# {
+#     "floating_ip": "10.184.0.100",
+#     "port_id": "1ae77d89ed42435baf7a0b0d618e069a"
+# }
+
+
+### Associate Floating IP (Allocate & Attach)
+POST  http://127.0.0.1:8002/api/floating-ips/associate/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNTg0ODg2LCJpYXQiOjE3NDE1ODEyODYsImp0aSI6Ijk4MDg0MjAwOTI5YTRiZmRiNWFmYzgwNDYxNmMzODJjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qGSjVSahyKEjUE3VRNMDRt07braSRpVu1GowFQLZzQ4
+
+{
+    "network_pool": "External Network",
+    "project_name": "new_project_rakshana",
+    "floating_ip": "10.184.53.230",    
+    "description": "Assigning floating IP"
+}
+
+### 1️⃣ Release (Disassociate) a Floating IP
+POST http://127.0.0.1:8002/api/floating-ips/release/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNTg0ODg2LCJpYXQiOjE3NDE1ODEyODYsImp0aSI6Ijk4MDg0MjAwOTI5YTRiZmRiNWFmYzgwNDYxNmMzODJjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qGSjVSahyKEjUE3VRNMDRt07braSRpVu1GowFQLZzQ4
+
+{
+    "floating_ip": "10.184.53.215"
+}
+
+### 2️⃣ Delete a Floating IP
+DELETE http://127.0.0.1:8002/api/floating-ips/delete/5ea0fb85-ad8f-47e7-b84f-28d3f188e012/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQwNTUyMjU2LCJpYXQiOjE3NDA1NDg2NTYsImp0aSI6IjQ5NDVkNjE5NzBmMjQxOGU4YWQ4NzNlNDE2MjRlM2ZjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.sGcxIz5Ox5jNtKUt62NZwBrjSfKX50QB0A-ekqvjmsE
+
+### Save Zabbix host id in the database
+POST  http://127.0.0.1:8002/api/update_zabbix_hostid/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjQwNjI0LCJpYXQiOjE3NDEyMzcwMjQsImp0aSI6Ijk4YjU5NzE4MTIxYjRkMjE4OWRjNWM5Y2I4M2U3YzM1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.6U4iDCCCI_jtqH812qlBa4x264rpisj0ohUbFAglxfM
+
+### Get Zabbix host id in the database
+GET   http://127.0.0.1:8002/api/usage/10457/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxMjQwNjI0LCJpYXQiOjE3NDEyMzcwMjQsImp0aSI6Ijk4YjU5NzE4MTIxYjRkMjE4OWRjNWM5Y2I4M2U3YzM1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.6U4iDCCCI_jtqH812qlBa4x264rpisj0ohUbFAglxfM
+
+### Proxmox API 
+POST https://10.184.53.100:8006/api2/json/access/ticket
+
+{
+    "username": "API@pve",
+    "password": "Cloud"
+}
+
+
+### List Service Monitors in the server
+GET http://127.0.0.1:8002/api/openstack/servicemonitor/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzMDUyMzE4LCJpYXQiOjE3NDMwNDg3MTgsImp0aSI6ImU2YzIyZmQwMzk5NzQ5ZWQ5YTQxYWViNWQ5Njk1MTZmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.W_eKzViRFB6jwkszvmZ0Mk6aQlAxhaUs4UGNiLLUcek
+
+
+
+### Test OpenStack Data API
+GET http://127.0.0.1:8002/api/network/topology/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNjA0NTI3LCJpYXQiOjE3NDE2MDA5MjcsImp0aSI6IjE4YmZiZDI4ZmRmMzQ1Yjk5NDBmMjAwMTA0MGU2N2I0IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.2EG2b3VndxvuXkCxiwAx3DebXymDaRpTBQ3R_qyFC_Q
+Accept: application/json
+
+
+### Get Persistent Volumes
+GET http://127.0.0.1:8002/api/persistent-volumes/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjU3NDY0LCJpYXQiOjE3NTEyNTM4NjQsImp0aSI6IjIyMTVhMzI3ZDQ0MTQ3MmJhZTRhNGI0NWM3ZTI2M2RlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.S3ZUD6HK51LRUD0fsf-I5Eh08z9flj9PRx9Z-g1L3kg
+
+### Get Persistent Volumes Details
+GET http://localhost:8002/api/kube-volume-details/?name=pvc-54f84a27-d91e-4a54-b743-280e3dfeb6fb
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjYxNDg5LCJpYXQiOjE3NTEyNTc4ODksImp0aSI6ImVjNzY0ZWFlNDEzODRkYmFiNmJiZGJiY2IxZGI3ZTdiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.TV53j2Vb3uonOgA13rsud9PBkqEgT-zbglb4PbgLK68
+
+### Get list of all Kubernetes namespaces
+GET http://localhost:8002/api/k8s/namespaces/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwNjU3NzAzLCJpYXQiOjE3NTA2NTQxMDMsImp0aSI6IjM2YjViOTNmODRjYTQxZmE5NmE3NmFhZTMyNzk1MjgzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.S3iWuHJgnxC47h62aqD1-tJfoKc5ktETIOp60GNJO38
+
+### Get list of all Kubernetes Stateful sets
+GET http://localhost:8002/api/k8s/statefulsets?namespace=all
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwNjYxMTE3LCJpYXQiOjE3NTA2NTc1MTcsImp0aSI6ImI0OGU5YWVlMWY3YzQ5Y2Q4YTA2NWQzN2M1MGExYTY5IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.mEDfJrc6fakDwKMdEgdCtacMrjMrxNwG9TgM0rdAuqE
+
+
+### Get Kubernetes Services (Authenticated)
+GET http://127.0.0.1:8002/api/k8s/services/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMDc3MDU2LCJpYXQiOjE3NTAwNzM0NTYsImp0aSI6IjgxZmU3OGY2YTA0OTRlZTliNDczMWU0Y2Q1MjY3YzVjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.r9xP83PMUnGFYhisaOg-8sInDUeQCGCJWB3chOIrS3U
+Accept: application/json
+
+### Get Kubernetes Services (Authenticated)
+GET http://127.0.0.1:8002/api/k8s/services?namespace=all
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMDc3MDU2LCJpYXQiOjE3NTAwNzM0NTYsImp0aSI6IjgxZmU3OGY2YTA0OTRlZTliNDczMWU0Y2Q1MjY3YzVjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.r9xP83PMUnGFYhisaOg-8sInDUeQCGCJWB3chOIrS3U
+Accept: application/json
+
+
+### Get Kubernetes nodes (Authenticated)
+GET http://127.0.0.1:8002/api/k8s/nodes/?namespace=default
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NjQxODg0LCJpYXQiOjE3NTQ2MzgyODQsImp0aSI6IjMxYTU3ZjJjMmRkZDQxZWZiNDg5MDAyZWNkNmM4ODhiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Wb8thzXHxxY42gdGKqACPEYUzxMEb9DKoxDMYyewlio
+Accept: application/json
+
+
+### Get Kubernetes nodes details(Authenticated)
+GET http://127.0.0.1:8002/api/k8s/node-details/?node_name=knode2
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzU0NjQxODg0LCJpYXQiOjE3NTQ2MzgyODQsImp0aSI6IjMxYTU3ZjJjMmRkZDQxZWZiNDg5MDAyZWNkNmM4ODhiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.Wb8thzXHxxY42gdGKqACPEYUzxMEb9DKoxDMYyewlio
+Accept: application/json
+
+
+### Get Kubernetes pods (Authenticated)
+GET http://127.0.0.1:8002/api/k8s/pods/?namespace=default
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwNDExODIzLCJpYXQiOjE3NTA0MDgyMjMsImp0aSI6ImU2OTFhNTYyNzM2ZTRlOGI5OGEwNmZiNDUzODU1YTBiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.eYxRW3-ibJOzMMcQs0KZniMH1eNZ6A2GImP1HrpghdQ
+Accept: application/json
+
+
+### List Kubernetes Deployments (Replace TOKEN with actual token)
+GET http://127.0.0.1:8002/api/k8s/deployments/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMjI1MTU5LCJpYXQiOjE3NTAyMjE1NTksImp0aSI6ImNkN2MxNWQ4YzM0ZDQ2ZTdiYjgwZTQ5N2UxYTZlZThhIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.vndGiuDZbsluCjyuHeGPKGx2i7I0RfH1kOid53laAjQ
+Content-Type: application/json
+
+
+### Get Deployment Details (Default namespace)
+GET http://127.0.0.1:8002/api/k8s/deployment-details/?name=mongodb-deployment
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMzk1MjkzLCJpYXQiOjE3NTAzOTE2OTMsImp0aSI6IjgzMmEwYTkxMTQzNzRkMjA5MDMwZGY3NWUwODVhNTAxIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.9ZkQ3CCbfyus6ZXlQ_4tBJGE5A0-kiSGDkysjGuMONM
+
+
+
+### List all pods
+GET http://127.0.0.1:8002/api/k8s/pods/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMzk5MjI5LCJpYXQiOjE3NTAzOTU2MjksImp0aSI6Ijg0OWI2NjFiMjI2NDQyYTk5MDJmYmYwYmNhMmE1NWYwIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.U6tedG32H-RRyLvrXdnNqyseDKS98D0p2IyuIKUBmbc
+Content-Type: application/json
+
+
+### Get Pod Details from default namespace
+GET http://127.0.0.1:8002/api/k8s/pod-details/?name=demo
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMzk5MjI5LCJpYXQiOjE3NTAzOTU2MjksImp0aSI6Ijg0OWI2NjFiMjI2NDQyYTk5MDJmYmYwYmNhMmE1NWYwIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.U6tedG32H-RRyLvrXdnNqyseDKS98D0p2IyuIKUBmbc
+Content-Type: application/json
+
+
+### Get Pod Details from custom namespace
+GET http://127.0.0.1:8000/api/pod-details/?name=nginx-service-4&namespace=dev
+Authorization: Bearer <your_token_here>
+Content-Type: application/json
+
+
+### Delete a pod
+DELETE http://127.0.0.1:8000/api/k8s/pods/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTgzMzUyLCJpYXQiOjE3NDQxNzk3NTIsImp0aSI6ImU1OGI0NmY4YmIyMTQyNmE4NDM2NmMwYjZiMGVkZTNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.14_bQUIkIZa2cOnWvI26uk-og50W58-8hjzHkc0E6zQ
+Content-Type: application/json
+
+{
+  "pod_name": "nginx"
+}
+
+
+
+### 🔹 Deploy an Nginx Pod (POST) getting launched in kmaster giving error
+POST http://127.0.0.1:8002/api/k8s/deploy-nginx/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxOTMxNDM1LCJpYXQiOjE3NDE5Mjc4MzUsImp0aSI6ImUzYzc5MDkwZjE1MDQ3NDRiMjU4MzQwODRiMTgzNjFjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.wANdSto3n6TQS-_hI5MGl-XQYbEAcbafG9C00Ackm24
+
+{
+  "pod_name": "nginx-test1",
+  "namespace": "default"
+}
+
+### 🔹 Deploy mysql Pod (POST)
+POST http://127.0.0.1:8002/api/k8s/deploy-application/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxODQ4MTU4LCJpYXQiOjE3NDE4NDQ1NTgsImp0aSI6IjBjZDQ2YzMwYjQyYjRkMWQ4NzJiN2M2NDA1ZWEwZDA3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.49kOutyR0AhCXtR7VdWF4EMagywrqezNPTMonpw6yyI
+
+{
+  "pod_name": "mysql-db-rakshana",
+  "namespace": "default",
+  "app_type": "mysql"
+}
+
+### 🔹 Delete Pod (Delete)
+DELETE http://127.0.0.1:8002/api/k8s/delete-pod/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMDYxMjg3LCJpYXQiOjE3NDIwNTc2ODcsImp0aSI6ImZiYTY5NGU2ZjY4MDQwNWM5ODJkYTlhNTA1MWJjYWRmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.iTvCmaXaeuZlZrpAg0KxtMgZptezeJDb0ihGiYQ_9z4
+
+{
+  "pod_name": "python-instance-rak",
+  "namespace": "default"
+
+}
+
+
+### Deploy Grafana
+POST http://127.0.0.1:8002/api/k8s/deploy-application/
+Content-Type: application/json
+Authorization: Bearer <TOKEN>
+
+{
+  "pod_name": "grafana-instance",
+  "namespace": "default",
+  "app_type": "grafana"
+}
+
+### Deploy Nginx
+POST http://127.0.0.1:8002/api/k8s/deploy-application/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxODY1NjE1LCJpYXQiOjE3NDE4NjIwMTUsImp0aSI6ImY2MzE3NzE3YWMwNzQ2MWNhODg2NTY5OGQ4NzJhYzA1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.-DLBWJ1_2jmqFSa3Hjo1bzLynGC41WJ-4PabEs6ermg
+
+{
+  "pod_name": "nginx-server-rakshana",
+  "namespace": "default",
+  "app_type": "nginx"
+}
+
+
+### Deploy Apache
+POST http://127.0.0.1:8002/api/k8s/deploy-application/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTgzMzUyLCJpYXQiOjE3NDQxNzk3NTIsImp0aSI6ImU1OGI0NmY4YmIyMTQyNmE4NDM2NmMwYjZiMGVkZTNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.14_bQUIkIZa2cOnWvI26uk-og50W58-8hjzHkc0E6zQ
+
+{
+  "pod_name": "apache-server",
+  "namespace": "default",
+  "app_type": "apache"
+}
+
+### List Events in Kubernetes
+GET http://127.0.0.1:8002/api/k8s/events/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTgzMzUyLCJpYXQiOjE3NDQxNzk3NTIsImp0aSI6ImU1OGI0NmY4YmIyMTQyNmE4NDM2NmMwYjZiMGVkZTNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.14_bQUIkIZa2cOnWvI26uk-og50W58-8hjzHkc0E6zQ
+
+### List Events in Kubernetes (Namespace)
+GET http://127.0.0.1:8002/api/k8s/events/?namespace=default
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQxNzczNzc1LCJpYXQiOjE3NDE3NzAxNzUsImp0aSI6Ijg1NDk4YzhjMjAyOTQ3ZTVhMjNmYjk0NGYzN2M0YjFjIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.NVvQgkPMqcOTbAB5Cskl007zNKyECv-9gpDCdgklddU
+
+
+
+### Get Kubernetes Workload Details
+GET http://127.0.0.1:8002/api/k8s/workloads/?namespace=all
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMDYyMDEzLCJpYXQiOjE3NTAwNTg0MTMsImp0aSI6ImExZDY1M2QzNmU5NjRjNTg5NGY4ZTE5ZjUzMjc5ZjEzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.TEgJNslJuNq68_cJN-HI0fRgnMPD5Ov7Z58_wegmYE4
+
+
+### Get Kubernetes Workload aggregate Details
+GET http://127.0.0.1:8002/api/k8s/workload-aggregate/?namespace=default
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwMDcyMTYzLCJpYXQiOjE3NTAwNjg1NjMsImp0aSI6IjRmZjMzZTMwMDE5OTQ5Y2U5YWYyY2E4ODEyMmU2NGJlIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.OS_UT0UtgVC7n-ZB4SQcv4o-p-m9GbrHIL45hn7NJ1U
+
+### Replicaset Details list
+GET http://127.0.0.1:8002/api/k8s/replicasets/?namespace=all
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjY1NjgwLCJpYXQiOjE3NTEyNjIwODAsImp0aSI6ImFmNmFlNDg3ZGIwYTQ3OTFhNjU2OWUyZDU0YjMwNmM2IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qgsnOJ5DoFyC6D1IBc2sASUBll96tn6EhqL7lHZ-RHU
+Accept: application/json
+
+
+### Replicaset Details
+GET http://127.0.0.1:8002/api/k8s/replicaset-details/?name=wordpress-68d6b674d8
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjY1NjgwLCJpYXQiOjE3NTEyNjIwODAsImp0aSI6ImFmNmFlNDg3ZGIwYTQ3OTFhNjU2OWUyZDU0YjMwNmM2IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.qgsnOJ5DoFyC6D1IBc2sASUBll96tn6EhqL7lHZ-RHU
+Accept: application/json
+
+
+### Deploy MongoDB
+POST http://localhost:8002/api/k8s/deploy/mongodb/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjg1NDQ4LCJpYXQiOjE3NTEyODE4NDgsImp0aSI6ImE5MDgwZGEyOWUyMDRkOWFiYThmMWJjNjZkMTU2MDExIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.TzQrDi3_CJPAJNIgn6UV8gUmG-qxJiHLOhUQkh_79pg
+
+{
+  "replica": 1,
+  "app_name": "mongodb",
+  "root_password": "cdacchennai",
+  "username": "cdacuser",
+  "password": "cdacpass",
+  "database": "cdacdb",
+  "node_port": 30017
+}
+
+
+
+### Get logs for a specific pod in a namespace
+GET http://localhost:8002/api/logs/default/mongodb-ffc4f8d98-54gn5/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMjg1NDQ4LCJpYXQiOjE3NTEyODE4NDgsImp0aSI6ImE5MDgwZGEyOWUyMDRkOWFiYThmMWJjNjZkMTU2MDExIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.TzQrDi3_CJPAJNIgn6UV8gUmG-qxJiHLOhUQkh_79pg
+
+
+### Deploy Nginx
+POST http://127.0.0.1:8002/api/k8s/deploy-pod/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMDYxMjg3LCJpYXQiOjE3NDIwNTc2ODcsImp0aSI6ImZiYTY5NGU2ZjY4MDQwNWM5ODJkYTlhNTA1MWJjYWRmIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.iTvCmaXaeuZlZrpAg0KxtMgZptezeJDb0ihGiYQ_9z4
+
+
+{
+  "appln_name": "python-instance-rak1",
+  "appln_type": "python"
+}
+
+### List pods for create replicaset
+GET http://127.0.0.1:8002/api/k8s/list-pods/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMTg2MDM1LCJpYXQiOjE3NDIxODI0MzUsImp0aSI6ImQ2MzVkZGFiYmUwZTRjYWU4YTAxZDk2ODMzZjM4YzlmIiwidXNlcl9pZCI6MiwiZW1haWwiOiJwcmFiaGF2QGNkYWMuaW4iLCJmaXJzdF9uYW1lIjoiTXMgViBBIFByYWJoYSIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMTg5NyJ9.QZacWRvk-xVblslMEdZ6F6N6M4m08p4mZPnSBjT7K-M
+
+### Create Replicaset
+POST http://127.0.0.1:8002/api/k8s/create-replicaset/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQyMDM5NTQ4LCJpYXQiOjE3NDIwMzU5NDgsImp0aSI6Ijg3NGRmM2M4MTcxZDQ4ZWY4MjU2Njc3NzEzZTAzMGUzIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.ZwVhawrnP4auzskwnT5Dp0HnTJpc35kqHcbbIm5P9Y0
+
+{
+  "pod_name": "mysql-instance",
+  "namespace": "default",
+  "replicas": 3
+}
+
+
+### Fetch workload statistics
+GET http://127.0.0.1:8002/api/k8s/workloadstati/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTgzMzUyLCJpYXQiOjE3NDQxNzk3NTIsImp0aSI6ImU1OGI0NmY4YmIyMTQyNmE4NDM2NmMwYjZiMGVkZTNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.14_bQUIkIZa2cOnWvI26uk-og50W58-8hjzHkc0E6zQ
+
+
+### List all DaemonSets
+GET http://127.0.0.1:8002/api/k8s/daemonsets/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTgzMzUyLCJpYXQiOjE3NDQxNzk3NTIsImp0aSI6ImU1OGI0NmY4YmIyMTQyNmE4NDM2NmMwYjZiMGVkZTNiIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.14_bQUIkIZa2cOnWvI26uk-og50W58-8hjzHkc0E6zQ
+
+
+### Authenticate and get JWT token
+POST https://10.184.43.52:8443/api/auth
+Content-Type: application/json
+Accept: application/vnd.ceph.api.v1.0+json
+
+{
+  "username": "admin",
+  "password": "Meghd@@t123"
+}
+
+
+
+### Get Cluster Health
+GET https://10.184.43.52:8443/api/cluster/health
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjZXBoLWRhc2hib2FyZCIsImp0aSI6IjVmMTg5MzY1LWI5MDgtNGZhYi1hZjM4LTA0MjYwZDdjZDY4YSIsImV4cCI6MTc0NDExNTE2OCwiaWF0IjoxNzQ0MDg2MzY4LCJ1c2VybmFtZSI6ImFkbWluIn0.dfVj6-YMUsDZpAzEMif4VuIMLZpeDhAroZ19MwSMgS8
+Accept: application/vnd.ceph.api.v1.0+json
+
+### Get Cluster Summary
+GET https://10.184.43.52:8443/api/cluster
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjZXBoLWRhc2hib2FyZCIsImp0aSI6IjVmMTg5MzY1LWI5MDgtNGZhYi1hZjM4LTA0MjYwZDdjZDY4YSIsImV4cCI6MTc0NDExNTE2OCwiaWF0IjoxNzQ0MDg2MzY4LCJ1c2VybmFtZSI6ImFkbWluIn0.dfVj6-YMUsDZpAzEMif4VuIMLZpeDhAroZ19MwSMgS8
+Accept: application/vnd.ceph.api.v1.0+json
+
+### Get Host Info
+GET https://10.184.43.52:8443/api/host
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjZXBoLWRhc2hib2FyZCIsImp0aSI6IjVmMTg5MzY1LWI5MDgtNGZhYi1hZjM4LTA0MjYwZDdjZDY4YSIsImV4cCI6MTc0NDExNTE2OCwiaWF0IjoxNzQ0MDg2MzY4LCJ1c2VybmFtZSI6ImFkbWluIn0.dfVj6-YMUsDZpAzEMif4VuIMLZpeDhAroZ19MwSMgS8
+Accept: application/vnd.ceph.api.v1.0+json
+
+
+### Get OSD Info
+GET https://10.184.43.52:8443/api/osd
+Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJjZXBoLWRhc2hib2FyZCIsImp0aSI6IjVmMTg5MzY1LWI5MDgtNGZhYi1hZjM4LTA0MjYwZDdjZDY4YSIsImV4cCI6MTc0NDExNTE2OCwiaWF0IjoxNzQ0MDg2MzY4LCJ1c2VybmFtZSI6ImFkbWluIn0.dfVj6-YMUsDZpAzEMif4VuIMLZpeDhAroZ19MwSMgS8
+Accept: application/vnd.ceph.api.v1.0+json
+
+
+
+# ---------------------------------CEPH-------------------------------------
+
+
+### Get Cluster Health
+GET http://localhost:8002/api/ceph/health/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDk4NjA0LCJpYXQiOjE3NDQwOTUwMDQsImp0aSI6ImJlMDE1ZDJhZjk1YzRkZWI4ZDVkNWRjYjA3ZWY2MmNkIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.9Jfvjg2i8anZmwYSsJxW0OPNisCS82msbWSwLh_sa0k
+
+
+### Get Cluster Summary
+GET http://localhost:8002/api/ceph/cluster/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MDk4NjA0LCJpYXQiOjE3NDQwOTUwMDQsImp0aSI6ImJlMDE1ZDJhZjk1YzRkZWI4ZDVkNWRjYjA3ZWY2MmNkIiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.9Jfvjg2i8anZmwYSsJxW0OPNisCS82msbWSwLh_sa0k
+
+
+### Get Host Info
+GET http://localhost:8002/api/ceph/host/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTA2OTkzLCJpYXQiOjE3NDQxMDMzOTMsImp0aSI6IjUwY2Q0MDQ3ZTU2ZTQ1NTZiOTlmODlmMDQwMmZiZDY1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.tsozpDuySHWdzfW8MFbOvRYQlCSqzaWZtIAaqU9DqN0
+
+
+
+### Get OSD Info
+GET http://localhost:8002/api/ceph/osd/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTA2OTkzLCJpYXQiOjE3NDQxMDMzOTMsImp0aSI6IjUwY2Q0MDQ3ZTU2ZTQ1NTZiOTlmODlmMDQwMmZiZDY1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.tsozpDuySHWdzfW8MFbOvRYQlCSqzaWZtIAaqU9DqN0
+
+
+### Get OSD Info
+GET http://localhost:8002/api/ceph/capacity/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTA2OTkzLCJpYXQiOjE3NDQxMDMzOTMsImp0aSI6IjUwY2Q0MDQ3ZTU2ZTQ1NTZiOTlmODlmMDQwMmZiZDY1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.tsozpDuySHWdzfW8MFbOvRYQlCSqzaWZtIAaqU9DqN0
+
+
+### Get Ceph Summary
+GET http://localhost:8002/api/ceph/summary/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTA2OTkzLCJpYXQiOjE3NDQxMDMzOTMsImp0aSI6IjUwY2Q0MDQ3ZTU2ZTQ1NTZiOTlmODlmMDQwMmZiZDY1IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.tsozpDuySHWdzfW8MFbOvRYQlCSqzaWZtIAaqU9DqN0
+
+### Get Ceph Inventonry
+GET http://localhost:8002/api/ceph/inventory/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTExMDg0LCJpYXQiOjE3NDQxMDc0ODQsImp0aSI6IjVmOTA0MmQ3N2ZjOTQ1NGFiYmY4YTRlNWQ1MmFhNDg3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.2QNOPP3f8uNcrRQOgzcASkfVAromVImmmVUi5MgP2dc
+
+### Get Ceph Pool
+GET http://localhost:8002/api/ceph/pools/
+Accept: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0MTExMDg0LCJpYXQiOjE3NDQxMDc0ODQsImp0aSI6IjVmOTA0MmQ3N2ZjOTQ1NGFiYmY4YTRlNWQ1MmFhNDg3IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.2QNOPP3f8uNcrRQOgzcASkfVAromVImmmVUi5MgP2dc
+
+
+### Get expiry vms
+GET http://localhost:8002/api/vmrequests/check/expiry/
+Accept: application/json
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NTYyLCJpYXQiOjE3NDQ3ODA5NjIsImp0aSI6Ijc3YzFhYjc4NzllZTRmYzVhNGI0M2U2NTA2ZDQzZWQ2IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.yZAEmKPdmmpfd22YorZumZB8mkKDL2lcz3IC_YuNJlI
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NTEzLCJpYXQiOjE3NDQ3ODA5MTMsImp0aSI6ImFjY2VmN2YyZDRhODQwODg5MmJlYTU1ODRkYTVmYzJlIiwidXNlcl9pZCI6NywiZW1haWwiOiJzZW50aGlsYkBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1yIEIgU2VudGhpbCBLdW1hciIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMjIzNSJ9.bZqdJYtt6cORRbBQpLHtBrOLa7YsQ38gs7XWgX79vmQ
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NjA3LCJpYXQiOjE3NDQ3ODEwMDcsImp0aSI6IjQxNDE4MzI3ZDNlYzQ5MzhhYzQyNTdmZDUwMDEzZWE4IiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.ezn4Xzov3U3GpWo0Fad0HUT2mQ5Qf-3G11Ca1M934XI
+
+
+### Create Volume from Image
+POST http://localhost:8002/api/create-volume/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg4Njk1LCJpYXQiOjE3NDQ3ODUwOTUsImp0aSI6IjZkZjEwNTgwOWRiZTRmZmU4NTNkZDlmNmI0ZDYwNTU4IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.6Af0rNfsseutxlZnglrXgKlZN5EiUG1bdb947a-f2ws
+
+{
+  "name": "cirros-test-rakshana",
+  "description": "Test volume created from image",
+  "image_name": "cirros-test",
+  "size": 2,
+  "availability_zone": "nova",
+  "type": "__DEFAULT__"
+}
+
+
+
+### Get rejected vms
+GET http://localhost:8002/api/rejected-vm-requests/
+Accept: application/json
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NTYyLCJpYXQiOjE3NDQ3ODA5NjIsImp0aSI6Ijc3YzFhYjc4NzllZTRmYzVhNGI0M2U2NTA2ZDQzZWQ2IiwidXNlcl9pZCI6MSwiZW1haWwiOiIiLCJmaXJzdF9uYW1lIjoiIiwicm9sZSI6IkFETUlOIiwiZW1wbG95ZWVfaWQiOm51bGx9.yZAEmKPdmmpfd22YorZumZB8mkKDL2lcz3IC_YuNJlI
+# Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NTEzLCJpYXQiOjE3NDQ3ODA5MTMsImp0aSI6ImFjY2VmN2YyZDRhODQwODg5MmJlYTU1ODRkYTVmYzJlIiwidXNlcl9pZCI6NywiZW1haWwiOiJzZW50aGlsYkBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1yIEIgU2VudGhpbCBLdW1hciIsInJvbGUiOiJGTEEiLCJlbXBsb3llZV9pZCI6IjEwMjIzNSJ9.bZqdJYtt6cORRbBQpLHtBrOLa7YsQ38gs7XWgX79vmQ
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ0Nzg0NjA3LCJpYXQiOjE3NDQ3ODEwMDcsImp0aSI6IjQxNDE4MzI3ZDNlYzQ5MzhhYzQyNTdmZDUwMDEzZWE4IiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.ezn4Xzov3U3GpWo0Fad0HUT2mQ5Qf-3G11Ca1M934XI
+
+
+
+
+### Create Ticket (Employee)
+POST http://localhost:8002/api/tickets/create/
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUxMzUyODQzLCJpYXQiOjE3NTEzNDkyNDMsImp0aSI6IjRlZmI0YzdmYTExNzQwODhiMjM0NDY3MWJlOWY2MThkIiwidXNlcl9pZCI6NCwiZW1haWwiOiJyYWtzaGFuYUBjZGFjLmluIiwiZmlyc3RfbmFtZSI6Ik1zIFJha3NoYW5hIiwicm9sZSI6IkVNUExPWUVFIiwiZW1wbG95ZWVfaWQiOiIzNDc5OTcifQ.vPjJfswDMB-k8fI3pMd9ifOm2Ae41-svibJugTyok8s
+
+{
+    "employee_id": "347997",
+    "issue": "Cannot access VPN",
+    "description": "I am unable to connect to the VPN since yesterday."
+   
+}
+
+###
+
+### List Tickets (Employee or Admin)
+GET http://localhost:8002/api/tickets/
+Authorization: Bearer <EMPLOYEE_OR_ADMIN_TOKEN>
+
+###
+
+### Admin Updates Ticket (Close)
+PATCH http://localhost:8002/api/tickets/1/update/
+Content-Type: application/json
+Authorization: Bearer <ADMIN_TOKEN>
+
+{
+    "solution": "VPN credentials have been reset. Please try again.",
+    "status": "Closed"
+}
