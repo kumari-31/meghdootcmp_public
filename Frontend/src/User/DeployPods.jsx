@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Button,
   Dialog,
@@ -25,6 +25,10 @@ import { useAuth } from "../Pages/Authentication/authContext";
 import apiClient from "../Axios";
 import { useNavigate } from "react-router-dom";
 
+const images = import.meta.glob("../assets/*.{png,jpg,jpeg,svg}", {
+  eager: true,
+});
+
 const categorizedCards = {
   Virtualization: [
     {
@@ -39,12 +43,6 @@ const categorizedCards = {
       logo: "nginx.png",
       description:
         'Nginx (pronounced "engine x") is a powerful, high-performance web server and reverse proxy',
-    },
-    {
-      name: "Nginxha",
-      logo: "nginx.png",
-      description:
-        "Highly available Nginx setup with multiple replicas for fault tolerance.",
     },
   ],
 
@@ -162,6 +160,7 @@ const serviceFieldConfigs = {
     { name: "username", label: "Username" },
     { name: "password", label: "Password", type: "password" },
     { name: "database", label: "Database" },
+    { name: "node_port", label: "Node Port", type: "number" },
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
     { name: "service_requirements", label: "Service Requirements" },
@@ -206,15 +205,6 @@ const serviceFieldConfigs = {
     { name: "database", label: "Database" },
     { name: "node_port", label: "Node Port", type: "number" },
   ],
-  nginxha: [
-    { name: "deployment_name", label: "Deployment Name" },
-    { name: "replicas", label: "Replicas", type: "number", default: 2 },
-    { name: "namespace", label: "Namespace", default: "default" },
-    { name: "service_start_date", label: "Service Start Date", type: "date" },
-    { name: "service_end_date", label: "Service End Date", type: "date" },
-    { name: "service_requirements", label: "Service Requirements" },
-    { name: "additional_notes", label: "Additional Notes" },
-  ],
   nginx: [
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
@@ -222,8 +212,6 @@ const serviceFieldConfigs = {
     { name: "additional_notes", label: "Additional Notes" },
     { name: "app_name", label: "App Name" },
   ],
-  
-  
 };
 
 const DatabaseCard = ({ card, handleOpen }) => {
@@ -263,8 +251,8 @@ const DatabaseCard = ({ card, handleOpen }) => {
           }}
         >
           <img
-            src={`/images/${card.logo}`}
-            alt={`${card.name} Logo`}
+            src={images[`../assets/${card.logo}`].default}
+            alt={card.name}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
@@ -339,13 +327,13 @@ const DeployPods = () => {
   useEffect(() => {
     if (user) {
       setFormData((prev) => ({
-      ...prev,
-      employee_id: user.employee_id || "",
-      name: user.username || user.first_name || "",
-      email: user.email || "",
-    }));
-  }
-}, [user]);
+        ...prev,
+        employee_id: user.employee_id || "",
+        name: user.username || user.first_name || "",
+        email: user.email || "",
+      }));
+    }
+  }, [user]);
 
   useEffect(() => {
     handleCategoryClick("All"); // Initialize displayedCards with all cards
@@ -370,26 +358,25 @@ const DeployPods = () => {
   }, []);
 
   const normalizeServiceName = (name) => {
-    if (!name) return "";
-    return name.toLowerCase().replace(/\s+/g, "").trim();
+    // Lowercase, remove "apache " prefix, remove spaces
+    return name
+      .toLowerCase()
+      .replace(/^apache\s+/, "") // remove vendor prefix
+      .replace(/\s+/g, ""); // remove spaces for matching
   };
-  
-  
 
   const handleOpen = (service) => {
-    const normalized = normalizeServiceName(service.name || service);
-
+    const normalized = normalizeServiceName(service);
     const additionalFields = serviceFieldConfigs[normalized] || [];
     const dynamicData = Object.fromEntries(
-      additionalFields.map((f) => [f.name, f.default || ""])
+      additionalFields.map((f) => [f.name, ""])
     );
-    
     setFormData({
       employee_id: formData.employee_id,
       email: formData.email,
       name: formData.name,
       service_name: service,
-      ...(normalized  !== "mongodb" && {
+      ...(normalized !== "mongodb" && {
         designation: "",
         purpose: "",
         project_name: "",
@@ -411,7 +398,7 @@ const DeployPods = () => {
 
   const handleSubmit = async () => {
     const normalized = normalizeServiceName(selectedService);
-  const dynamicFields = serviceFieldConfigs[normalized] || [];
+    const dynamicFields = serviceFieldConfigs[normalized] || [];
 
     const requiredFields =
       normalized === "mongodb"
@@ -436,16 +423,15 @@ const DeployPods = () => {
 
     const apiEndpoint =
       normalized === "mongodb"
-        ? "/k8s/deploy/mongodb/"              // MongoDB direct deploy
-        : "/service-requests/create/";        // EVERYTHING else goes to approval flow
+        ? "/k8s/deploy/mongodb/"
+        : "/service-requests/create/";
 
-  
     const submissionData =
       normalized === "mongodb"
-        ? Object.fromEntries(dynamicFields.map((f) => [f.name, formData[f.name]]))
-        : formData;   // NGINX-HA also goes here
-      
-  
+        ? Object.fromEntries(
+            dynamicFields.map((f) => [f.name, formData[f.name]])
+          )
+        : formData;
 
     try {
       const response = await apiClient.post(apiEndpoint, submissionData);
