@@ -5,7 +5,7 @@ import axios from 'axios';
 // A factory to create an axios instance bound to the current access token state
 export const createApiClient = (getAccessToken, setAccessToken) => {
   const api = axios.create({
-    baseURL: process.VITE_API_BASE_URL || '',
+    baseURL: process.env.REACT_APP_API_BASE || '',
     withCredentials: true, // important so refresh endpoint receives cookie
   });
 
