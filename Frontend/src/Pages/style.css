@@ -1,0 +1,82 @@
+
+.cloud-container {
+  position: absolute;
+ 
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, -50%) scale(1.0); 
+ opacity: 0.3; /* Increased visibility */
+ width: 150px; /* Define size */
+ height: 100px;
+ display: flex;
+ justify-content: center;
+ align-items: center;
+  text-align: center;
+ transform: scale(3.0); /* Reduce overall size */
+}
+
+.loading-message {
+  position: absolute; /* Position it over the cloud */
+  top: 50%; /* Center vertically */
+  left: 50%; /* Center horizontally */
+  transform: translate(-50%, -50%); /* Adjust for the text size */
+  color:#333; /* Change color as needed */
+  font-size: 12px; /* Adjust font size */
+}
+
+.cloud-back,
+.cloud-front {
+ stroke-width: 1; /* More visible */
+ fill:rgba(148, 148, 238,0.5);
+}
+
+.cloud-back {
+ stroke: rgba(35, 35, 236,1);
+}
+
+.cloud-front {
+ stroke: #fff;
+ stroke-dashoffset: 0;
+ stroke-dasharray: 20, 10; /* Adjusted */
+ animation: cloudLoader 2.5s linear infinite;
+}
+
+@keyframes cloudLoader {
+ 0% {
+   stroke-dashoffset: 0;
+   stroke-dasharray: 20, 10;
+ }
+ 50% {
+   stroke-dasharray: 25, 8;
+ }
+ 100% {
+   stroke-dashoffset: -60; /* Adjusted for smaller effect */
+   stroke-dasharray: 20, 10;
+ }
+}
+
+.error-message {
+ font-size: 18px;
+ font-weight: bold;
+ text-align: center;
+ margin-top: 20px;
+ padding: 20px;
+ border-radius: 5px;
+}
+
+.error-message h2 {
+ color: darkred;
+}
+
+.error-message p {
+ color: #333;
+ font-size: 16px;
+}
+
+.error-icon{
+ margin-top: 80px;
+ font-size: 224px;
+ color: #dc3545;
+}
+
+

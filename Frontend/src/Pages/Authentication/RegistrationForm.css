@@ -1,0 +1,142 @@
+/* RegistrationForm.css */
+
+
+
+.registration-page {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsl(218, 41%, 15%);
+  background-image: radial-gradient(650px circle at 0% 0%,
+      hsl(218, 41%, 35%) 15%,
+      hsl(218, 41%, 30%) 35%,
+      hsl(218, 41%, 20%) 75%,
+      hsl(218, 41%, 19%) 80%,
+      transparent 100%),
+    radial-gradient(1250px circle at 100% 100%,
+      hsl(218, 41%, 45%) 15%,
+      hsl(218, 41%, 30%) 35%,
+      hsl(218, 41%, 20%) 75%,
+      hsl(218, 41%, 19%) 80%,
+      transparent 100%);
+  position: relative;
+  overflow: auto;
+}
+
+.registration-container {
+  display: flex;
+  width: 100%;
+  max-width: 1400px;
+  background: transparent;
+  z-index: 2;
+  padding: 20px;
+}
+
+.text-side {
+  flex: 1;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 60px;
+}
+
+.text-side h1 {
+  font-size: 3em;
+  margin-bottom: 30px;
+}
+
+.text-side p {
+  font-size: 1.2em;
+  color: white;
+  line-height: 1.8;
+}
+
+.form-side {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.form-card {
+  position: relative;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  padding: 60px;
+  border-radius: 12px;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 500px;
+  z-index: 1;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.form-row > * {
+  flex: 1 1 45%;
+}
+
+.form-field {
+  flex: 1;
+  margin-right: 10px;
+}
+
+.form-field:last-child {
+  margin-right: 0;
+}
+
+.form-row input {
+  padding: 16px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 1.1em;
+}
+
+.registration-button {
+  background: #2575fc;
+  color: white;
+  padding: 16px 24px;
+  border: none;
+  border-radius: 6px;
+  width: 100%;
+  cursor: pointer;
+  font-size: 1.2em;
+}
+/* Move circles outside form-card */
+#radius-shape-1 {
+  height: 250px; /* Make height equal to width */
+  width: 250px;
+  top: -110px;
+  left: -110px;
+  background: radial-gradient(#44006b, #ad1fff);
+  overflow: hidden;
+  position: absolute;
+  z-index: 0;
+  border-radius: 70%; /* Ensure it's a circle */
+}
+
+#radius-shape-2 {
+  border-radius: 38% 62% 63% 37% / 70% 33% 67% 30%;
+  bottom: -110px;
+  right: -110px;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(#44006b, #ad1fff);
+  overflow: hidden;
+  position: absolute;
+  z-index: 0;
+}
+
+
+.signup-link {
+    margin-top: 15px;
+    text-align: center;
+}
+
+.signup-link a {
+    color: #2575fc;
+    text-decoration: none;
+}

@@ -1,0 +1,18 @@
+git status
+git add .
+git status
+git commit -m "27 March commit"
+git push -u origin master
+
+
+
+Create new branch "new-branch"
+-----------------------------
+
+git checkout -b new-branch
+git status
+git add .
+git branch
+git checkout new-branch
+git commit -m "Changes in new-branch"
+git push origin new-branch

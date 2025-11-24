@@ -1,0 +1,23 @@
+        "capabilities:cpu_info:arch": "x86_64",
+        "capabilities:cpu_info:features": "dca,de,xop",
+        "capabilities:cpu_info:model": "Delhi",
+        "capabilities:cpu_info:topology:threads": "2",
+        "capabilities:cpu_info:vendor": "Intel",
+        "capabilities:cpu_info:topology:sockets": "1"
+
+        
+        "hw:cpu_policy": "dedicated",
+        "hw:cpu_thread_policy": "isolate"
+       
+        "hw:cpu_threads": "1",
+        "hw:cpu_max_cores": "1",
+        "hw:cpu_max_sockets": "1",
+        "hw:cpu_max_threads": "1",
+        "hw:cpu_cores": "1",
+        "hw:cpu_sockets": "2"
+
+        "hw_rng:allowed": "true",
+        "hw_rng:rate_bytes": "1024",
+        "hw_rng:rate_period": "5"
+
+        "hw:tpm_model": "TIS"
