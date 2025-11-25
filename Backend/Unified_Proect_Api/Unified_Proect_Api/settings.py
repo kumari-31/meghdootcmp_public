@@ -63,12 +63,7 @@ ALLOWED_HOSTS = ['*']
 # CORS_ALLOW_ALL_ORIGINS = True  # Or set to False and specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
 
-CORS_ALLOWED_ORIGINS = [
-   
-    "http://localhost:3000",
-    "http://10.184.40.149:3000",
-    "http://10.184.39.33:8002",  # Add your production origin if necessary
-]
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
 
 
 ROOT_URLCONF = 'Unified_Proect_Api.urls'

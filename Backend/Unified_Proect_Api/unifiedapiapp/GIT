@@ -16,3 +16,11 @@ git branch
 git checkout new-branch
 git commit -m "Changes in new-branch"
 git push origin new-branch
+
+
+pull changes from remote
+-----------------------------       
+
+git pull origin dev-cmp --no-rebase 
+git log --oneline --graph --decorate --all # View commit history
+git status
