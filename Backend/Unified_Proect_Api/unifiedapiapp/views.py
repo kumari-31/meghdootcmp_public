@@ -5199,48 +5199,71 @@ class VmRequestStatusUpdateAPIView(APIView):
 class VmRequestOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    """
-    Unified API for FLA and ADMIN to view all VM request statuses,
-    with counts and detailed data.
-    """
-    
-
     def get(self, request):
         try:
-            role = request.auth.get("role", None)
-            employee_id = request.auth.get("employee_id", None)
+            role = request.auth.get("role")
+            employee_id = request.auth.get("employee_id")
 
-            # --- Determine dataset based on role ---
+            # -----------------------------------
+            # ROLE-WISE BASE QUERYSET
+            # -----------------------------------
+
             if role == "ADMIN":
-                queryset = VmRequest.objects.all()
+                base_qs = VmRequest.objects.all()
+
+                # Admin sees only "FLA Accepted + Admin Pending"
+                queryset = base_qs.filter(fla_status="Accepted", admin_status="Pending")
+
+                status_counts = {
+                    "pending": queryset.count(),
+                    "accepted": base_qs.filter(admin_status="Accepted").count(),
+                    "rejected": base_qs.filter(admin_status="Rejected").count(),
+                }
+
             elif role == "FLA":
-                # Fetch all requests related to FLA’s employees
                 related_emp_ids = Employee.objects.filter(
                     fla_employee_id=employee_id
                 ).values_list("employee_id", flat=True)
+
                 queryset = VmRequest.objects.filter(
                     Q(employee_id__in=related_emp_ids) | Q(employee_id=employee_id)
                 )
+
+                status_counts = {
+                    "pending": queryset.filter(fla_status="Pending").count(),
+                    "accepted": queryset.filter(fla_status="Accepted").count(),
+                    "rejected": queryset.filter(fla_status="Rejected").count(),
+                }
+
             else:
-                # For regular users — only their own requests
+                # EMPLOYEE
                 queryset = VmRequest.objects.filter(employee_id=employee_id)
 
-            # --- Status counts ---
-            status_counts = {
-                "pending": queryset.filter(admin_status="Pending").count(),
-                "accepted": queryset.filter(admin_status="Accepted").count(),
-                "rejected": queryset.filter(admin_status="Rejected").count(),
-            }
+                status_counts = {
+                    "pending": queryset.filter(fla_status="Pending").count(),
+                    "accepted": queryset.filter(fla_status="Accepted", admin_status="Accepted").count(),
+                    "rejected": queryset.filter(
+                        Q(fla_status="Rejected") | Q(admin_status="Rejected")
+                    ).count(),
+                }
 
-            # --- Pagination ---
+            # -----------------------------------
+            # PAGINATION (works for ALL roles)
+            # -----------------------------------
+
             page = int(request.GET.get("page", 1))
             size = int(request.GET.get("size", 10))
+
             total_records = queryset.count()
             start = (page - 1) * size
             end = start + size
+
             queryset = queryset.order_by("-request_timestamp")[start:end]
 
-            # --- Detailed Data ---
+            # -----------------------------------
+            # SERIALIZE DATA (same for all roles)
+            # -----------------------------------
+
             data = []
             for vm in queryset:
                 data.append({
@@ -5273,7 +5296,6 @@ class VmRequestOverviewAPIView(APIView):
                     "admin_rejection_reason": getattr(vm, "admin_rejection_reason", None),
                 })
 
-            # --- Response ---
             return Response(
                 {
                     "role": role,
@@ -5288,6 +5310,7 @@ class VmRequestOverviewAPIView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 
@@ -13380,7 +13403,6 @@ class ServiceRequestPendingAdminAPIView(APIView):
             
 
             apps_v1, core_v1 = get_k8s_client3()
-            print("ngix function")
             print("service name:", service_request.service_name)
             if service_request.service_name.lower() == "nginx":
                 # if not pod_name or not isinstance(pod_name, str):
@@ -13711,10 +13733,11 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 }, status=status.HTTP_201_CREATED)
                 
              
-            elif service_request.service_name.lower() == "nginx-ha":
+            elif service_request.service_name.replace("-", "").lower() == "nginxha":
 
-                replicas = service_request.replica if service_request.replica else 2
-                deployment_name = f"{service_request.app_name}-{service_request.id}"
+                # Default replicas = 2 if empty
+                replicas = int(service_request.replica) if service_request.replica else 2
+                deployment_name = f"{service_request.app_name}-ha-{service_request.id}"
                 service_name = deployment_name + "-svc"
 
                 apps_v1, core_v1 = get_k8s_client3()
@@ -13723,10 +13746,17 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 # 1️⃣ Create Deployment
                 # ---------------------------
                 deployment = client.V1Deployment(
-                    metadata=client.V1ObjectMeta(name=deployment_name, labels={"app": deployment_name}),
+                    api_version="apps/v1",
+                    kind="Deployment",
+                    metadata=client.V1ObjectMeta(
+                        name=deployment_name,
+                        labels={"app": deployment_name}
+                    ),
                     spec=client.V1DeploymentSpec(
-                        replicas=int(replicas),
-                        selector=client.V1LabelSelector(match_labels={"app": deployment_name}),
+                        replicas=replicas,
+                        selector=client.V1LabelSelector(
+                            match_labels={"app": deployment_name}
+                        ),
                         template=client.V1PodTemplateSpec(
                             metadata=client.V1ObjectMeta(labels={"app": deployment_name}),
                             spec=client.V1PodSpec(
@@ -13745,13 +13775,17 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 try:
                     apps_v1.create_namespaced_deployment("default", deployment)
                 except client.exceptions.ApiException as e:
-                    return Response({"error": f"NGINX-HA Deployment failed: {str(e)}"}, status=500)
+                    return Response({
+                        "error": "NGINX-HA Deployment failed",
+                        "details": e.body
+                    }, status=500)
 
                 # ---------------------------
                 # 2️⃣ Create NodePort service
                 # ---------------------------
                 # Check port availability
                 used_ports = set()
+
                 services = core_v1.list_service_for_all_namespaces().items
 
                 for svc in services:
@@ -13793,6 +13827,12 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 service_request.save()
 
                 print(f"🔥 NGINX-HA Deployed: {deployment_name}, NodePort={node_port}")
+
+                return Response({
+                "message": "NGINX-HA deployed successfully",
+                "node_port": node_port,
+                "deployment_name": deployment_name
+            }, status=200)
 
                 
             elif service_request.service_name.lower() == "couchdb":

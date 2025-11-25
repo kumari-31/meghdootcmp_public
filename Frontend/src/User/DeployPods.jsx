@@ -44,6 +44,12 @@ const categorizedCards = {
       description:
         'Nginx (pronounced "engine x") is a powerful, high-performance web server and reverse proxy',
     },
+    {
+      name: "Nginxha",
+      logo: "nginx.png",
+      description:
+        "Highly available Nginx setup with multiple replicas for fault tolerance.",
+    },
   ],
 
   "Relational Databases": [
@@ -212,6 +218,15 @@ const serviceFieldConfigs = {
     { name: "additional_notes", label: "Additional Notes" },
     { name: "app_name", label: "App Name" },
   ],
+  nginxha: [
+    { name: "app_name", label: "Deployment Name" },
+    { name: "replica", label: "Replica", type: "number", default: 2 },
+    { name: "namespace", label: "Namespace", default: "default" },
+    { name: "service_start_date", label: "Service Start Date", type: "date" },
+    { name: "service_end_date", label: "Service End Date", type: "date" },
+    { name: "service_requirements", label: "Service Requirements" },
+    { name: "additional_notes", label: "Additional Notes" },
+  ],
 };
 
 const DatabaseCard = ({ card, handleOpen }) => {
@@ -369,7 +384,10 @@ const DeployPods = () => {
     const normalized = normalizeServiceName(service);
     const additionalFields = serviceFieldConfigs[normalized] || [];
     const dynamicData = Object.fromEntries(
-      additionalFields.map((f) => [f.name, ""])
+      additionalFields.map((f) => [
+        f.name,
+        f.default !== undefined ? f.default : "",
+      ])
     );
     setFormData({
       employee_id: formData.employee_id,
