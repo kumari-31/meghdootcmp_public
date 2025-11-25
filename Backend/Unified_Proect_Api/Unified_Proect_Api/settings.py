@@ -64,11 +64,12 @@ ALLOWED_HOSTS = ['*']
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-
+   
     "http://localhost:3000",
-    "http://10.184.40.36:3000",
+    "http://10.184.40.149:3000",
     "http://10.184.39.33:8002",  # Add your production origin if necessary
 ]
+
 
 ROOT_URLCONF = 'Unified_Proect_Api.urls'
 
