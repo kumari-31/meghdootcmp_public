@@ -1,4 +1,4 @@
-import  { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AiOutlineKubernetes, AiOutlineLogout } from "react-icons/ai";
 import { SiOpenstack } from "react-icons/si";
@@ -84,7 +84,7 @@ const Navbar = () => {
   const [pendingRequests, setPendingRequests] = useState([]);
   const { logout, user } = useAuth();
   const userRole = user?.role;
-console.log("User Role in Navbar:", userRole);
+  console.log("User Role in Navbar:", userRole);
   const navigate = useNavigate();
 
   const [profileAnchor, setProfileAnchor] = useState(null);
@@ -92,7 +92,7 @@ console.log("User Role in Navbar:", userRole);
 
   /* -------------------- 🔔 NOTIFICATION HANDLERS -------------------- */
 
-   /* 🔔 Notification Handlers */
+  /* 🔔 Notification Handlers */
   const handleNotificationClick = (event) => {
     setNotificationAnchor(event.currentTarget);
   };
@@ -261,14 +261,18 @@ console.log("User Role in Navbar:", userRole);
               {
                 id: 7,
                 name: "Administration",
-                subMenu: ["Projects", "Users", "Groups", "Roles","ApplicationCredentials"].map(
-                  (item) => ({
-                    name: item,
-                    path: `/app/openstack/${item
-                      .toLowerCase()
-                      .replace(/\s+/g, "-")}`,
-                  })
-                ),
+                subMenu: [
+                  "Projects",
+                  "Users",
+                  "Groups",
+                  "Roles",
+                  "ApplicationCredentials",
+                ].map((item) => ({
+                  name: item,
+                  path: `/app/openstack/${item
+                    .toLowerCase()
+                    .replace(/\s+/g, "-")}`,
+                })),
               },
               // {
               //   id: 8,
@@ -324,6 +328,11 @@ console.log("User Role in Navbar:", userRole);
               name: "Request Service Status",
               path: "/app/kubernetes/request-status",
               roles: ["FLA", "EMPLOYEE"],
+            },
+            {
+              name: "Deployed Services",
+              path: "/app/kubernetes/deployed-services",
+              roles: ["EMPLOYEE"],
             },
           ],
         },
@@ -403,28 +412,28 @@ console.log("User Role in Navbar:", userRole);
   const handleSubMenuClick = (subMenuName) => setSelectedSubMenu(subMenuName);
 
   const handlePlatformChange = (platform) => {
-  setSelectedPlatform(platform);
-  localStorage.setItem("selectedPlatform", platform);
-  setSelectedMenu(null);
+    setSelectedPlatform(platform);
+    localStorage.setItem("selectedPlatform", platform);
+    setSelectedMenu(null);
 
-  if (userRole === "ADMIN") {
-    navigate(`/app/${platform}`);
-  } else if (userRole === "FLA") {
-    // Default route for FLA
-    navigate(
-      platform === "openstack"
-        ? "/app/openstack/fla/approvals"
-        : "/app/kubernetes/fla-service-approval"
-    );
-  } else if (userRole === "EMPLOYEE") {
-    // Default route for Employee
-    navigate(
-      platform === "openstack"
-        ? "/app/openstack/vmrequest"
-        : "/app/kubernetes/deploypods"
-    );
-  }
-};
+    if (userRole === "ADMIN") {
+      navigate(`/app/${platform}`);
+    } else if (userRole === "FLA") {
+      // Default route for FLA
+      navigate(
+        platform === "openstack"
+          ? "/app/openstack/fla/approvals"
+          : "/app/kubernetes/fla-service-approval"
+      );
+    } else if (userRole === "EMPLOYEE") {
+      // Default route for Employee
+      navigate(
+        platform === "openstack"
+          ? "/app/openstack/vmrequest"
+          : "/app/kubernetes/deploypods"
+      );
+    }
+  };
 
   /* 🧱 Meghdoot Cloud click handler (avoid unauthorized for FLA/EMPLOYEE) */
   const handleLogoClick = (e) => {
@@ -433,7 +442,6 @@ console.log("User Role in Navbar:", userRole);
     else if (userRole === "FLA") navigate("/app/openstack/fla/approvals");
     else if (userRole === "EMPLOYEE") navigate("/app/openstack/vmrequest");
   };
-
 
   /* -------------------- 🧱 RENDER -------------------- */
 
@@ -494,7 +502,11 @@ console.log("User Role in Navbar:", userRole);
             }}
           >
             <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="h6">{userRole === "ADMIN" ? "Pending VM Requests" : "Pending FLA Requests"}</Typography>
+              <Typography variant="h6">
+                {userRole === "ADMIN"
+                  ? "Pending VM Requests"
+                  : "Pending FLA Requests"}
+              </Typography>
             </Box>
             <Divider />
 
@@ -638,23 +650,6 @@ console.log("User Role in Navbar:", userRole);
 };
 
 export default Navbar;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // import { useState, useEffect } from "react";
 // import { Link, useNavigate } from "react-router-dom";

@@ -550,13 +550,14 @@
 //   );
 // };
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
   Tooltip,
   ResponsiveContainer,
+  BarChart,
 } from "recharts";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
@@ -570,12 +571,7 @@ import {
   CircularProgress,
   Stack,
 } from "@mui/material";
-// import {
-//   GaugeContainer,
-//   GaugeValueArc,
-//   GaugeReferenceArc,
-//   useGaugeState,
-// } from "@mui/x-charts/Gauge";
+
 import {
   CircularProgressbarWithChildren,
   buildStyles,
@@ -665,30 +661,6 @@ const GradientCircularStat = ({
   );
 };
 
-// function GaugePointer() {
-//   const { valueAngle, outerRadius, cx, cy } = useGaugeState();
-
-//   if (valueAngle === null) {
-//     return null;
-//   }
-
-//   const target = {
-//     x: cx + outerRadius * Math.sin(valueAngle),
-//     y: cy - outerRadius * Math.cos(valueAngle),
-//   };
-
-//   return (
-//     <g>
-//       <circle cx={cx} cy={cy} r={5} fill="red" />
-//       <path
-//         d={`M ${cx} ${cy} L ${target.x} ${target.y}`}
-//         stroke="red"
-//         strokeWidth={3}
-//       />
-//     </g>
-//   );
-// }
-
 const Dashboard = () => {
   const [data, setData] = useState({
     total_instances: 0,
@@ -713,6 +685,21 @@ const Dashboard = () => {
     open: 0,
     inProgress: 0,
     closed: 0,
+  });
+  const [openstackReq, setOpenstackReq] = useState({
+    total: 0,
+    pending: 0,
+    accepted: 0,
+    rejected: 0,
+    today: 0,
+  });
+
+  const [k8sReq, setK8sReq] = useState({
+    total: 0,
+    pending: 0,
+    accepted: 0,
+    rejected: 0,
+    today: 0,
   });
 
   const handleDateChange = (newDate) => {
@@ -765,35 +752,6 @@ const Dashboard = () => {
     { name: "Today", value: summary.today, fill: "#ef5350" },
   ];
 
-  // const CustomLabel = ({
-  //   cx,
-  //   cy,
-  //   midAngle,
-  //   innerRadius,
-  //   outerRadius,
-  //   index,
-  // }) => {
-  //   const RADIAN = Math.PI / 180;
-  //   const radius = innerRadius + (outerRadius - innerRadius) * 0.6;
-  //   const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  //   const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-  //   const item = radialData[index]; // ensure radialData is accessible in component scope
-
-  //   return (
-  //     <text
-  //       x={x}
-  //       y={y}
-  //       fill="#000"
-  //       textAnchor="middle"
-  //       dominantBaseline="central"
-  //       fontSize={12}
-  //     >
-  //       {item ? `${item.name}: ${item.value}` : ""}
-  //     </text>
-  //   );
-  // };
-
   // ✅ Custom Tooltip
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
@@ -816,6 +774,91 @@ const Dashboard = () => {
     return null;
   };
 
+  useEffect(() => {
+    const fetchOpenstackOverview = async () => {
+      try {
+        const res = await apiClient.get("/vmdetails/overview/?page=1&size=500");
+        const data = res.data;
+
+        const todayCount =
+          data.data?.filter((vm) => dayjs(vm.created_at).isToday()).length || 0;
+
+        setOpenstackReq({
+          total: data.total_records,
+          pending: data.status_counts.pending,
+          accepted: data.status_counts.accepted,
+          rejected: data.status_counts.rejected,
+          today: todayCount,
+        });
+      } catch (err) {
+        console.error("OS Overview Error:", err);
+      }
+    };
+
+    fetchOpenstackOverview();
+  }, []);
+
+  useEffect(() => {
+    const fetchK8sReq = async () => {
+      try {
+        const res = await apiClient.get("/service-requests/");
+        const records = res.data.data;
+
+        const pending = records.filter(
+          (r) => r.admin_status === "Pending"
+        ).length;
+        const accepted = records.filter(
+          (r) => r.admin_status === "Accepted"
+        ).length;
+        const rejected = records.filter(
+          (r) => r.admin_status === "Rejected"
+        ).length;
+        const today = records.filter((r) =>
+          dayjs(r.request_timestamp).isToday()
+        ).length;
+
+        setK8sReq({
+          total: records.length,
+          pending,
+          accepted,
+          rejected,
+          today,
+        });
+      } catch (err) {
+        console.error("K8s Overview Error:", err);
+      }
+    };
+
+    fetchK8sReq();
+  }, []);
+
+  const makeDonutData = (stats) => [
+    { name: "Pending", value: stats.pending, fill: "#ffca28" },
+    { name: "Accepted", value: stats.accepted, fill: "#66bb6a" },
+    { name: "Rejected", value: stats.rejected, fill: "#ef5350" },
+  ];
+
+  /* ---------- Helpers (place near top of your component) ---------- */
+  const chartColors = {
+    pending: { start: "#FFD966", end: "#FFB86B" },
+    accepted: { start: "#6EE7B7", end: "#34D399" },
+    rejected: { start: "#FF8A80", end: "#F44336" },
+    trend: "#7C4DFF",
+  };
+
+  const buildStackData = (stats) => {
+    // one row with counts so horizontal stacked bar looks like a single band
+    return [
+      {
+        name: "Requests",
+        pending: stats.pending || 0,
+        accepted: stats.accepted || 0,
+        rejected: stats.rejected || 0,
+        total: stats.total || 0,
+        today: stats.today || 0,
+      },
+    ];
+  };
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -985,7 +1028,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-
       <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
         <Card
           sx={{
@@ -1037,23 +1079,281 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      {/* Second row - Three cards */}
-      {/* {[
-        { title: "AWS", stats: ["Running: 4 EC2 Instances", "Stopped: 0 EC2 Instances"] },
-        { title: "Microsoft", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
-        { title: "Oracle", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
-      ].map((cloud, index) => (
-        <Grid2 item xs={4} key={index}>
-          <Card sx={{ padding: 2 , height: 200, minWidth:600}}>
-            <CardContent>
-              <Typography variant="h6">{cloud.title}</Typography>
-              {cloud.stats.map((stat, i) => (
-                <Typography key={i} variant="body2">{stat}</Typography>
-              ))}
-            </CardContent>
-          </Card>
-        </Grid2>
-      ))} */}
+      /* ---------- Futuristic OpenStack Card ---------- */
+      <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
+        <Card
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            boxShadow: "0 8px 30px rgba(12, 12, 40, 0.08)",
+            background:
+              "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,255,0.95))",
+          }}
+        >
+          <CardContent sx={{ pb: 1 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  OpenStack VM Requests
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Overview — pending requests (FLA approved) and admin decisions
+                </Typography>
+              </Box>
+
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box sx={{ textAlign: "right" }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                    {openstackReq.total}
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      background:
+                        "linear-gradient(90deg, rgba(255,255,255,0.6), rgba(255,255,255,0.2))",
+                      boxShadow: "inset 0 -2px 10px rgba(2,6,23,0.03)",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Today
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {openstackReq.today}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      background: "linear-gradient(135deg, #EEF7FF, #F6F6FF)",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Pending
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.pending.end, fontWeight: 700 }}
+                    >
+                      {openstackReq.pending}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
+            </Stack>
+
+            {/* Large wide chart area */}
+            <Box
+              sx={{
+                mt: 2,
+                width: "100%",
+                height: 140,
+                display: "flex",
+                gap: 2,
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={buildStackData(openstackReq)}
+                    layout="vertical"
+                    margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                  >
+                    <defs>
+                      <linearGradient id="gradPending" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.pending.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.pending.end}
+                        />
+                      </linearGradient>
+                      <linearGradient id="gradAccepted" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.accepted.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.accepted.end}
+                        />
+                      </linearGradient>
+                      <linearGradient id="gradRejected" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.rejected.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.rejected.end}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" hide />
+                    <Tooltip
+                      cursor={{ fill: "rgba(12,12,40,0.03)" }}
+                      formatter={(value, name) => [
+                        value,
+                        name.charAt(0).toUpperCase() + name.slice(1),
+                      ]}
+                    />
+
+                    {/* Stacked bars */}
+                    <Bar
+                      dataKey="pending"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#gradPending)"
+                    />
+                    <Bar
+                      dataKey="accepted"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#gradAccepted)"
+                    />
+                    <Bar
+                      dataKey="rejected"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#gradRejected)"
+                    />
+
+                    {/* Labels on right side showing numeric values */}
+                    <LabelList
+                      dataKey="total"
+                      position="right"
+                      formatter={(val) => `Total ${val}`}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+
+              {/* Right side: breakdown + mini trend */}
+              <Box
+                sx={{
+                  width: 260,
+                  p: 1.5,
+                  borderRadius: 2,
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(250,251,255,0.85))",
+                  boxShadow: "0 6px 18px rgba(12,12,40,0.04)",
+                }}
+              >
+                <Stack spacing={1.2}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Accepted
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.accepted.end, fontWeight: 800 }}
+                    >
+                      {openstackReq.accepted}
+                    </Typography>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Pending (FLA)
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.pending.end, fontWeight: 800 }}
+                    >
+                      {openstackReq.pending}
+                    </Typography>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Rejected
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.rejected.end, fontWeight: 800 }}
+                    >
+                      {openstackReq.rejected}
+                    </Typography>
+                  </Stack>
+
+                  <Divider sx={{ mt: 0.5 }} />
+
+                  <Typography variant="caption" color="text.secondary">
+                    Recent trend
+                  </Typography>
+                  <Box sx={{ width: "100%", height: 50 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={[
+                          {
+                            x: "t",
+                            total: openstackReq.total || 0,
+                            today: openstackReq.today || 0,
+                          },
+                        ]}
+                      >
+                        <XAxis dataKey="x" hide />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="today"
+                          stroke={chartColors.trend}
+                          strokeWidth={3}
+                          dot={{ r: 3 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="total"
+                          fill="rgba(124,77,255,0.08)"
+                          stroke="transparent"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Stack>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid2>
+      {/* 
       <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
         <Card
           sx={{
@@ -1071,99 +1371,8 @@ const Dashboard = () => {
             <Typography variant="body2">This Week: 0</Typography>
           </CardContent>
         </Card>
-      </Grid2>
-
+      </Grid2> */}
       {/* Third row - Three cards */}
-      <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
-        <Card
-          sx={{
-            height: "auto",
-            width: "100%",
-            borderRadius: 4,
-            boxShadow: 6,
-            p: 2,
-            // minWidth: 700,
-            // background: "linear-gradient(145deg, #f0faff, #ffffff)",
-          }}
-        >
-          <CardContent>
-            <Typography variant="h6" gutterBottom>
-              🎫 Ticket Overview
-            </Typography>
-            {/* <Divider sx={{ mb: 2 }} /> */}
-
-            {loading ? (
-              <Box
-                display="flex"
-                justifyContent="center"
-                alignItems="center"
-                height={100}
-              >
-                <CircularProgress />
-              </Box>
-            ) : (
-              <Stack direction="row" spacing={4}>
-                {/* Chart */}
-                <Box sx={{ width: "50%", height: 320 }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RadialBarChart
-                      cx="50%"
-                      cy="50%"
-                      innerRadius="30%"
-                      outerRadius="100%"
-                      barSize={18}
-                      data={radialData}
-                    >
-                      <PolarAngleAxis
-                        type="number"
-                        domain={[0, Math.max(summary.total, 10)]}
-                        angleAxisId={0}
-                        tick={false}
-                      />
-                      <RadialBar
-                        background
-                        dataKey="value"
-                        cornerRadius={10}
-                        label={({ index }) =>
-                          `${radialData[index].name}: ${radialData[index].value}`
-                        }
-                      />
-                      <Tooltip content={<CustomTooltip />} />
-                    </RadialBarChart>
-                  </ResponsiveContainer>
-                </Box>
-
-                {/* Stats */}
-                <Box
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Typography variant="h5" sx={{ mb: 2 }}>
-                    🟣 Total Tickets: {summary.total}
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 1 }}>
-                    🔵 <strong>Open:</strong> {summary.open}
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 1 }}>
-                    🟡 <strong>In Progress:</strong> {summary.inProgress}
-                  </Typography>
-                  <Typography variant="body1" sx={{ mb: 1 }}>
-                    🟢 <strong>Closed:</strong> {summary.closed}
-                  </Typography>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="body1">
-                    🔴 <strong>Today:</strong> {summary.today}
-                  </Typography>
-                </Box>
-              </Stack>
-            )}
-          </CardContent>
-        </Card>
-      </Grid2>
-
       <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
         <Card
           sx={{
@@ -1197,8 +1406,272 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
+      /* ---------- Futuristic Kubernetes Card ---------- */
+      <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
+        <Card
+          sx={{
+            p: 2,
+            borderRadius: 3,
+            boxShadow: "0 8px 30px rgba(6, 8, 30, 0.06)",
+            background:
+              "linear-gradient(180deg, rgba(255,254,250,0.98), rgba(245,250,255,0.95))",
+          }}
+        >
+          <CardContent sx={{ pb: 1 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  Kubernetes Service Requests
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Services requested for K8s (deployments, dbs, ingress etc.)
+                </Typography>
+              </Box>
 
-      <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box sx={{ textAlign: "right" }}>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    Total
+                  </Typography>
+                  <Typography variant="h5" sx={{ fontWeight: 800 }}>
+                    {k8sReq.total}
+                  </Typography>
+                </Box>
+
+                <Stack direction="row" spacing={1}>
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      background:
+                        "linear-gradient(90deg, rgba(255,255,255,0.6), rgba(255,255,255,0.2))",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Today
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      {k8sReq.today}
+                    </Typography>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderRadius: 2,
+                      background: "linear-gradient(135deg, #FFF7EC, #FFFDF5)",
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      Pending
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.pending.end, fontWeight: 700 }}
+                    >
+                      {k8sReq.pending}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Stack>
+            </Stack>
+
+            {/* Large wide chart area */}
+            <Box
+              sx={{
+                mt: 2,
+                width: "100%",
+                height: 140,
+                display: "flex",
+                gap: 2,
+              }}
+            >
+              <Box sx={{ flex: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={buildStackData(k8sReq)}
+                    layout="vertical"
+                    margin={{ top: 8, right: 8, left: 8, bottom: 8 }}
+                  >
+                    <defs>
+                      <linearGradient id="kgradPending" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.pending.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.pending.end}
+                        />
+                      </linearGradient>
+                      <linearGradient id="kgradAccepted" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.accepted.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.accepted.end}
+                        />
+                      </linearGradient>
+                      <linearGradient id="kgradRejected" x1="0" x2="1">
+                        <stop
+                          offset="0%"
+                          stopColor={chartColors.rejected.start}
+                        />
+                        <stop
+                          offset="100%"
+                          stopColor={chartColors.rejected.end}
+                        />
+                      </linearGradient>
+                    </defs>
+
+                    <XAxis type="number" hide />
+                    <YAxis type="category" dataKey="name" hide />
+                    <Tooltip cursor={{ fill: "rgba(12,12,40,0.03)" }} />
+
+                    <Bar
+                      dataKey="pending"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#kgradPending)"
+                    />
+                    <Bar
+                      dataKey="accepted"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#kgradAccepted)"
+                    />
+                    <Bar
+                      dataKey="rejected"
+                      stackId="a"
+                      barSize={28}
+                      radius={[8, 8, 8, 8]}
+                      fill="url(#kgradRejected)"
+                    />
+
+                    <LabelList
+                      dataKey="total"
+                      position="right"
+                      formatter={(val) => `Total ${val}`}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Box>
+
+              {/* Right side: breakdown + mini trend */}
+              <Box
+                sx={{
+                  width: 260,
+                  p: 1.5,
+                  borderRadius: 2,
+                  background:
+                    "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(252,255,250,0.9))",
+                  boxShadow: "0 6px 18px rgba(6,8,30,0.03)",
+                }}
+              >
+                <Stack spacing={1.2}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Accepted
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.accepted.end, fontWeight: 800 }}
+                    >
+                      {k8sReq.accepted}
+                    </Typography>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Pending
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.pending.end, fontWeight: 800 }}
+                    >
+                      {k8sReq.pending}
+                    </Typography>
+                  </Stack>
+
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Rejected
+                    </Typography>
+                    <Typography
+                      variant="h6"
+                      sx={{ color: chartColors.rejected.end, fontWeight: 800 }}
+                    >
+                      {k8sReq.rejected}
+                    </Typography>
+                  </Stack>
+
+                  <Divider sx={{ mt: 0.5 }} />
+
+                  <Typography variant="caption" color="text.secondary">
+                    Recent trend
+                  </Typography>
+                  <Box sx={{ width: "100%", height: 50 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ComposedChart
+                        data={[
+                          {
+                            x: "t",
+                            total: k8sReq.total || 0,
+                            today: k8sReq.today || 0,
+                          },
+                        ]}
+                      >
+                        <XAxis dataKey="x" hide />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="today"
+                          stroke={chartColors.trend}
+                          strokeWidth={3}
+                          dot={{ r: 3 }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="total"
+                          fill="rgba(124,77,255,0.08)"
+                          stroke="transparent"
+                        />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </Stack>
+              </Box>
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid2>
+      {/* <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
         <Card
           sx={{
             padding: 2,
@@ -1215,7 +1688,7 @@ const Dashboard = () => {
             <Typography variant="body2">Switches: 0</Typography>
           </CardContent>
         </Card>
-      </Grid2>
+      </Grid2> */}
     </Grid2>
   );
 };

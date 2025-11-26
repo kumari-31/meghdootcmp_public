@@ -38,6 +38,14 @@ export const AuthProvider = ({ children }) => {
     } catch {
       console.warn("Logout request failed (maybe already logged out)");
     }
+    // CLEAR LOCAL STORAGE ON LOGOUT
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (err) {
+      console.error("Failed to clear storage:", err);
+    }
+
     clearInactivityTimer();
     setUser(null);
     window.location.href = "/"; // redirect to login
@@ -48,6 +56,8 @@ export const AuthProvider = ({ children }) => {
     clearInactivityTimer();
     inactivityTimer.current = setTimeout(() => {
       console.warn("⚠️ Auto-logging out due to inactivity");
+      localStorage.clear();
+      sessionStorage.clear();
       logout();
     }, INACTIVITY_LIMIT);
   };
@@ -117,6 +127,10 @@ export const AuthProvider = ({ children }) => {
         console.warn(
           "Session expired — user_data cookie missing. Logging out."
         );
+
+        localStorage.clear();
+        sessionStorage.clear();
+
         logout();
       }
     }, 30 * 1000); // check every 30 seconds

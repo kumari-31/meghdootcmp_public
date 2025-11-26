@@ -97,8 +97,8 @@ from datetime import timedelta
 # }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),       # short-lived access token
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=20),          # longer refresh token
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=25),       # short-lived access token
+    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=30),          # longer refresh token
     'ROTATE_REFRESH_TOKENS': True,                        # rotate refresh tokens
     'BLACKLIST_AFTER_ROTATION': True,                     # blacklist old refresh tokens
     'UPDATE_LAST_LOGIN': True,                             # optional
@@ -123,14 +123,14 @@ REFRESH_COOKIE_HTTPONLY = True
 REFRESH_COOKIE_SECURE = False     # must be True when SameSite=None
 REFRESH_COOKIE_SAMESITE = "Lax"  # or "None" if cross-site cookies are needed
 REFRESH_COOKIE_PATH = "/"
-REFRESH_COOKIE_AGE = 20 * 60  # 20 minutes
+REFRESH_COOKIE_AGE = 30 * 60  # 20 minutes
 
 ACCESS_COOKIE_NAME = "MDSID"
 ACCESS_COOKIE_HTTPONLY = True
 ACCESS_COOKIE_SECURE = False
 ACCESS_COOKIE_SAMESITE = "Lax"
 ACCESS_COOKIE_PATH = "/"
-ACCESS_COOKIE_AGE = 15 * 60  # 15 minutes
+ACCESS_COOKIE_AGE = 25 * 60  # 15 minutes
 
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases

@@ -21,7 +21,7 @@ import { tableCellClasses } from "@mui/material/TableCell";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useEffect, useState } from "react";
-import apiClient from "../Axios"; // adjust your API import
+import apiClient from "../Axios";
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
@@ -62,49 +62,49 @@ const FlaServiceApproval = () => {
   const [alertDialog, setAlertDialog] = useState({
     open: false,
     message: "",
-    severity: "success", // or "error"
+    severity: "success",
   });
   const [rejectDialog, setRejectDialog] = useState({
     open: false,
     requestId: null,
     reason: "",
   });
+
   const [statusDialog, setStatusDialog] = useState({
     open: false,
     status: "",
     data: [],
   });
 
-  // Fetch service requests
+  // ✔ Move fetchRequests outside useEffect so it can be reused
+  const fetchRequests = async () => {
+    try {
+      const response = await apiClient.get("/fla/service-requests/");
+      const data = response.data.data;
+
+      // Sort latest → oldest
+      data.sort(
+        (a, b) => new Date(b.request_timestamp) - new Date(a.request_timestamp)
+      );
+
+      const pending = data.filter((req) => req.fla_status === "Pending");
+      const accepted = data.filter((req) => req.fla_status === "Accepted");
+      const rejected = data.filter((req) => req.fla_status === "Rejected");
+
+      setRequests(data);
+      setCounts({
+        pending: pending.length,
+        accepted: accepted.length,
+        rejected: rejected.length,
+      });
+    } catch (err) {
+      setError("Failed to fetch service requests.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const response = await apiClient.get("/fla/service-requests/");
-        const data = response.data.data;
-
-        const pendingRequests = data.filter(
-          (req) => req.fla_status === "Pending"
-        );
-        const acceptedRequests = data.filter(
-          (req) => req.fla_status === "Accepted"
-        );
-        const rejectedRequests = data.filter(
-          (req) => req.fla_status === "Rejected"
-        );
-
-        setRequests(data); // table shows only pending
-        setCounts({
-          pending: pendingRequests.length,
-          accepted: acceptedRequests.length,
-          rejected: rejectedRequests.length,
-        });
-      } catch (err) {
-        setError("Failed to fetch service requests.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchRequests();
   }, []);
 
@@ -116,7 +116,8 @@ const FlaServiceApproval = () => {
       });
 
       if (response.status === 200) {
-        setRequests((prev) => prev.filter((r) => r.id !== requestId)); // remove request
+        await fetchRequests(); // Auto refresh table
+
         setAlertDialog({
           open: true,
           message: `Request ${status} successfully.`,
@@ -147,14 +148,8 @@ const FlaServiceApproval = () => {
       });
 
       if (response.status === 200) {
-        setRequests((prev) =>
-          prev.filter((r) => r.id !== rejectDialog.requestId)
-        );
-        setCounts((prev) => ({
-          ...prev,
-          pending: prev.pending - 1,
-          rejected: prev.rejected + 1,
-        }));
+        await fetchRequests(); // auto refresh
+
         setAlertDialog({
           open: true,
           message: "Request rejected successfully.",
@@ -172,12 +167,6 @@ const FlaServiceApproval = () => {
     }
   };
 
-  const handleChangePage = (_, newPage) => setPage(newPage);
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
   const emptyRows =
     rowsPerPage - Math.min(rowsPerPage, requests.length - page * rowsPerPage);
 
@@ -186,12 +175,14 @@ const FlaServiceApproval = () => {
 
   return (
     <>
+      {/* Count Cards */}
       <Stack
         direction="row"
         spacing={3}
         justifyContent="flex-start"
         sx={{ width: "90%", mx: "auto", mt: 4, mb: 2 }}
       >
+        {/* Pending */}
         <Paper
           elevation={3}
           sx={{
@@ -206,6 +197,8 @@ const FlaServiceApproval = () => {
             {counts.pending}
           </Typography>
         </Paper>
+
+        {/* Accepted */}
         <Paper
           elevation={3}
           sx={{
@@ -230,6 +223,8 @@ const FlaServiceApproval = () => {
             {counts.accepted}
           </Typography>
         </Paper>
+
+        {/* Rejected */}
         <Paper
           elevation={3}
           sx={{
@@ -256,6 +251,7 @@ const FlaServiceApproval = () => {
         </Paper>
       </Stack>
 
+      {/* Pending Table */}
       <Paper
         sx={{
           width: "90%",
@@ -265,10 +261,7 @@ const FlaServiceApproval = () => {
           boxShadow: 3,
         }}
       >
-        <Typography
-          variant="h5"
-          sx={{ marginBottom: 2, textAlign: "left", fontWeight: "bold" }}
-        >
+        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
           Pending Service Requests for Approval
         </Typography>
 
@@ -287,6 +280,7 @@ const FlaServiceApproval = () => {
                 <StyledTableCell>Actions</StyledTableCell>
               </TableRow>
             </TableHead>
+
             <TableBody>
               {requests
                 .filter((req) => req.fla_status === "Pending")
@@ -317,6 +311,7 @@ const FlaServiceApproval = () => {
                       )}
                     </StyledTableCell>
                     <StyledTableCell>{request.fla_status}</StyledTableCell>
+
                     <StyledTableCell>
                       <Stack
                         direction="row"
@@ -333,6 +328,7 @@ const FlaServiceApproval = () => {
                         >
                           Accept
                         </Button>
+
                         <Button
                           variant="contained"
                           color="error"
@@ -351,6 +347,7 @@ const FlaServiceApproval = () => {
                     </StyledTableCell>
                   </StyledTableRow>
                 ))}
+
               {emptyRows > 0 && (
                 <TableRow style={{ height: 53 * emptyRows }}>
                   <TableCell colSpan={9} />
@@ -363,83 +360,91 @@ const FlaServiceApproval = () => {
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={requests.length}
+          count={requests.filter((r) => r.fla_status === "Pending").length}
           rowsPerPage={rowsPerPage}
           page={page}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
         />
-        <Dialog
-          open={alertDialog.open}
-          onClose={() => setAlertDialog({ ...alertDialog, open: false })}
-        >
-          <DialogTitle sx={{ textAlign: "center", p: 3 }}>
-            {alertDialog.severity === "success" ? (
-              <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
-            ) : (
-              <ErrorIcon color="error" sx={{ fontSize: 60 }} />
-            )}
-          </DialogTitle>
-          <DialogContent sx={{ textAlign: "center", px: 6 }}>
-            <Typography variant="h6" gutterBottom>
-              {alertDialog.severity === "success" ? "Success" : "Error"}
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {alertDialog.message}
-            </Typography>
-          </DialogContent>
-          <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
-            <Button
-              onClick={() => setAlertDialog({ ...alertDialog, open: false })}
-              variant="contained"
-              color={alertDialog.severity}
-            >
-              OK
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        <Dialog
-          open={rejectDialog.open}
-          onClose={() =>
-            setRejectDialog({ open: false, requestId: null, reason: "" })
-          }
-        >
-          {/* <DialogTitle >Rejection Reason</DialogTitle> */}
-          <Typography sx={{ p: 2 }}>Rejection Reason</Typography>
-          <DialogContent sx={{ minWidth: 500, pt: 2 }}>
-            <TextField
-              fullWidth
-              multiline
-              rows={4}
-              variant="outlined"
-              label="Enter the reason for rejection"
-              value={rejectDialog.reason}
-              onChange={(e) =>
-                setRejectDialog((prev) => ({ ...prev, reason: e.target.value }))
-              }
-            />
-          </DialogContent>
-          <DialogActions>
-            <Button
-              onClick={() =>
-                setRejectDialog({ open: false, requestId: null, reason: "" })
-              }
-              color="inherit"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleReject}
-              color="error"
-              variant="contained"
-              disabled={!rejectDialog.reason.trim()}
-            >
-              Submit
-            </Button>
-          </DialogActions>
-        </Dialog>
       </Paper>
+
+      {/* Alert Dialog */}
+      <Dialog
+        open={alertDialog.open}
+        onClose={() => setAlertDialog({ ...alertDialog, open: false })}
+      >
+        <DialogTitle sx={{ textAlign: "center", p: 3 }}>
+          {alertDialog.severity === "success" ? (
+            <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
+          ) : (
+            <ErrorIcon color="error" sx={{ fontSize: 60 }} />
+          )}
+        </DialogTitle>
+
+        <DialogContent sx={{ textAlign: "center", px: 6 }}>
+          <Typography variant="h6">
+            {alertDialog.severity === "success" ? "Success" : "Error"}
+          </Typography>
+          <Typography>{alertDialog.message}</Typography>
+        </DialogContent>
+
+        <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
+          <Button
+            onClick={() => setAlertDialog({ ...alertDialog, open: false })}
+            variant="contained"
+            color={alertDialog.severity}
+          >
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Reject Dialog */}
+      <Dialog
+        open={rejectDialog.open}
+        onClose={() =>
+          setRejectDialog({ open: false, requestId: null, reason: "" })
+        }
+      >
+        <Typography sx={{ p: 2 }}>Rejection Reason</Typography>
+
+        <DialogContent sx={{ minWidth: 500, pt: 2 }}>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Enter rejection reason"
+            value={rejectDialog.reason}
+            onChange={(e) =>
+              setRejectDialog((prev) => ({ ...prev, reason: e.target.value }))
+            }
+          />
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            onClick={() =>
+              setRejectDialog({ open: false, requestId: null, reason: "" })
+            }
+          >
+            Cancel
+          </Button>
+
+          <Button
+            onClick={handleReject}
+            color="error"
+            variant="contained"
+            disabled={!rejectDialog.reason.trim()}
+          >
+            Submit
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Status Dialog (Accepted / Rejected) */}
       <Dialog
         open={statusDialog.open}
         onClose={() => setStatusDialog({ open: false, status: "", data: [] })}
@@ -447,6 +452,7 @@ const FlaServiceApproval = () => {
         fullWidth
       >
         <DialogTitle>{statusDialog.status} Requests</DialogTitle>
+
         <DialogContent dividers>
           {statusDialog.data.length > 0 ? (
             <TableContainer component={Paper}>
@@ -463,6 +469,7 @@ const FlaServiceApproval = () => {
                     <StyledTableCell>Status</StyledTableCell>
                   </TableRow>
                 </TableHead>
+
                 <TableBody>
                   {statusDialog.data.map((request, index) => (
                     <StyledTableRow key={request.id}>
@@ -489,12 +496,13 @@ const FlaServiceApproval = () => {
             <Typography>No records found.</Typography>
           )}
         </DialogContent>
+
         <DialogActions>
           <Button
+            variant="contained"
             onClick={() =>
               setStatusDialog({ open: false, status: "", data: [] })
             }
-            variant="contained"
           >
             Close
           </Button>

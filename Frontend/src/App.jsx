@@ -14,9 +14,7 @@ const ServiceDetails = lazy(() =>
 const ReplicaSetDetails = lazy(() =>
   import("./Kubernets/ReplicaSetDetailsComponent")
 );
-const NodesDetails = lazy(() =>
-  import("./Kubernets/NodesDetails")
-);
+const NodesDetails = lazy(() => import("./Kubernets/NodesDetails"));
 const Services = lazy(() => import("./Kubernets/Services"));
 const Nodes = lazy(() => import("./Kubernets/Nodes"));
 const Deployments = lazy(() => import("./Kubernets/Deployments"));
@@ -24,6 +22,7 @@ const StatefulSets = lazy(() => import("./Kubernets/StatefulSets"));
 const PersistentVolumes = lazy(() => import("./Kubernets/PersistentVolumes"));
 const StatefulSetDetails = lazy(() => import("./Kubernets/StatefulSetDetails"));
 const DeployPods = lazy(() => import("./User/DeployPods"));
+const DeployedServices = lazy(() => import("./User/DeployedServices"));
 const AddEmployee = lazy(() => import("./Pages/Admin/AddEmployee"));
 const AddEmployeefla = lazy(() => import("./Pages/Fla/AddEmployee"));
 const FlaServiceApproval = lazy(() =>
@@ -44,7 +43,9 @@ const LoginForm = lazy(() => import("./Pages/Authentication/LoginForm"));
 const RegistrationForm = lazy(() =>
   import("./Pages/Authentication/RegistrationForm")
 );
-const ApplicationCredantials = lazy(() => import("./Pages/Administration/ApplicationCredentials"));
+const ApplicationCredantials = lazy(() =>
+  import("./Pages/Administration/ApplicationCredentials")
+);
 const Unauthorized = lazy(() => import("./Pages/Unauthorized"));
 const VmRequest = lazy(() => import("./User/VmRequest"));
 const OpenstackOverview = lazy(() => import("./Pages/OpenstackOverview"));
@@ -133,7 +134,8 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-            *****************************************/////////////OPENSTACK API\\\\\\\\\\\\\\\\\\\\\\\\\\***********************************************************
+            *****************************************/////////////OPENSTACK
+            API\\\\\\\\\\\\\\\\\\\\\\\\\\***********************************************************
             <Route
               path="openstack"
               element={
@@ -351,8 +353,7 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-
-          <Route
+            <Route
               path="openstack/applicationcredentials"
               element={
                 <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -360,7 +361,6 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-            
             <Route
               path="openstack/floating-ips"
               element={
@@ -538,6 +538,14 @@ const App = () => {
               }
             />
             <Route
+              path="kubernetes/deployed-services"
+              element={
+                <ProtectedRoute allowedRoles={["EMPLOYEE"]}>
+                  <DeployedServices />
+                </ProtectedRoute>
+              }
+            />{" "}
+            <Route
               path="kubernetes/events"
               element={
                 <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -573,11 +581,9 @@ const App = () => {
               path="kubernetes/service-details/:serviceName"
               element={<ServiceDetails />}
             />
-             <Route
-               path="kubernetes/nodes-details/:name"
-              element={
-                  <NodesDetails />
-              }
+            <Route
+              path="kubernetes/nodes-details/:name"
+              element={<NodesDetails />}
             />
             <Route
               path="kubernetes/replicaset-details/:replicasetsName"

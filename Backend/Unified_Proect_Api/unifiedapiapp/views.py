@@ -5204,20 +5204,16 @@ class VmRequestOverviewAPIView(APIView):
             role = request.auth.get("role")
             employee_id = request.auth.get("employee_id")
 
-            # -----------------------------------
-            # ROLE-WISE BASE QUERYSET
-            # -----------------------------------
-
+            # -------------------------------------------------------
+            # ROLE-WISE BASE QUERYSET (UNFILTERED DATA)
+            # -------------------------------------------------------
             if role == "ADMIN":
-                base_qs = VmRequest.objects.all()
-
-                # Admin sees only "FLA Accepted + Admin Pending"
-                queryset = base_qs.filter(fla_status="Accepted", admin_status="Pending")
+                queryset = VmRequest.objects.all()
 
                 status_counts = {
-                    "pending": queryset.count(),
-                    "accepted": base_qs.filter(admin_status="Accepted").count(),
-                    "rejected": base_qs.filter(admin_status="Rejected").count(),
+                    "pending": queryset.filter(fla_status="Accepted", admin_status="Pending").count(),
+                    "accepted": queryset.filter(admin_status="Accepted").count(),
+                    "rejected": queryset.filter(admin_status="Rejected").count(),
                 }
 
             elif role == "FLA":
@@ -5236,36 +5232,35 @@ class VmRequestOverviewAPIView(APIView):
                 }
 
             else:
-                # EMPLOYEE
                 queryset = VmRequest.objects.filter(employee_id=employee_id)
 
                 status_counts = {
                     "pending": queryset.filter(fla_status="Pending").count(),
-                    "accepted": queryset.filter(fla_status="Accepted", admin_status="Accepted").count(),
+                    "accepted": queryset.filter(
+                        fla_status="Accepted", admin_status="Accepted"
+                    ).count(),
                     "rejected": queryset.filter(
                         Q(fla_status="Rejected") | Q(admin_status="Rejected")
                     ).count(),
                 }
 
-            # -----------------------------------
-            # PAGINATION (works for ALL roles)
-            # -----------------------------------
-
+            # -------------------------------------------------------
+            # PAGINATION (on full dataset)
+            # -------------------------------------------------------
             page = int(request.GET.get("page", 1))
             size = int(request.GET.get("size", 10))
-
             total_records = queryset.count()
+
             start = (page - 1) * size
             end = start + size
 
-            queryset = queryset.order_by("-request_timestamp")[start:end]
+            paged_qs = queryset.order_by("-request_timestamp")[start:end]
 
-            # -----------------------------------
-            # SERIALIZE DATA (same for all roles)
-            # -----------------------------------
-
+            # -------------------------------------------------------
+            # SERIALIZE DATA
+            # -------------------------------------------------------
             data = []
-            for vm in queryset:
+            for vm in paged_qs:
                 data.append({
                     "id": vm.id,
                     "name": vm.name,
@@ -5303,13 +5298,14 @@ class VmRequestOverviewAPIView(APIView):
                     "status_counts": status_counts,
                     "page": page,
                     "size": size,
-                    "data": data,
+                    "data": data,  # FULL DATA (not filtered)
                 },
-                status=status.HTTP_200_OK,
+                status=200,
             )
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": str(e)}, status=500)
+
 
 
 
@@ -13445,7 +13441,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
 
                 # Create service
                 created_service = core_v1.create_namespaced_service(namespace="default", body=service)
-                
+
                 # ⭐ Retrieve the assigned NodePort
                 node_port = created_service.spec.ports[0].node_port
                 print("Assigned NodePort:", node_port)
@@ -13458,7 +13454,28 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 service_request.deployment_status = "Deployed"
                 service_request.save()
 
+                # Send deployment success email
+                employee = Employee.objects.get(employee_id=service_request.employee_id)
+                send_deployment_email(
+                    email=employee.email,
+                    employee_name=employee.name,
+                    service_request=service_request
+                )
+
+                serializer = ServiceRequestSerializer(service_request)
+        
+                node_ip = os.getenv("node_ip")
+                deployment_url = f"http://{node_ip}:{service_request.node_port}/"
+
                 print("Deployment marked as Deployed")
+                return Response({
+                "message": "Service request status updated successfully by admin",
+                "data": serializer.data,
+                "deployment_url": deployment_url,
+                "node_port": service_request.node_port,
+                "service_name": service_request.service_name,
+                "app_name": service_request.app_name
+            }, status=status.HTTP_200_OK)
 
             elif service_request.service_name.lower() == "mongodb":
                 data = request.data
@@ -13732,13 +13749,13 @@ class ServiceRequestPendingAdminAPIView(APIView):
                     "assigned_node_port": assigned_port
                 }, status=status.HTTP_201_CREATED)
                 
-             
             elif service_request.service_name.replace("-", "").lower() == "nginxha":
 
+                serializer = ServiceRequestSerializer(service_request)
                 # Default replicas = 2 if empty
                 replicas = int(service_request.replica) if service_request.replica else 2
-                deployment_name = f"{service_request.app_name}-ha-{service_request.id}"
-                service_name = deployment_name + "-svc"
+                deployment_name = f"{service_request.app_name.lower()}-ha-{service_request.id}"
+                service_name = f"{deployment_name}-svc"
 
                 apps_v1, core_v1 = get_k8s_client3()
 
@@ -13777,7 +13794,8 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 except client.exceptions.ApiException as e:
                     return Response({
                         "error": "NGINX-HA Deployment failed",
-                        "details": e.body
+                        "details": e.body,
+                        "data": serializer.data
                     }, status=500)
 
                 # ---------------------------
@@ -13819,8 +13837,12 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 try:
                     core_v1.create_namespaced_service("default", service_manifest)
                 except client.exceptions.ApiException as e:
-                    return Response({"error": f"NGINX-HA Service failed: {str(e)}"}, status=500)
-
+                    return Response({
+                    "error": "NGINX-HA Service failed",
+                    "details": str(e),
+                    "data": serializer.data   # <-- now safe
+                }, status=500)
+                
                 # Save NodePort and mark deployment status
                 service_request.node_port = node_port
                 service_request.deployment_status = "Deployed"
@@ -13828,12 +13850,27 @@ class ServiceRequestPendingAdminAPIView(APIView):
 
                 print(f"🔥 NGINX-HA Deployed: {deployment_name}, NodePort={node_port}")
 
-                return Response({
-                "message": "NGINX-HA deployed successfully",
-                "node_port": node_port,
-                "deployment_name": deployment_name
-            }, status=200)
+                # Send deployment success email
+                employee = Employee.objects.get(employee_id=service_request.employee_id)
+                send_deployment_email(
+                    email=employee.email,
+                    employee_name=employee.name,
+                    service_request=service_request
+                )
+                serializer = ServiceRequestSerializer(service_request)
+                node_ip = os.getenv("node_ip")
 
+                deployment_url = f"http://{node_ip}:{service_request.node_port}/"
+
+                return Response({   
+                    "message": "NGINX-HA Deployed Successfully",
+                    "data": serializer.data,
+                    "deployment_url": deployment_url,
+                    "node_port": service_request.node_port,
+                    "service_name": service_request.service_name,
+                    "app_name": service_request.app_name
+                }, status=status.HTTP_200_OK)
+            
                 
             elif service_request.service_name.lower() == "couchdb":
                 replica = service_request.replica
@@ -14024,7 +14061,109 @@ class ServiceRequestPendingAdminAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+def send_deployment_email(email, employee_name, service_request):
+    """
+    Sends service deployment success email to employee.
+    Matches the same quality/style as OTP email function.
+    """
+    node_ip = os.getenv("node_ip", "YOUR_NODE_IP")
+    deployment_url = f"http://{node_ip}:{getattr(service_request, 'node_port', '')}/"
 
+    subject = f"{getattr(service_request, 'service_name', 'Service')} Deployment Successful - Meghdoot CMP"
+
+    message = f'''Dear {employee_name},
+
+Your requested service {getattr(service_request, 'service_name', '')} has been successfully deployed on the Meghdoot CMP Platform.
+
+Below are the deployment details:
+
+- Service Name: {getattr(service_request, 'service_name', '')}
+- Application Name: {getattr(service_request, 'app_name', '')}
+- Deployment Status: {getattr(service_request, 'deployment_status', '')}
+- Node Port: {getattr(service_request, 'node_port', '')}
+- Access URL: {deployment_url}
+
+You may now access and use your deployed service.
+
+If you have any questions or did not request this service, please contact the Meghdoot CMP Support Team.
+
+Best regards,
+Meghdoot CMP Cloud Team
+'''
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=getattr(settings, "EMAIL_HOST_USER", None),
+            recipient_list=[email],
+            fail_silently=False
+        )
+        print(f"Deployment email sent successfully to {email}")
+        return True
+    except Exception as e:
+        print("Error sending deployment email:", e)
+        return False
+        return True
+
+    except Exception as e:
+        print("Error sending deployment email:", e)
+        return False
+
+
+class EmployeeDeployedServicesAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            employee_id = request.auth.get("employee_id", None)
+
+            if not employee_id:
+                return Response(
+                    {"error": "Employee ID not found in token"},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Fetch all successful deployments for this employee
+            deployed_services = ServiceRequest.objects.filter(
+                employee_id=employee_id,
+                deployment_status="Deployed"
+            ).order_by("-admin_approved_timestamp")
+
+            result = []
+
+            node_ip = os.getenv("node_ip", "0.0.0.0")
+
+            for svc in deployed_services:
+                deployment_url = (
+                    f"http://{node_ip}:{svc.node_port}/"
+                    if svc.node_port else None
+                )
+
+                result.append({
+                    "id": svc.id,
+                    "service_name": svc.service_name,
+                    "app_name": svc.app_name,
+                    "replica": svc.replica,
+                    "project_name": svc.project_name,
+                    "purpose": svc.purpose,
+                    "request_timestamp": svc.request_timestamp,
+                    "approved_timestamp": svc.admin_approved_timestamp,
+                    "deployment_status": svc.deployment_status,
+                    "node_port": svc.node_port,
+                    "deployment_url": deployment_url,
+                    "k8s_service_name": f"{svc.app_name.lower()}-{svc.id}",
+                })
+
+            return Response({
+                "message": "Deployed services fetched successfully",
+                "services": result
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 

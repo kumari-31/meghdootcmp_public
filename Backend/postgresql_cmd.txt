@@ -1,0 +1,4 @@
+1.sudo -u postgres psql #  open postgres 
+2. \c meghdootcmp
+3. \dt 
+4. 
