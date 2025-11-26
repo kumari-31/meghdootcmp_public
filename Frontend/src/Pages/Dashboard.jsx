@@ -557,8 +557,15 @@ import {
   PolarAngleAxis,
   Tooltip,
   ResponsiveContainer,
+  Bar,
   BarChart,
-} from "recharts";
+  XAxis,
+  YAxis,
+  LabelList,
+  ComposedChart,
+  Line,
+  Area,
+  } from "recharts";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import {
@@ -568,7 +575,6 @@ import {
   Grid2,
   Box,
   Divider,
-  CircularProgress,
   Stack,
 } from "@mui/material";
 
@@ -1079,7 +1085,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      /* ---------- Futuristic OpenStack Card ---------- */
+      {/*  ---------- Futuristic OpenStack Card ---------- */ }
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
@@ -1406,7 +1412,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      /* ---------- Futuristic Kubernetes Card ---------- */
+      {/* ---------- Futuristic Kubernetes Card ---------- */}
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
