@@ -558,6 +558,13 @@ import {
   Tooltip,
   ResponsiveContainer,
   BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  LabelList,
+  ComposedChart,
+  Line,
+  Area,
 } from "recharts";
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
@@ -568,7 +575,6 @@ import {
   Grid2,
   Box,
   Divider,
-  CircularProgress,
   Stack,
 } from "@mui/material";
 
@@ -1079,15 +1085,19 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      /* ---------- Futuristic OpenStack Card ---------- */
+      {/* ---------- Futuristic OpenStack Card ---------- */}
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
             p: 2,
             borderRadius: 3,
-            boxShadow: "0 8px 30px rgba(12, 12, 40, 0.08)",
-            background:
-              "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,255,0.95))",
+            padding: 1,
+            height: "100%",
+            width: "100%",
+            boxShadow: 6,
+            // boxShadow: "0 8px 30px rgba(12, 12, 40, 0.08)",
+            // background:
+            //   "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(245,247,255,0.95))",
           }}
         >
           <CardContent sx={{ pb: 1 }}>
@@ -1406,15 +1416,21 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      /* ---------- Futuristic Kubernetes Card ---------- */
+
+      {/* ---------- Futuristic Kubernetes Card ---------- */}
+
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
             p: 2,
             borderRadius: 3,
-            boxShadow: "0 8px 30px rgba(6, 8, 30, 0.06)",
-            background:
-              "linear-gradient(180deg, rgba(255,254,250,0.98), rgba(245,250,255,0.95))",
+            padding: 1,
+            height: "100%",
+            width: "100%",
+            boxShadow: 6,
+            // boxShadow: "0 8px 30px rgba(6, 8, 30, 0.06)",
+            // background:
+            //   "linear-gradient(180deg, rgba(255,254,250,0.98), rgba(245,250,255,0.95))",
           }}
         >
           <CardContent sx={{ pb: 1 }}>
