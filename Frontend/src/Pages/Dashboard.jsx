@@ -1,554 +1,3 @@
-// import React, { useEffect, useState } from "react";
-// // import Cardone from "../Components/Cardone";
-// import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
-// import Calendar from 'react-calendar';
-// import 'react-calendar/dist/Calendar.css';
-// import { Card, CardContent, Typography, Grid2,Box } from '@mui/material';
-// import {
-//   GaugeContainer,
-//   GaugeValueArc,
-//   GaugeReferenceArc,
-//   useGaugeState
-// } from '@mui/x-charts/Gauge';
-// import apiClient from "../Axios";
-// import "./Dashboard.css";
-
-// function GaugePointer() {
-//   const { valueAngle, outerRadius, cx, cy } = useGaugeState();
-
-//   if (valueAngle === null) {
-//     return null;
-//   }
-
-//   const target = {
-//     x: cx + outerRadius * Math.sin(valueAngle),
-//     y: cy - outerRadius * Math.cos(valueAngle),
-//   };
-
-//   return (
-//     <g>
-//       <circle cx={cx} cy={cy} r={5} fill="red" />
-//       <path d={`M ${cx} ${cy} L ${target.x} ${target.y}`} stroke="red" strokeWidth={3} />
-//     </g>
-//   );
-// }
-
-// const Dashboard = () => {
-//   const [data, setData] = useState({
-//     total_instances: 0,
-//     total_vcpus: 0,
-//     used_vcpus: 0,
-//     total_memory_mb: 0,
-//     used_memory_mb: 0,
-//     total_storage_gb: 0,
-//     used_storage_gb: 0,
-//   });
-//   const [k8sData, setK8sData] = useState({
-//     daemonsets: 0,
-//     pods: 0,
-//     deployments: 0,
-//     replicasets: 0,
-//   });
-//   const [date, setDate] = useState(new Date());
-
-//   const handleDateChange = (newDate) => {
-//     setDate(newDate);
-//   };
-
-//   useEffect(() => {
-
-//     const fetchData = async () => {
-//       try {
-//         const response = await apiClient.get("/overview/");
-
-//         setData(response.data);
-//       } catch (error) {
-//         console.error("Error fetching data:", error);
-//       }
-//     };
-//     fetchData();
-//   }, []);
-
-//   // Calculate usage percentages
-//   const vcpuUsage = ((data.used_vcpus / data.total_vcpus) * 100).toFixed(1);
-//   const memoryUsage = ((data.used_memory_mb / data.total_memory_mb) * 100).toFixed(1);
-//   const storageUsage = ((data.used_storage_gb / data.total_storage_gb) * 100).toFixed(1);
-
-//   // Determine bar color based on usage
-//   const getBarColor = (usage) => {
-//     if (usage > 80) return "#ff4d4f"; // Red for critical
-//     if (usage > 60) return "#faad14"; // Orange for warning
-//     return "#4caf50"; // Green for normal
-//   };
-
-//   // Create half-gauge chart data
-//   const createGaugeData = (usage) => [
-//     { value: usage, fill: getBarColor(usage) },
-//     { value: 100 - usage, fill: "#ddd" }, // Remaining portion
-//   ];
-
-//   useEffect(() => {
-//     const fetchK8sData = async () => {
-//       try {
-//         const response = await apiClient.get("/k8s/workloadstati/"); // Update API Endpoint
-//         setK8sData(response.data);
-//       } catch (error) {
-//         console.error("Error fetching Kubernetes data:", error);
-//       }
-//     };
-
-//     fetchK8sData();
-//   }, []);
-
-//   return (
-//     <Grid2 container spacing={3}>
-//       <Grid2 item xs={12} md={6}>
-//         <Card sx={{ padding: 1, height: 300, minWidth:600 }}>
-//           <CardContent>
-//             <Typography variant="h6">Infrastructure-as-a-Service (Openstack)</Typography>
-//             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-//               <div style={{ width:350, marginTop:10 }}>
-//                 {[
-//                   { label: "vCPU", value: vcpuUsage, used: data.used_vcpus, total: data.total_vcpus },
-//                   { label: "RAM", value: memoryUsage, used: (data.used_memory_mb / 1024).toFixed(1), total: (data.total_memory_mb / 1024).toFixed(1) },
-//                   { label: "Storage", value: storageUsage, used: data.used_storage_gb, total: data.total_storage_gb },
-//                 ].map((stat, index) => (
-//                   <div key={index}>
-//                     <Typography variant="h7"> {stat.label}</Typography>
-//                     <div style={{ backgroundColor: "#ddd", height: "10px", borderRadius: "4px", margin: "8px 0", overflow: "hidden" }}>
-//                       <span style={{ width: `${stat.value}%`, backgroundColor: getBarColor(stat.value), display: "block", height: "100%" }}></span>
-//                     </div>
-//                     <Typography>
-//                       Used: <b>{stat.used}</b> Total: <b>{stat.total}</b>
-//                     </Typography>
-//                   </div>
-//                 ))}
-//               </div>
-//               <div style={{ textAlign: "center" }}>
-//                 <Typography variant="h4">{data.total_instances}</Typography>
-//                 <Typography variant="body2">Total Virtual Machines</Typography>
-//                 <div style={{ display: "flex", justifyContent: "center", gap: "20px" , marginTop: "20px" }}>
-//                   {[
-//                     { label: "vCPU", usage: vcpuUsage },
-//                     { label: "RAM", usage: memoryUsage },
-//                   ].map((gauge, idx) => (
-//                     <div key={idx} style={{ textAlign: "center" }}>
-//                       <Typography variant="body2">{gauge.label}</Typography>
-//                       <RadialBarChart width={150} height={80} innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={createGaugeData(Number(gauge.usage))}>
-//                         <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-//                         <RadialBar minAngle={15} background clockWise dataKey="value" cornerRadius={5} />
-//                       </RadialBarChart>
-//                       <Typography variant="h7">{gauge.usage}%</Typography>
-//                     </div>
-//                   ))}
-//                 </div>
-//               </div>
-//             </div>
-//           </CardContent>
-//         </Card>
-//       </Grid2>
-
-//       <Grid2 item xs={6}>
-//         <Card sx={{ padding: 1, height: 300, minWidth:1100 }}>
-//           <CardContent>
-//           <Typography variant="h6">Platform As Service (Kubernetes)</Typography>
-//           <Grid2 container spacing={8} sx={{ marginTop: 2, justifyContent: "center" }}>
-//             {/* DaemonSets */}
-//             <Grid2 item xs={6} sm={3}>
-//               <Typography variant="body2" align="center">DaemonSets</Typography>
-//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.daemonsets}>
-//                 <GaugeReferenceArc />
-//                 <GaugeValueArc />
-//                 <GaugePointer />
-//               </GaugeContainer>
-//               <Typography variant="body2" align="center"><b>{k8sData.daemonsets}</b></Typography>
-//             </Grid2>
-
-//             {/* Pods */}
-//             <Grid2 item xs={6} sm={3}>
-//               <Typography variant="body2" align="center">Pods</Typography>
-//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.pods}>
-//                 <GaugeReferenceArc />
-//                 <GaugeValueArc />
-//                 <GaugePointer />
-//               </GaugeContainer>
-//               <Typography variant="body2" align="center"><b>{k8sData.pods}</b></Typography>
-//             </Grid2>
-
-//             {/* Deployments */}
-//             <Grid2 item xs={6} sm={3}>
-//               <Typography variant="body2" align="center">Deployments</Typography>
-//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.deployments}>
-//                 <GaugeReferenceArc />
-//                 <GaugeValueArc />
-//                 <GaugePointer />
-//               </GaugeContainer>
-//               <Typography variant="body2" align="center"><b>{k8sData.deployments}</b></Typography>
-//             </Grid2>
-
-//             {/* ReplicaSets */}
-//             <Grid2 item xs={6} sm={3}>
-//               <Typography variant="body2" align="center">ReplicaSets</Typography>
-//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.replicasets}>
-//                 <GaugeReferenceArc />
-//                 <GaugeValueArc />
-//                 <GaugePointer />
-//               </GaugeContainer>
-//               <Typography variant="body2" align="center"><b>{k8sData.replicasets}</b></Typography>
-//             </Grid2>
-//           </Grid2>
-//           </CardContent>
-//         </Card>
-//       </Grid2>
-//       {/* Second row - Three cards */}
-//       {/* {[
-//         { title: "AWS", stats: ["Running: 4 EC2 Instances", "Stopped: 0 EC2 Instances"] },
-//         { title: "Microsoft", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
-//         { title: "Oracle", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
-//       ].map((cloud, index) => (
-//         <Grid2 item xs={4} key={index}>
-//           <Card sx={{ padding: 2 , height: 200, minWidth:600}}>
-//             <CardContent>
-//               <Typography variant="h6">{cloud.title}</Typography>
-//               {cloud.stats.map((stat, i) => (
-//                 <Typography key={i} variant="body2">{stat}</Typography>
-//               ))}
-//             </CardContent>
-//           </Card>
-//         </Grid2>
-//       ))} */}
-
-//       {/* Third row - Three cards */}
-//       <Grid2 item xs={4}>
-//         <Card sx={{ padding: 2, height: 400, minWidth:670 }}>
-//           <CardContent>
-//             <Typography variant="h6">Devices Under Management - 166</Typography>
-//             <Typography variant="body2">Servers: 3 Up</Typography>
-//             <Typography variant="body2">Switches: 11 Down</Typography>
-//             <Typography variant="body2">Load Balancers: 8 Not Configured</Typography>
-//           </CardContent>
-//         </Card>
-//       </Grid2>
-
-//       <Grid2 item xs={4}>
-//         <Card sx={{ padding: 2 }}>
-//           <CardContent>
-//             <Typography variant="h6">Maintenance Calendar</Typography>
-//             <Box
-//         sx={{
-//           "& .react-calendar": {
-//             backgroundColor: (theme) => theme.palette.background.paper,
-//             color: (theme) => theme.palette.text.primary,
-//             borderRadius: 2,
-//             padding: 1,
-//           },
-//           "& .react-calendar__tile": {
-//             color: (theme) => theme.palette.text.primary,
-//           },
-//           "& .react-calendar__navigation button": {
-//             color: (theme) => theme.palette.text.primary,
-//           },
-//         }}
-//       >
-//             <Calendar onChange={handleDateChange} value={date} />
-//             </Box>
-//           </CardContent>
-//         </Card>
-//       </Grid2>
-
-//       <Grid2 item xs={4}>
-//         <Card sx={{ padding: 2, height: 400, minWidth:700 }}>
-//           <CardContent>
-//             <Typography variant="h6">Alerts</Typography>
-//             <Typography variant="body2">VMs: 0</Typography>
-//             <Typography variant="body2">PDUs: 0</Typography>
-//             <Typography variant="body2">Switches: 0</Typography>
-//           </CardContent>
-//         </Card>
-//       </Grid2>
-//     </Grid2>
-// );
-// };
-
-// export default Dashboard;
-
-// import React, { useEffect, useState } from "react";
-// import Cardone from "../Components/Cardone";
-// import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
-// import Calendar from 'react-calendar';
-// import 'react-calendar/dist/Calendar.css';
-// import { Card, CardContent, Typography } from '@mui/material';
-// import apiClient from "../Axios";
-// import "./Dashboard.css";
-
-// const Dashboard = () => {
-//   const [data, setData] = useState({
-//     total_instances: 0,
-//     total_vcpus: 0,
-//     used_vcpus: 0,
-//     total_memory_mb: 0,
-//     used_memory_mb: 0,
-//     total_storage_gb: 0,
-//     used_storage_gb: 0,
-//   });
-//   const [date, setDate] = useState(new Date());
-
-//   const handleDateChange = (newDate) => {
-//     setDate(newDate);
-//   };
-
-//   useEffect(() => {
-
-//     const fetchData = async () => {
-//       try {
-//         const response = await apiClient.get("overview");
-
-//         setData(response.data);
-//       } catch (error) {
-//         console.error("Error fetching data:", error);
-//       }
-//     };
-//     fetchData();
-//   }, []);
-
-//   // Calculate usage percentages
-//   const vcpuUsage = ((data.used_vcpus / data.total_vcpus) * 100).toFixed(1);
-//   const memoryUsage = ((data.used_memory_mb / data.total_memory_mb) * 100).toFixed(1);
-//   const storageUsage = ((data.used_storage_gb / data.total_storage_gb) * 100).toFixed(1);
-
-//   // Determine bar color based on usage
-//   const getBarColor = (usage) => {
-//     if (usage > 80) return "#ff4d4f"; // Red for critical
-//     if (usage > 60) return "#faad14"; // Orange for warning
-//     return "#4caf50"; // Green for normal
-//   };
-
-//   // Create half-gauge chart data
-//   const createGaugeData = (usage) => [
-//     { value: usage, fill: getBarColor(usage) },
-//     { value: 100 - usage, fill: "#ddd" }, // Remaining portion
-//   ];
-
-//   return (
-//     <div className="dashboard">
-//       <div className="dashboard-content">
-//         {/* Top Section */}
-//     <div className="row">
-//     <div className="dashboard-card">
-//   <h3>Infrastructure-as-a-Service (Openstack)</h3>
-
-//   <div className="section">
-
-//      {/* Stats Section */}
-//      <div className="stats">
-//       {/* CPU */}
-//       <div className="stat">
-//         <p>vCPU</p>
-//         <div className="bar">
-//           <span
-//             className="bar-filled"
-//             style={{
-//               width: ${vcpuUsage}%,
-//               backgroundColor: getBarColor(vcpuUsage),
-//             }}
-//           ></span>
-//         </div>
-//         <p>
-//           Used: <b>{data.used_vcpus} vCPU</b> Total: <b>{data.total_vcpus} vCPU</b>
-//         </p>
-//       </div>
-//       {/* RAM */}
-//       <div className="stat">
-//         <p>RAM</p>
-//         <div className="bar">
-//           <span
-//             className="bar-filled"
-//             style={{
-//               width: ${memoryUsage}%,
-//               backgroundColor: getBarColor(memoryUsage),
-//             }}
-//           ></span>
-//         </div>
-//         <p>
-//           Used: <b>{(data.used_memory_mb / 1024).toFixed(1)} GB</b> Total:{" "}
-//           <b>{(data.total_memory_mb / 1024).toFixed(1)} GB</b>
-//         </p>
-//       </div>
-//       {/* Storage */}
-//       <div className="stat">
-//         <p>Storage</p>
-//         <div className="bar">
-//           <span
-//             className="bar-filled"
-//             style={{
-//               width: ${storageUsage}%,
-//               backgroundColor: getBarColor(storageUsage),
-//             }}
-//           ></span>
-//         </div>
-//         <p>
-//           Used: <b>{data.used_storage_gb} GB</b> Total: <b>{data.total_storage_gb} GB</b>
-//         </p>
-//       </div>
-//     </div>
-
-//     <div className="gauges-section">
-//        {/* Total Instances Info */}
-//     <div className="instances-info">
-//       <h2>{data.total_instances}</h2>
-//       <h5>Total Virtual Machines </h5>
-//     </div>
-//     {/* Half-Gauge Charts */}
-//     <div className="gauges">
-//       {/* vCPU Half-Gauge */}
-//       <div className="gauge-container">
-//         <h5>vCPU</h5>
-//         <RadialBarChart
-//           width={150}
-//           height={80}
-//           innerRadius="70%"
-//           outerRadius="100%"
-//           startAngle={180}
-//           endAngle={0}
-//           data={createGaugeData(Number(vcpuUsage))}
-//         >
-//           <PolarAngleAxis
-//             type="number"
-//             domain={[0, 100]}
-//             angleAxisId={0}
-//             tick={false}
-//           />
-//           <RadialBar
-//             minAngle={15}
-//             background
-//             clockWise
-//             dataKey="value"
-//             cornerRadius={5}
-//           />
-//         </RadialBarChart>
-//         <p>
-//           {vcpuUsage}% ({data.used_vcpus}/{data.total_vcpus} vCPU)
-//         </p>
-//       </div>
-
-//       {/* RAM Half-Gauge */}
-//       <div className="gauge-container">
-//         <h5>RAM</h5>
-//         <RadialBarChart
-//           width={150}
-//           height={80}
-//           innerRadius="70%"
-//           outerRadius="100%"
-//           startAngle={180}
-//           endAngle={0}
-//           data={createGaugeData(Number(memoryUsage))}
-//         >
-//           <PolarAngleAxis
-//             type="number"
-//             domain={[0, 100]}
-//             angleAxisId={0}
-//             tick={false}
-//           />
-//           <RadialBar
-//             minAngle={15}
-//             background
-//             clockWise
-//             dataKey="value"
-//             cornerRadius={5}
-//           />
-//         </RadialBarChart>
-//         <p>
-//           {memoryUsage}% (
-//           {(data.used_memory_mb / 1024).toFixed(1)}/
-//           {(data.total_memory_mb / 1024).toFixed(1)} GB)
-//         </p>
-//       </div>
-//     </div>
-
-//    </div>
-//   </div>
-// </div>
-//     <Cardone
-//             title="Platform As Service (Kubernetes)"
-//             stats={[
-//               { label: "vCPU", value: "Available: 9 vCPU" },
-//               { label: "RAM", value: "Configured: 10 GB, Allocated: 16 GB" },
-//               { label: "Storage", value: "Available: 941 GB" },
-//             ]}
-//             chartData={[
-//               { value: 36, fill: "#faad14" },
-//               { value: 64, fill: "#ddd" },
-//             ]}
-//             type="large"
-//           />
-//         </div>
-
-//         {/* Second Section */}
-//         <div className="row">
-//           <Cardone
-//             title="AWS"
-//             stats={[
-//               { label: "Running", value: "4 EC2 Instances" },
-//               { label: "Stopped", value: "0 EC2 Instances" },
-//             ]}
-//             type="medium"
-//           />
-//           <Cardone
-//             title="Microsoft"
-//             stats={[
-//               { label: "Running", value: "7 VM Instances" },
-//               { label: "Stopped", value: "0 VM Instances" },
-//               { label: "Disk", value: "300 GB" },
-//             ]}
-//             type="medium"
-//           />
-//            <Cardone
-//             title="Oracle"
-//             stats={[
-//               { label: "Running", value: "7 VM Instances" },
-//               { label: "Stopped", value: "0 VM Instances" },
-//               { label: "Disk", value: "300 GB" },
-//             ]}
-//             type="medium"
-//           />
-//         </div>
-
-//         {/* Bottom Section */}
-//         <div className="row">
-//           <Cardone
-//             title="Devices Under Management - 166"
-//             stats={[
-//               { label: "Servers", value: "3 Up" },
-//               { label: "Switches", value: "11 Down" },
-//               { label: "Load Balancers", value: "8 Not Configured" },
-//             ]}
-//             type="wide"
-//           />
-//           <Card sx={{ minWidth: 275, padding: 2 }}>
-//       <CardContent>
-//         <Typography variant="h6" gutterBottom>
-//           Maintenance Calendar
-//         </Typography>
-//         <Calendar
-//           onChange={handleDateChange}
-//           value={date}
-//         />
-//       </CardContent>
-//     </Card>
-//           <Cardone
-//             title="Alerts"
-//             stats={[
-//               { label: "VMs", value: "0" },
-//               { label: "PDUs", value: "0" },
-//               { label: "Switches", value: "0" },
-//             ]}
-//             type="wide"
-//           />
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
 
 import { useEffect, useState } from "react";
 import {
@@ -559,7 +8,6 @@ import {
   ResponsiveContainer,
   Bar,
   BarChart,
-  Bar,
   XAxis,
   YAxis,
   LabelList,
@@ -567,6 +15,12 @@ import {
   Line,
   Area,
 } from "recharts";
+import {
+    GaugeContainer,
+    GaugeValueArc,
+    GaugeReferenceArc,
+    useGaugeState
+  } from '@mui/x-charts/Gauge';
 import Calendar from "react-calendar";
 import "react-calendar/dist/Calendar.css";
 import {
@@ -591,6 +45,25 @@ dayjs.extend(isToday);
 import apiClient from "../Axios";
 import "./Dashboard.css";
 
+function GaugePointer() {
+    const { valueAngle, outerRadius, cx, cy } = useGaugeState();
+  
+    if (valueAngle === null) {
+      return null;
+    }
+  
+    const target = {
+      x: cx + outerRadius * Math.sin(valueAngle),
+      y: cy - outerRadius * Math.cos(valueAngle),
+    };
+  
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={5} fill="red" />
+        <path d={`M ${cx} ${cy} L ${target.x} ${target.y}`} stroke="red" strokeWidth={3} />
+      </g>
+    );
+  }
 const RadialSeparators = ({ count, style }) => {
   const turns = 1 / count;
   return (
@@ -917,6 +390,14 @@ const Dashboard = () => {
   }, []);
 
   return (
+    <Box
+    sx={{
+      height: "100vh",
+      overflow: "hidden",
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
     <Grid2 container spacing={3}>
       <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
         <Card
@@ -1036,57 +517,112 @@ const Dashboard = () => {
         </Card>
       </Grid2>
       <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
-        <Card
-          sx={{
-            padding: 1,
-            height: "100%",
-            width: "100%",
-            borderRadius: 4,
-            boxShadow: 6,
-          }}
-        >
-          <CardContent>
-            <Typography variant="h6">
-              Platform As Service (Kubernetes)
-            </Typography>
-            <Grid2
-              container
-              spacing={4}
-              sx={{ marginTop: 2, justifyContent: "center" }}
-            >
-              <Grid2 item xs={6} sm={3}>
-                <GradientCircularStat
-                  value={k8sData.daemonsets || 0}
-                  label="DaemonSets"
-                  gradientId="grad1"
-                />
-              </Grid2>
-              <Grid2 item xs={6} sm={3}>
-                <GradientCircularStat
-                  value={k8sData.pods || 0}
-                  label="Pods"
-                  gradientId="grad2"
-                />
-              </Grid2>
-              <Grid2 item xs={6} sm={3}>
-                <GradientCircularStat
-                  value={k8sData.deployments || 0}
-                  label="Deployments"
-                  gradientId="grad3"
-                />
-              </Grid2>
-              <Grid2 item xs={6} sm={3}>
-                <GradientCircularStat
-                  value={k8sData.replicasets || 0}
-                  label="ReplicaSets"
-                  gradientId="grad4"
-                />
-              </Grid2>
-            </Grid2>
-          </CardContent>
-        </Card>
+  <Card
+    sx={{
+      padding: 1,
+      height: "100%",
+      width: "100%",
+      borderRadius: 4,
+      boxShadow: 6,
+    }}
+  >
+    <CardContent>
+      <Typography variant="h6">Platform As Service (Kubernetes)</Typography>
+
+      <Grid2
+        container
+        spacing={8}
+        sx={{ marginTop: 2, justifyContent: "center" }}
+      >
+        {/* DaemonSets */}
+        <Grid2 item xs={6} sm={3}>
+          <Typography variant="body2" align="center">
+            DaemonSets
+          </Typography>
+          <GaugeContainer
+            width={200}
+            height={150}
+            startAngle={-110}
+            endAngle={110}
+            value={k8sData.daemonsets}
+          >
+            <GaugeReferenceArc />
+            <GaugeValueArc />
+            <GaugePointer />
+          </GaugeContainer>
+          <Typography variant="body2" align="center">
+            <b>{k8sData.daemonsets}</b>
+          </Typography>
+        </Grid2>
+
+        {/* Pods */}
+        <Grid2 item xs={6} sm={3}>
+          <Typography variant="body2" align="center">
+            Pods
+          </Typography>
+          <GaugeContainer
+            width={200}
+            height={150}
+            startAngle={-110}
+            endAngle={110}
+            value={k8sData.pods}
+          >
+            <GaugeReferenceArc />
+            <GaugeValueArc />
+            <GaugePointer />
+          </GaugeContainer>
+          <Typography variant="body2" align="center">
+            <b>{k8sData.pods}</b>
+          </Typography>
+        </Grid2>
+
+        {/* Deployments */}
+        <Grid2 item xs={6} sm={3}>
+          <Typography variant="body2" align="center">
+            Deployments
+          </Typography>
+          <GaugeContainer
+            width={200}
+            height={150}
+            startAngle={-110}
+            endAngle={110}
+            value={k8sData.deployments}
+          >
+            <GaugeReferenceArc />
+            <GaugeValueArc />
+            <GaugePointer />
+          </GaugeContainer>
+          <Typography variant="body2" align="center">
+            <b>{k8sData.deployments}</b>
+          </Typography>
+        </Grid2>
+
+        {/* ReplicaSets */}
+        <Grid2 item xs={6} sm={3}>
+          <Typography variant="body2" align="center">
+            ReplicaSets
+          </Typography>
+          <GaugeContainer
+            width={200}
+            height={150}
+            startAngle={-110}
+            endAngle={110}
+            value={k8sData.replicasets}
+          >
+            <GaugeReferenceArc />
+            <GaugeValueArc />
+            <GaugePointer />
+          </GaugeContainer>
+          <Typography variant="body2" align="center">
+            <b>{k8sData.replicasets}</b>
+          </Typography>
+        </Grid2>
       </Grid2>
-      /* ---------- Futuristic OpenStack Card ---------- */
+    </CardContent>
+  </Card>
+</Grid2>
+
+      {/* ---------- Futuristic OpenStack Card ---------- */}
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
@@ -1417,7 +953,7 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      /* ---------- Futuristic Kubernetes Card ---------- */
+      {/* ---------- Futuristic Kubernetes Card ---------- */}
       <Grid2 item xs={12} md={12} lg={12} sx={{ mb: 2 }}>
         <Card
           sx={{
@@ -1686,29 +1222,585 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </Grid2>
-      {/* <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
-        <Card
-          sx={{
-            padding: 2,
-            height: "100%",
-            minWidth: 700,
-            borderRadius: 4,
-            boxShadow: 6,
-          }}
-        >
-          <CardContent>
-            <Typography variant="h6">Alerts</Typography>
-            <Typography variant="body2">VMs: 0</Typography>
-            <Typography variant="body2">PDUs: 0</Typography>
-            <Typography variant="body2">Switches: 0</Typography>
-          </CardContent>
-        </Card>
-      </Grid2> */}
+   
     </Grid2>
+    </Box>
   );
 };
 
 export default Dashboard;
+
+
+
+
+
+
+
+
+
+
+// import React, { useEffect, useState } from "react";
+// // import Cardone from "../Components/Cardone";
+// import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
+// import Calendar from 'react-calendar';
+// import 'react-calendar/dist/Calendar.css';
+// import { Card, CardContent, Typography, Grid2,Box } from '@mui/material';
+// import {
+//   GaugeContainer,
+//   GaugeValueArc,
+//   GaugeReferenceArc,
+//   useGaugeState
+// } from '@mui/x-charts/Gauge';
+// import apiClient from "../Axios";
+// import "./Dashboard.css";
+
+// function GaugePointer() {
+//   const { valueAngle, outerRadius, cx, cy } = useGaugeState();
+
+//   if (valueAngle === null) {
+//     return null;
+//   }
+
+//   const target = {
+//     x: cx + outerRadius * Math.sin(valueAngle),
+//     y: cy - outerRadius * Math.cos(valueAngle),
+//   };
+
+//   return (
+//     <g>
+//       <circle cx={cx} cy={cy} r={5} fill="red" />
+//       <path d={`M ${cx} ${cy} L ${target.x} ${target.y}`} stroke="red" strokeWidth={3} />
+//     </g>
+//   );
+// }
+
+// const Dashboard = () => {
+//   const [data, setData] = useState({
+//     total_instances: 0,
+//     total_vcpus: 0,
+//     used_vcpus: 0,
+//     total_memory_mb: 0,
+//     used_memory_mb: 0,
+//     total_storage_gb: 0,
+//     used_storage_gb: 0,
+//   });
+//   const [k8sData, setK8sData] = useState({
+//     daemonsets: 0,
+//     pods: 0,
+//     deployments: 0,
+//     replicasets: 0,
+//   });
+//   const [date, setDate] = useState(new Date());
+
+//   const handleDateChange = (newDate) => {
+//     setDate(newDate);
+//   };
+
+//   useEffect(() => {
+
+//     const fetchData = async () => {
+//       try {
+//         const response = await apiClient.get("/overview/");
+
+//         setData(response.data);
+//       } catch (error) {
+//         console.error("Error fetching data:", error);
+//       }
+//     };
+//     fetchData();
+//   }, []);
+
+//   // Calculate usage percentages
+//   const vcpuUsage = ((data.used_vcpus / data.total_vcpus) * 100).toFixed(1);
+//   const memoryUsage = ((data.used_memory_mb / data.total_memory_mb) * 100).toFixed(1);
+//   const storageUsage = ((data.used_storage_gb / data.total_storage_gb) * 100).toFixed(1);
+
+//   // Determine bar color based on usage
+//   const getBarColor = (usage) => {
+//     if (usage > 80) return "#ff4d4f"; // Red for critical
+//     if (usage > 60) return "#faad14"; // Orange for warning
+//     return "#4caf50"; // Green for normal
+//   };
+
+//   // Create half-gauge chart data
+//   const createGaugeData = (usage) => [
+//     { value: usage, fill: getBarColor(usage) },
+//     { value: 100 - usage, fill: "#ddd" }, // Remaining portion
+//   ];
+
+//   useEffect(() => {
+//     const fetchK8sData = async () => {
+//       try {
+//         const response = await apiClient.get("/k8s/workloadstati/"); // Update API Endpoint
+//         setK8sData(response.data);
+//       } catch (error) {
+//         console.error("Error fetching Kubernetes data:", error);
+//       }
+//     };
+
+//     fetchK8sData();
+//   }, []);
+
+//   return (
+//     <Grid2 container spacing={3}>
+//       <Grid2 item xs={12} md={6}>
+//         <Card sx={{ padding: 1, height: 300, minWidth:600 }}>
+//           <CardContent>
+//             <Typography variant="h6">Infrastructure-as-a-Service (Openstack)</Typography>
+//             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+//               <div style={{ width:350, marginTop:10 }}>
+//                 {[
+//                   { label: "vCPU", value: vcpuUsage, used: data.used_vcpus, total: data.total_vcpus },
+//                   { label: "RAM", value: memoryUsage, used: (data.used_memory_mb / 1024).toFixed(1), total: (data.total_memory_mb / 1024).toFixed(1) },
+//                   { label: "Storage", value: storageUsage, used: data.used_storage_gb, total: data.total_storage_gb },
+//                 ].map((stat, index) => (
+//                   <div key={index}>
+//                     <Typography variant="h7"> {stat.label}</Typography>
+//                     <div style={{ backgroundColor: "#ddd", height: "10px", borderRadius: "4px", margin: "8px 0", overflow: "hidden" }}>
+//                       <span style={{ width: `${stat.value}%`, backgroundColor: getBarColor(stat.value), display: "block", height: "100%" }}></span>
+//                     </div>
+//                     <Typography>
+//                       Used: <b>{stat.used}</b> Total: <b>{stat.total}</b>
+//                     </Typography>
+//                   </div>
+//                 ))}
+//               </div>
+//               <div style={{ textAlign: "center" }}>
+//                 <Typography variant="h4">{data.total_instances}</Typography>
+//                 <Typography variant="body2">Total Virtual Machines</Typography>
+//                 <div style={{ display: "flex", justifyContent: "center", gap: "20px" , marginTop: "20px" }}>
+//                   {[
+//                     { label: "vCPU", usage: vcpuUsage },
+//                     { label: "RAM", usage: memoryUsage },
+//                   ].map((gauge, idx) => (
+//                     <div key={idx} style={{ textAlign: "center" }}>
+//                       <Typography variant="body2">{gauge.label}</Typography>
+//                       <RadialBarChart width={150} height={80} innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={createGaugeData(Number(gauge.usage))}>
+//                         <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+//                         <RadialBar minAngle={15} background clockWise dataKey="value" cornerRadius={5} />
+//                       </RadialBarChart>
+//                       <Typography variant="h7">{gauge.usage}%</Typography>
+//                     </div>
+//                   ))}
+//                 </div>
+//               </div>
+//             </div>
+//           </CardContent>
+//         </Card>
+//       </Grid2>
+
+//       <Grid2 item xs={6}>
+//         <Card sx={{ padding: 1, height: 300, minWidth:1100 }}>
+//           <CardContent>
+//           <Typography variant="h6">Platform As Service (Kubernetes)</Typography>
+//           <Grid2 container spacing={8} sx={{ marginTop: 2, justifyContent: "center" }}>
+//             {/* DaemonSets */}
+//             <Grid2 item xs={6} sm={3}>
+//               <Typography variant="body2" align="center">DaemonSets</Typography>
+//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.daemonsets}>
+//                 <GaugeReferenceArc />
+//                 <GaugeValueArc />
+//                 <GaugePointer />
+//               </GaugeContainer>
+//               <Typography variant="body2" align="center"><b>{k8sData.daemonsets}</b></Typography>
+//             </Grid2>
+
+//             {/* Pods */}
+//             <Grid2 item xs={6} sm={3}>
+//               <Typography variant="body2" align="center">Pods</Typography>
+//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.pods}>
+//                 <GaugeReferenceArc />
+//                 <GaugeValueArc />
+//                 <GaugePointer />
+//               </GaugeContainer>
+//               <Typography variant="body2" align="center"><b>{k8sData.pods}</b></Typography>
+//             </Grid2>
+
+//             {/* Deployments */}
+//             <Grid2 item xs={6} sm={3}>
+//               <Typography variant="body2" align="center">Deployments</Typography>
+//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.deployments}>
+//                 <GaugeReferenceArc />
+//                 <GaugeValueArc />
+//                 <GaugePointer />
+//               </GaugeContainer>
+//               <Typography variant="body2" align="center"><b>{k8sData.deployments}</b></Typography>
+//             </Grid2>
+
+//             {/* ReplicaSets */}
+//             <Grid2 item xs={6} sm={3}>
+//               <Typography variant="body2" align="center">ReplicaSets</Typography>
+//               <GaugeContainer width={200} height={150} startAngle={-110} endAngle={110} value={k8sData.replicasets}>
+//                 <GaugeReferenceArc />
+//                 <GaugeValueArc />
+//                 <GaugePointer />
+//               </GaugeContainer>
+//               <Typography variant="body2" align="center"><b>{k8sData.replicasets}</b></Typography>
+//             </Grid2>
+//           </Grid2>
+//           </CardContent>
+//         </Card>
+//       </Grid2>
+//       {/* Second row - Three cards */}
+//       {/* {[
+//         { title: "AWS", stats: ["Running: 4 EC2 Instances", "Stopped: 0 EC2 Instances"] },
+//         { title: "Microsoft", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
+//         { title: "Oracle", stats: ["Running: 7 VM Instances", "Stopped: 0 VM Instances", "Disk: 300 GB"] },
+//       ].map((cloud, index) => (
+//         <Grid2 item xs={4} key={index}>
+//           <Card sx={{ padding: 2 , height: 200, minWidth:600}}>
+//             <CardContent>
+//               <Typography variant="h6">{cloud.title}</Typography>
+//               {cloud.stats.map((stat, i) => (
+//                 <Typography key={i} variant="body2">{stat}</Typography>
+//               ))}
+//             </CardContent>
+//           </Card>
+//         </Grid2>
+//       ))} */}
+
+//       {/* Third row - Three cards */}
+//       <Grid2 item xs={4}>
+//         <Card sx={{ padding: 2, height: 400, minWidth:670 }}>
+//           <CardContent>
+//             <Typography variant="h6">Devices Under Management - 166</Typography>
+//             <Typography variant="body2">Servers: 3 Up</Typography>
+//             <Typography variant="body2">Switches: 11 Down</Typography>
+//             <Typography variant="body2">Load Balancers: 8 Not Configured</Typography>
+//           </CardContent>
+//         </Card>
+//       </Grid2>
+
+//       <Grid2 item xs={4}>
+//         <Card sx={{ padding: 2 }}>
+//           <CardContent>
+//             <Typography variant="h6">Maintenance Calendar</Typography>
+//             <Box
+//         sx={{
+//           "& .react-calendar": {
+//             backgroundColor: (theme) => theme.palette.background.paper,
+//             color: (theme) => theme.palette.text.primary,
+//             borderRadius: 2,
+//             padding: 1,
+//           },
+//           "& .react-calendar__tile": {
+//             color: (theme) => theme.palette.text.primary,
+//           },
+//           "& .react-calendar__navigation button": {
+//             color: (theme) => theme.palette.text.primary,
+//           },
+//         }}
+//       >
+//             <Calendar onChange={handleDateChange} value={date} />
+//             </Box>
+//           </CardContent>
+//         </Card>
+//       </Grid2>
+
+//       <Grid2 item xs={4}>
+//         <Card sx={{ padding: 2, height: 400, minWidth:700 }}>
+//           <CardContent>
+//             <Typography variant="h6">Alerts</Typography>
+//             <Typography variant="body2">VMs: 0</Typography>
+//             <Typography variant="body2">PDUs: 0</Typography>
+//             <Typography variant="body2">Switches: 0</Typography>
+//           </CardContent>
+//         </Card>
+//       </Grid2>
+//     </Grid2>
+// );
+// };
+
+// export default Dashboard;
+
+
+
+
+
+
+
+
+
+
+
+// import React, { useEffect, useState } from "react";
+// import Cardone from "../Components/Cardone";
+// import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
+// import Calendar from 'react-calendar';
+// import 'react-calendar/dist/Calendar.css';
+// import { Card, CardContent, Typography } from '@mui/material';
+// import apiClient from "../Axios";
+// import "./Dashboard.css";
+
+// const Dashboard = () => {
+//   const [data, setData] = useState({
+//     total_instances: 0,
+//     total_vcpus: 0,
+//     used_vcpus: 0,
+//     total_memory_mb: 0,
+//     used_memory_mb: 0,
+//     total_storage_gb: 0,
+//     used_storage_gb: 0,
+//   });
+//   const [date, setDate] = useState(new Date());
+
+//   const handleDateChange = (newDate) => {
+//     setDate(newDate);
+//   };
+
+//   useEffect(() => {
+
+//     const fetchData = async () => {
+//       try {
+//         const response = await apiClient.get("overview");
+
+//         setData(response.data);
+//       } catch (error) {
+//         console.error("Error fetching data:", error);
+//       }
+//     };
+//     fetchData();
+//   }, []);
+
+//   // Calculate usage percentages
+//   const vcpuUsage = ((data.used_vcpus / data.total_vcpus) * 100).toFixed(1);
+//   const memoryUsage = ((data.used_memory_mb / data.total_memory_mb) * 100).toFixed(1);
+//   const storageUsage = ((data.used_storage_gb / data.total_storage_gb) * 100).toFixed(1);
+
+//   // Determine bar color based on usage
+//   const getBarColor = (usage) => {
+//     if (usage > 80) return "#ff4d4f"; // Red for critical
+//     if (usage > 60) return "#faad14"; // Orange for warning
+//     return "#4caf50"; // Green for normal
+//   };
+
+//   // Create half-gauge chart data
+//   const createGaugeData = (usage) => [
+//     { value: usage, fill: getBarColor(usage) },
+//     { value: 100 - usage, fill: "#ddd" }, // Remaining portion
+//   ];
+
+//   return (
+//     <div className="dashboard">
+//       <div className="dashboard-content">
+//         {/* Top Section */}
+//     <div className="row">
+//     <div className="dashboard-card">
+//   <h3>Infrastructure-as-a-Service (Openstack)</h3>
+
+//   <div className="section">
+
+//      {/* Stats Section */}
+//      <div className="stats">
+//       {/* CPU */}
+//       <div className="stat">
+//         <p>vCPU</p>
+//         <div className="bar">
+//           <span
+//             className="bar-filled"
+//             style={{
+//               width: ${vcpuUsage}%,
+//               backgroundColor: getBarColor(vcpuUsage),
+//             }}
+//           ></span>
+//         </div>
+//         <p>
+//           Used: <b>{data.used_vcpus} vCPU</b> Total: <b>{data.total_vcpus} vCPU</b>
+//         </p>
+//       </div>
+//       {/* RAM */}
+//       <div className="stat">
+//         <p>RAM</p>
+//         <div className="bar">
+//           <span
+//             className="bar-filled"
+//             style={{
+//               width: ${memoryUsage}%,
+//               backgroundColor: getBarColor(memoryUsage),
+//             }}
+//           ></span>
+//         </div>
+//         <p>
+//           Used: <b>{(data.used_memory_mb / 1024).toFixed(1)} GB</b> Total:{" "}
+//           <b>{(data.total_memory_mb / 1024).toFixed(1)} GB</b>
+//         </p>
+//       </div>
+//       {/* Storage */}
+//       <div className="stat">
+//         <p>Storage</p>
+//         <div className="bar">
+//           <span
+//             className="bar-filled"
+//             style={{
+//               width: ${storageUsage}%,
+//               backgroundColor: getBarColor(storageUsage),
+//             }}
+//           ></span>
+//         </div>
+//         <p>
+//           Used: <b>{data.used_storage_gb} GB</b> Total: <b>{data.total_storage_gb} GB</b>
+//         </p>
+//       </div>
+//     </div>
+
+//     <div className="gauges-section">
+//        {/* Total Instances Info */}
+//     <div className="instances-info">
+//       <h2>{data.total_instances}</h2>
+//       <h5>Total Virtual Machines </h5>
+//     </div>
+//     {/* Half-Gauge Charts */}
+//     <div className="gauges">
+//       {/* vCPU Half-Gauge */}
+//       <div className="gauge-container">
+//         <h5>vCPU</h5>
+//         <RadialBarChart
+//           width={150}
+//           height={80}
+//           innerRadius="70%"
+//           outerRadius="100%"
+//           startAngle={180}
+//           endAngle={0}
+//           data={createGaugeData(Number(vcpuUsage))}
+//         >
+//           <PolarAngleAxis
+//             type="number"
+//             domain={[0, 100]}
+//             angleAxisId={0}
+//             tick={false}
+//           />
+//           <RadialBar
+//             minAngle={15}
+//             background
+//             clockWise
+//             dataKey="value"
+//             cornerRadius={5}
+//           />
+//         </RadialBarChart>
+//         <p>
+//           {vcpuUsage}% ({data.used_vcpus}/{data.total_vcpus} vCPU)
+//         </p>
+//       </div>
+
+//       {/* RAM Half-Gauge */}
+//       <div className="gauge-container">
+//         <h5>RAM</h5>
+//         <RadialBarChart
+//           width={150}
+//           height={80}
+//           innerRadius="70%"
+//           outerRadius="100%"
+//           startAngle={180}
+//           endAngle={0}
+//           data={createGaugeData(Number(memoryUsage))}
+//         >
+//           <PolarAngleAxis
+//             type="number"
+//             domain={[0, 100]}
+//             angleAxisId={0}
+//             tick={false}
+//           />
+//           <RadialBar
+//             minAngle={15}
+//             background
+//             clockWise
+//             dataKey="value"
+//             cornerRadius={5}
+//           />
+//         </RadialBarChart>
+//         <p>
+//           {memoryUsage}% (
+//           {(data.used_memory_mb / 1024).toFixed(1)}/
+//           {(data.total_memory_mb / 1024).toFixed(1)} GB)
+//         </p>
+//       </div>
+//     </div>
+
+//    </div>
+//   </div>
+// </div>
+//     <Cardone
+//             title="Platform As Service (Kubernetes)"
+//             stats={[
+//               { label: "vCPU", value: "Available: 9 vCPU" },
+//               { label: "RAM", value: "Configured: 10 GB, Allocated: 16 GB" },
+//               { label: "Storage", value: "Available: 941 GB" },
+//             ]}
+//             chartData={[
+//               { value: 36, fill: "#faad14" },
+//               { value: 64, fill: "#ddd" },
+//             ]}
+//             type="large"
+//           />
+//         </div>
+
+//         {/* Second Section */}
+//         <div className="row">
+//           <Cardone
+//             title="AWS"
+//             stats={[
+//               { label: "Running", value: "4 EC2 Instances" },
+//               { label: "Stopped", value: "0 EC2 Instances" },
+//             ]}
+//             type="medium"
+//           />
+//           <Cardone
+//             title="Microsoft"
+//             stats={[
+//               { label: "Running", value: "7 VM Instances" },
+//               { label: "Stopped", value: "0 VM Instances" },
+//               { label: "Disk", value: "300 GB" },
+//             ]}
+//             type="medium"
+//           />
+//            <Cardone
+//             title="Oracle"
+//             stats={[
+//               { label: "Running", value: "7 VM Instances" },
+//               { label: "Stopped", value: "0 VM Instances" },
+//               { label: "Disk", value: "300 GB" },
+//             ]}
+//             type="medium"
+//           />
+//         </div>
+
+//         {/* Bottom Section */}
+//         <div className="row">
+//           <Cardone
+//             title="Devices Under Management - 166"
+//             stats={[
+//               { label: "Servers", value: "3 Up" },
+//               { label: "Switches", value: "11 Down" },
+//               { label: "Load Balancers", value: "8 Not Configured" },
+//             ]}
+//             type="wide"
+//           />
+//           <Card sx={{ minWidth: 275, padding: 2 }}>
+//       <CardContent>
+//         <Typography variant="h6" gutterBottom>
+//           Maintenance Calendar
+//         </Typography>
+//         <Calendar
+//           onChange={handleDateChange}
+//           value={date}
+//         />
+//       </CardContent>
+//     </Card>
+//           <Cardone
+//             title="Alerts"
+//             stats={[
+//               { label: "VMs", value: "0" },
+//               { label: "PDUs", value: "0" },
+//               { label: "Switches", value: "0" },
+//             ]}
+//             type="wide"
+//           />
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
 
 // <Grid2 item xs={12} sm={12} md={6} lg={6} xl={6}>
 //         <Card sx={{ padding: 1, height: "100%", width: "100%", borderRadius: 4,
