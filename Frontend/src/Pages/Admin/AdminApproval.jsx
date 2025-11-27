@@ -20,8 +20,35 @@ import {
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
+import { styled } from "@mui/material/styles";
+import { tableCellClasses } from "@mui/material/TableCell";
 import { GoAlert } from "react-icons/go";
 import apiClient from "../../Axios"; // Update path if required
+
+const StyledTableCell = styled(TableCell)(({ theme }) => ({
+  [`&.${tableCellClasses.head}`]: {
+    backgroundColor: "#253848",
+    color: theme.palette.common.white,
+    fontWeight: "bold",
+    fontSize: 16,
+    textAlign: "center",
+  },
+  [`&.${tableCellClasses.body}`]: {
+    fontSize: 14,
+    textAlign: "center",
+    color: "#000",
+  },
+}));
+
+const StyledTableRow = styled(TableRow)(({ theme }) => ({
+  backgroundColor: theme.palette.grey[100],
+  "&:nth-of-type(odd)": {
+    backgroundColor: theme.palette.grey[300],
+  },
+  "&:last-child td, &:last-child th": {
+    border: 0,
+  },
+}));
 
 const AdminApproval = () => {
   const [overview, setOverview] = useState({
@@ -39,7 +66,7 @@ const AdminApproval = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [filteredRows, setFilteredRows] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
-
+  const [disabledActions, setDisabledActions] = useState([]);
   const [rejectDialog, setRejectDialog] = useState({
     open: false,
     id: null,
@@ -83,9 +110,18 @@ const AdminApproval = () => {
   // Handle card click (Approved/Rejected list)
   const handleCardClick = (statusKey) => {
     setStatusFilter(statusKey);
-    const filtered = overview.data.filter(
-      (r) => r.fla_status?.toLowerCase() === statusKey
-    );
+    const filtered =
+      statusKey === "accepted"
+        ? overview.data.filter(
+            (r) =>
+              r.fla_status?.toLowerCase() === "accepted" &&
+              r.admin_status === "Accepted"
+          )
+        : overview.data.filter(
+            (r) =>
+              r.fla_status?.toLowerCase() === "rejected" ||
+              r.admin_status === "Rejected"
+          );
     setFilteredRows(filtered);
     setOpenDialog(true);
   };
@@ -93,6 +129,8 @@ const AdminApproval = () => {
   // Handle Accept/Reject
   const handleStatusUpdate = async (id, status, reason = "") => {
     try {
+      // Disable this action to prevent double click
+      setDisabledActions((prev) => [...prev, id]);
       const response = await apiClient.post("/vmrequest/status/", {
         vm_request_id: id,
         status,
@@ -116,6 +154,8 @@ const AdminApproval = () => {
         message: "Error updating request status.",
         severity: "error",
       });
+      // Re-enable if failed
+      setDisabledActions((prev) => prev.filter((r) => r !== id));
     }
   };
 
@@ -187,7 +227,7 @@ const AdminApproval = () => {
           }}
           onClick={() => handleCardClick("accepted")}
         >
-          <Typography variant="subtitle1">Total Approved by FLA</Typography>
+          <Typography variant="subtitle1">Total Approved by Admin</Typography>
           <Typography variant="h3" color="success.main">
             {counts.accepted}
           </Typography>
@@ -202,7 +242,7 @@ const AdminApproval = () => {
           }}
           onClick={() => handleCardClick("rejected")}
         >
-          <Typography variant="subtitle1">Total Rejected by FLA</Typography>
+          <Typography variant="subtitle1">Total Rejected by Admin</Typography>
           <Typography variant="h3" color="error.main">
             {counts.rejected}
           </Typography>
@@ -225,39 +265,42 @@ const AdminApproval = () => {
         <TableContainer sx={{ maxHeight: 500 }}>
           <Table stickyHeader>
             <TableHead>
-              <TableRow>
-                <TableCell>Sr. No.</TableCell>
-                <TableCell>Name</TableCell>
-                <TableCell>VM Name</TableCell>
-                <TableCell>Project</TableCell>
-                <TableCell>Image</TableCell>
-                <TableCell>Flavor</TableCell>
-                <TableCell>Purpose</TableCell>
-                <TableCell>FLA Status</TableCell>
-                <TableCell>Requested On</TableCell>
-                <TableCell align="center">Actions</TableCell>
-              </TableRow>
+              <StyledTableRow>
+                <StyledTableCell>Sr. No.</StyledTableCell>
+                <StyledTableCell>Name</StyledTableCell>
+                <StyledTableCell>VM Name</StyledTableCell>
+                <StyledTableCell>Project</StyledTableCell>
+                <StyledTableCell>Image</StyledTableCell>
+                <StyledTableCell>Flavor</StyledTableCell>
+                <StyledTableCell>Purpose</StyledTableCell>
+                <StyledTableCell>FLA Status</StyledTableCell>
+                <StyledTableCell>Requested On</StyledTableCell>
+                <StyledTableCell align="center">Actions</StyledTableCell>
+              </StyledTableRow>
             </TableHead>
             <TableBody>
               {pendingRows.map((req, index) => (
-                <TableRow key={req.id} hover>
-                  <TableCell>{page * rowsPerPage + index + 1}</TableCell>
-                  <TableCell>{req.name}</TableCell>
-                  <TableCell>{req.vm_name}</TableCell>
-                  <TableCell>{req.project_name}</TableCell>
-                  <TableCell>{req.image}</TableCell>
-                  <TableCell>{req.flavor}</TableCell>
-                  <TableCell>{req.purpose_of_request}</TableCell>
-                  <TableCell>{req.fla_status}</TableCell>
-                  <TableCell>
+                <StyledTableRow key={req.id} hover>
+                  <StyledTableCell>
+                    {page * rowsPerPage + index + 1}
+                  </StyledTableCell>
+                  <StyledTableCell>{req.name}</StyledTableCell>
+                  <StyledTableCell>{req.vm_name}</StyledTableCell>
+                  <StyledTableCell>{req.project_name}</StyledTableCell>
+                  <StyledTableCell>{req.image}</StyledTableCell>
+                  <StyledTableCell>{req.flavor}</StyledTableCell>
+                  <StyledTableCell>{req.purpose_of_request}</StyledTableCell>
+                  <StyledTableCell>{req.fla_status}</StyledTableCell>
+                  <StyledTableCell>
                     {new Date(req.request_timestamp).toLocaleString("en-IN")}
-                  </TableCell>
-                  <TableCell align="center">
+                  </StyledTableCell>
+                  <StyledTableCell align="center">
                     <Stack direction="row" spacing={1} justifyContent="center">
                       <Button
                         variant="contained"
                         color="success"
                         size="small"
+                        disabled={disabledActions.includes(req.id)}
                         onClick={() => handleStatusUpdate(req.id, "Accepted")}
                       >
                         Accept
@@ -266,6 +309,7 @@ const AdminApproval = () => {
                         variant="contained"
                         color="error"
                         size="small"
+                        disabled={disabledActions.includes(req.id)}
                         onClick={() =>
                           setRejectDialog({
                             open: true,
@@ -277,8 +321,8 @@ const AdminApproval = () => {
                         Reject
                       </Button>
                     </Stack>
-                  </TableCell>
-                </TableRow>
+                  </StyledTableCell>
+                </StyledTableRow>
               ))}
             </TableBody>
           </Table>
@@ -310,23 +354,23 @@ const AdminApproval = () => {
           <TableContainer>
             <Table>
               <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>VM Name</TableCell>
-                  <TableCell>Project</TableCell>
-                  <TableCell>Status</TableCell>
-                </TableRow>
+                <StyledTableRow>
+                  <StyledTableCell>Name</StyledTableCell>
+                  <StyledTableCell>Email</StyledTableCell>
+                  <StyledTableCell>VM Name</StyledTableCell>
+                  <StyledTableCell>Project</StyledTableCell>
+                  <StyledTableCell>Status</StyledTableCell>
+                </StyledTableRow>
               </TableHead>
               <TableBody>
                 {filteredRows.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell>{r.name}</TableCell>
-                    <TableCell>{r.email}</TableCell>
-                    <TableCell>{r.vm_name}</TableCell>
-                    <TableCell>{r.project_name}</TableCell>
-                    <TableCell>{r.fla_status}</TableCell>
-                  </TableRow>
+                  <StyledTableRow key={r.id}>
+                    <StyledTableCell>{r.name}</StyledTableCell>
+                    <StyledTableCell>{r.email}</StyledTableCell>
+                    <StyledTableCell>{r.vm_name}</StyledTableCell>
+                    <StyledTableCell>{r.project_name}</StyledTableCell>
+                    <StyledTableCell>{r.fla_status}</StyledTableCell>
+                  </StyledTableRow>
                 ))}
               </TableBody>
             </Table>
@@ -409,6 +453,926 @@ const AdminApproval = () => {
 };
 
 export default AdminApproval;
+// import {
+//   Button,
+//   Checkbox,
+//   CircularProgress,
+//   Dialog,
+//   DialogActions,
+//   DialogContent,
+//   DialogTitle,
+//   Paper,
+//   Stack,
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableContainer,
+//   TableHead,
+//   TableRow,
+//   TablePagination,
+//   TextField,
+//   Typography,
+// } from "@mui/material";
+// import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+// import ErrorIcon from "@mui/icons-material/Error";
+// import { useEffect, useState } from "react";
+// import apiClient from "../../Axios";
+
+// const AdminApproval = () => {
+//   const [overview, setOverview] = useState({
+//     role: "",
+//     total_records: 0,
+//     status_counts: { pending: 0, accepted: 0, rejected: 0, error: 0 },
+//     data: [],
+//   });
+
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+//   const [page, setPage] = useState(0);
+//   const [rowsPerPage, setRowsPerPage] = useState(5);
+
+//   // For card popups (Approved / Rejected / Error)
+//   const [statusFilter, setStatusFilter] = useState("");
+//   const [filteredRows, setFilteredRows] = useState([]);
+//   const [openDialog, setOpenDialog] = useState(false);
+
+//   const [rejectDialog, setRejectDialog] = useState({
+//     open: false,
+//     id: null,
+//     reason: "",
+//   });
+
+//   const [alertDialog, setAlertDialog] = useState({
+//     open: false,
+//     message: "",
+//     severity: "success",
+//   });
+
+//   const [selectedIds, setSelectedIds] = useState([]);
+//   const [errorIds, setErrorIds] = useState([]);
+
+//   const fetchOverview = async (pageNo = 1, size = 10) => {
+//     setLoading(true);
+//     try {
+//       const res = await apiClient.get(
+//         `/vmdetails/overview/?page=${pageNo}&size=${size}`
+//       );
+//       setOverview(res.data);
+//       setError(null);
+//     } catch (err) {
+//       setError("Failed to load data. Try again later.");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   useEffect(() => {
+//     fetchOverview(page + 1, rowsPerPage);
+//   }, [page, rowsPerPage]);
+
+//   // Only Pending allowed on main table
+//   const pendingRows = overview.data.filter(
+//     (r) => r.admin_status === "Pending" && r.fla_status === "Accepted"
+//   );
+
+//   const handleCardClick = (statusKey) => {
+//     let filtered = [];
+
+//     if (statusKey === "error") {
+//       filtered = overview.data.filter((r) => errorIds.includes(r.id));
+//     } else {
+//       filtered = overview.data.filter(
+//         (r) => r.admin_status?.toLowerCase() === statusKey
+//       );
+//     }
+
+//     setStatusFilter(statusKey);
+//     setFilteredRows(filtered);
+//     setOpenDialog(true);
+//   };
+
+//   const handleStatusUpdate = async (id, status, reason = "") => {
+//     try {
+//       const response = await apiClient.post("/vmrequest/status/", {
+//         vm_request_id: id,
+//         status,
+//         admin_rejection_reason: status === "Rejected" ? reason : null,
+//       });
+
+//       if (response.status === 200) {
+//         setAlertDialog({
+//           open: true,
+//           message: `Request ${status}!`,
+//           severity: "success",
+//         });
+
+//         await fetchOverview(page + 1, rowsPerPage);
+//       }
+//     } catch (error) {
+//       console.error("Update error:", error);
+
+//       setErrorIds((prev) => [...prev, id]);
+
+//       setAlertDialog({
+//         open: true,
+//         message: "VM error occurred — moved to Error tab!",
+//         severity: "error",
+//       });
+
+//       fetchOverview(page + 1, rowsPerPage);
+//     }
+//   };
+
+//   const handleRowSelect = (id) => {
+//     setSelectedIds((prev) =>
+//       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+//     );
+//   };
+
+//   const handleSelectAllClick = () => {
+//     if (selectedIds.length === pendingRows.length) {
+//       setSelectedIds([]);
+//     } else {
+//       setSelectedIds(pendingRows.map((r) => r.id));
+//     }
+//   };
+
+//   const handleApproveAll = async () => {
+//     for (const req of pendingRows) {
+//       await handleStatusUpdate(req.id, "Approved");
+//     }
+//     setSelectedIds([]);
+//   };
+
+//   if (loading)
+//     return (
+//       <Stack
+//         alignItems="center"
+//         justifyContent="center"
+//         sx={{ height: "80vh" }}
+//       >
+//         <CircularProgress size={60} />
+//       </Stack>
+//     );
+
+//   if (error)
+//     return (
+//       <Typography variant="h6" color="error" textAlign="center" mt={8}>
+//         {error}
+//       </Typography>
+//     );
+
+//   const counts = overview.status_counts || {};
+
+//   return (
+//     <>
+//       {/* Cards */}
+//       <Stack direction="row" spacing={3} justifyContent="center" sx={{ mt: 4 }}>
+//         <Paper sx={{ p: 2, minWidth: 220 }}>
+//           <Typography>Total Pending</Typography>
+//           <Typography variant="h3">{counts.pending}</Typography>
+//         </Paper>
+
+//         <Paper
+//           sx={{ p: 2, minWidth: 220, cursor: "pointer" }}
+//           onClick={() => handleCardClick("accepted")}
+//         >
+//           <Typography>Approved</Typography>
+//           <Typography variant="h3" color="success.main">
+//             {counts.accepted}
+//           </Typography>
+//         </Paper>
+
+//         <Paper
+//           sx={{ p: 2, minWidth: 220, cursor: "pointer" }}
+//           onClick={() => handleCardClick("rejected")}
+//         >
+//           <Typography>Rejected</Typography>
+//           <Typography variant="h3" color="error.main">
+//             {counts.rejected}
+//           </Typography>
+//         </Paper>
+
+//         <Paper
+//           sx={{ p: 2, minWidth: 220, cursor: "pointer" }}
+//           onClick={() => handleCardClick("error")}
+//         >
+//           <Typography>Error</Typography>
+//           <Typography variant="h3" color="warning.main">
+//             {counts.error}
+//           </Typography>
+//         </Paper>
+//       </Stack>
+
+//       {/* Pending Table */}
+//       <Paper sx={{ width: "90%", mt: 3, mx: "auto", p: 3 }}>
+//         <Typography variant="h5">Pending Approval Requests</Typography>
+
+//         <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+//           {pendingRows.length > 0 && (
+//             <Button
+//               variant="contained"
+//               color="success"
+//               onClick={handleApproveAll}
+//             >
+//               Approve All
+//             </Button>
+//           )}
+//         </Stack>
+
+//         <TableContainer sx={{ maxHeight: 500 }}>
+//           <Table stickyHeader>
+//             <TableHead>
+//               <TableRow>
+//                 <TableCell padding="checkbox">
+//                   <Checkbox
+//                     indeterminate={
+//                       selectedIds.length > 0 &&
+//                       selectedIds.length < pendingRows.length
+//                     }
+//                     checked={
+//                       pendingRows.length > 0 &&
+//                       selectedIds.length === pendingRows.length
+//                     }
+//                     onChange={handleSelectAllClick}
+//                   />
+//                 </TableCell>
+//                 <TableCell>Sr No.</TableCell>
+//                 <TableCell>User</TableCell>
+//                 <TableCell>VM Name</TableCell>
+//                 <TableCell>Project</TableCell>
+//                 <TableCell>Image</TableCell>
+//                 <TableCell>Flavor</TableCell>
+//                 <TableCell>Purpose</TableCell>
+//                 <TableCell>Actions</TableCell>
+//               </TableRow>
+//             </TableHead>
+
+//             <TableBody>
+//               {pendingRows.map((req, index) => (
+//                 <TableRow key={req.id}>
+//                   <TableCell padding="checkbox">
+//                     <Checkbox
+//                       checked={selectedIds.includes(req.id)}
+//                       onChange={() => handleRowSelect(req.id)}
+//                     />
+//                   </TableCell>
+//                   <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+//                   <TableCell>{req.name}</TableCell>
+//                   <TableCell>{req.vm_name}</TableCell>
+//                   <TableCell>{req.project_name}</TableCell>
+//                   <TableCell>{req.image}</TableCell>
+//                   <TableCell>{req.flavor}</TableCell>
+//                   <TableCell>{req.purpose_of_request}</TableCell>
+
+//                   <TableCell>
+//                     <Stack direction="row" spacing={1}>
+//                       <Button
+//                         variant="contained"
+//                         color="success"
+//                         size="small"
+//                         onClick={() => handleStatusUpdate(req.id, "Approved")}
+//                       >
+//                         Approve
+//                       </Button>
+
+//                       <Button
+//                         variant="contained"
+//                         color="error"
+//                         size="small"
+//                         onClick={() =>
+//                           setRejectDialog({
+//                             open: true,
+//                             id: req.id,
+//                             reason: "",
+//                           })
+//                         }
+//                       >
+//                         Reject
+//                       </Button>
+//                     </Stack>
+//                   </TableCell>
+//                 </TableRow>
+//               ))}
+//             </TableBody>
+//           </Table>
+//         </TableContainer>
+
+//         <TablePagination
+//           rowsPerPageOptions={[5, 10, 25]}
+//           count={counts.pending}
+//           rowsPerPage={rowsPerPage}
+//           page={page}
+//           onPageChange={(e, newPage) => setPage(newPage)}
+//           onRowsPerPageChange={(e) => {
+//             setRowsPerPage(parseInt(e.target.value, 10));
+//             setPage(0);
+//           }}
+//         />
+//       </Paper>
+
+//       {/* Reject Reason Dialog */}
+//       <Dialog
+//         open={rejectDialog.open}
+//         onClose={() => setRejectDialog({ open: false, id: null, reason: "" })}
+//       >
+//         <DialogTitle>Reject Request</DialogTitle>
+//         <DialogContent>
+//           <Typography>Please provide a reason:</Typography>
+//           <TextField
+//             fullWidth
+//             multiline
+//             rows={3}
+//             value={rejectDialog.reason}
+//             onChange={(e) =>
+//               setRejectDialog({ ...rejectDialog, reason: e.target.value })
+//             }
+//             label="Reason"
+//           />
+//         </DialogContent>
+//         <DialogActions>
+//           <Button
+//             onClick={() =>
+//               setRejectDialog({ open: false, id: null, reason: "" })
+//             }
+//           >
+//             Cancel
+//           </Button>
+//           <Button
+//             variant="contained"
+//             color="error"
+//             disabled={!rejectDialog.reason.trim()}
+//             onClick={() => {
+//               handleStatusUpdate(
+//                 rejectDialog.id,
+//                 "Rejected",
+//                 rejectDialog.reason
+//               );
+//               setRejectDialog({ open: false, id: null, reason: "" });
+//             }}
+//           >
+//             Submit
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
+
+//       {/* Popup Showing Approved/Rejected/Error */}
+//       <Dialog
+//         fullWidth
+//         maxWidth="lg"
+//         open={openDialog}
+//         onClose={() => setOpenDialog(false)}
+//       >
+//         <DialogTitle sx={{ fontWeight: "bold" }}>
+//           {statusFilter === "accepted"
+//             ? "Approved Requests"
+//             : statusFilter === "rejected"
+//             ? "Rejected Requests"
+//             : "Error Requests"}
+//         </DialogTitle>
+
+//         <DialogContent>
+//           {filteredRows.length === 0 ? (
+//             <Typography textAlign="center" sx={{ py: 3 }}>
+//               No records found
+//             </Typography>
+//           ) : (
+//             <TableContainer sx={{ maxHeight: 500 }}>
+//               <Table stickyHeader>
+//                 <TableHead>
+//                   <TableRow>
+//                     <TableCell>Sr No.</TableCell>
+//                     <TableCell>Name</TableCell>
+//                     <TableCell>VM Name</TableCell>
+//                     <TableCell>Project</TableCell>
+//                     <TableCell>Image</TableCell>
+//                     <TableCell>Flavor</TableCell>
+//                     <TableCell>Purpose</TableCell>
+//                     {statusFilter === "rejected" && (
+//                       <TableCell>Reason</TableCell>
+//                     )}
+//                     {statusFilter === "error" && (
+//                       <TableCell align="center">Retry</TableCell>
+//                     )}
+//                   </TableRow>
+//                 </TableHead>
+
+//                 <TableBody>
+//                   {filteredRows.map((req, index) => (
+//                     <TableRow key={req.id}>
+//                       <TableCell>{index + 1}</TableCell>
+//                       <TableCell>{req.name}</TableCell>
+//                       <TableCell>{req.vm_name}</TableCell>
+//                       <TableCell>{req.project_name}</TableCell>
+//                       <TableCell>{req.image}</TableCell>
+//                       <TableCell>{req.flavor}</TableCell>
+//                       <TableCell>{req.purpose_of_request}</TableCell>
+
+//                       {statusFilter === "rejected" && (
+//                         <TableCell color="error.main">
+//                           {req.admin_rejection_reason || "—"}
+//                         </TableCell>
+//                       )}
+
+//                       {statusFilter === "error" && (
+//                         <TableCell align="center">
+//                           <Button
+//                             variant="outlined"
+//                             color="warning"
+//                             size="small"
+//                             onClick={() =>
+//                               handleStatusUpdate(req.id, "Approved")
+//                             }
+//                           >
+//                             Retry VM
+//                           </Button>
+//                         </TableCell>
+//                       )}
+//                     </TableRow>
+//                   ))}
+//                 </TableBody>
+//               </Table>
+//             </TableContainer>
+//           )}
+//         </DialogContent>
+
+//         <DialogActions>
+//           <Button variant="contained" onClick={() => setOpenDialog(false)}>
+//             Close
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
+
+//       {/* Alerts */}
+//       <Dialog
+//         open={alertDialog.open}
+//         onClose={() => setAlertDialog({ ...alertDialog, open: false })}
+//       >
+//         <DialogTitle sx={{ textAlign: "center" }}>
+//           {alertDialog.severity === "success" ? (
+//             <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
+//           ) : (
+//             <ErrorIcon color="error" sx={{ fontSize: 60 }} />
+//           )}
+//         </DialogTitle>
+//         <DialogContent sx={{ textAlign: "center" }}>
+//           <Typography>{alertDialog.message}</Typography>
+//         </DialogContent>
+//         <DialogActions sx={{ justifyContent: "center" }}>
+//           <Button
+//             variant="contained"
+//             onClick={() => setAlertDialog({ ...alertDialog, open: false })}
+//           >
+//             OK
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
+//     </>
+//   );
+// };
+
+// export default AdminApproval;
+
+// import { useEffect, useState } from "react";
+// import {
+//   Stack,
+//   Paper,
+//   Typography,
+//   Table,
+//   TableBody,
+//   TableCell,
+//   TableContainer,
+//   TableHead,
+//   TableRow,
+//   TablePagination,
+//   Dialog,
+//   DialogTitle,
+//   DialogContent,
+//   DialogActions,
+//   Button,
+//   TextField,
+//   CircularProgress,
+//   Checkbox,
+// } from "@mui/material";
+// import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+// import ErrorIcon from "@mui/icons-material/Error";
+// import { GoAlert } from "react-icons/go";
+// import apiClient from "../../Axios"; // Update path if required
+
+// const AdminApproval = () => {
+//   const [overview, setOverview] = useState({
+//     role: "",
+//     total_records: 0,
+//     status_counts: { pending: 0, accepted: 0, rejected: 0 },
+//     data: [],
+//   });
+
+//   const [loading, setLoading] = useState(true);
+//   const [error, setError] = useState(null);
+//   const [page, setPage] = useState(0);
+//   const [rowsPerPage, setRowsPerPage] = useState(5);
+
+//   const [statusFilter, setStatusFilter] = useState("");
+//   const [filteredRows, setFilteredRows] = useState([]);
+//   const [openDialog, setOpenDialog] = useState(false);
+//   const [selectedRows, setSelectedRows] = useState([]);
+
+//   const [rejectDialog, setRejectDialog] = useState({
+//     open: false,
+//     id: null,
+//     reason: "",
+//   });
+
+//   const [alertDialog, setAlertDialog] = useState({
+//     open: false,
+//     message: "",
+//     severity: "success",
+//   });
+
+//   // Fetch data from backend
+//   const fetchOverview = async (pageNo = 1, size = 10) => {
+//     setLoading(true);
+//     try {
+//       const res = await apiClient.get(
+//         `/vmdetails/overview/?page=${pageNo}&size=${size}`
+//       );
+//       setOverview(res.data);
+//       setError(null);
+//     } catch (err) {
+//       console.error("Error fetching overview:", err);
+//       setError("Failed to load data. Please try again later.");
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   // Initial load + auto-refresh every 30 seconds
+
+//   useEffect(() => {
+//     fetchOverview(page + 1, rowsPerPage);
+//     const interval = setInterval(
+//       () => fetchOverview(page + 1, rowsPerPage),
+//       30000
+//     );
+//     return () => clearInterval(interval);
+//   }, [page, rowsPerPage]);
+
+//   // Handle card click (Approved/Rejected list)
+//   const handleCardClick = (statusKey) => {
+//     setStatusFilter(statusKey);
+//     const filtered = overview.data.filter(
+//       (r) => r.fla_status?.toLowerCase() === statusKey
+//     );
+//     setFilteredRows(filtered);
+//     setOpenDialog(true);
+//   };
+
+//   // Handle Accept/Reject
+//   const handleStatusUpdate = async (id, status, reason = "") => {
+//     try {
+//       const response = await apiClient.post("/vmrequest/status/", {
+//         vm_request_id: id,
+//         status,
+//         admin_rejection_reason: status === "Rejected" ? reason : null,
+//       });
+
+//       if (response.status === 200) {
+//         setAlertDialog({
+//           open: true,
+//           message: `Request ${status}!`,
+//           severity: "success",
+//         });
+//         await fetchOverview(page + 1, rowsPerPage); // Refresh immediately
+//       } else {
+//         throw new Error("Unexpected server response");
+//       }
+//     } catch (error) {
+//       console.error("Error updating status:", error);
+//       setAlertDialog({
+//         open: true,
+//         message: "Error updating request status.",
+//         severity: "error",
+//       });
+//     }
+//   };
+
+//   const handleChangePage = (event, newPage) => setPage(newPage);
+//   const handleChangeRowsPerPage = (event) => {
+//     setRowsPerPage(parseInt(event.target.value, 10));
+//     setPage(0);
+//   };
+
+//   const rows = overview.data || [];
+//   const counts = overview.status_counts || {};
+//   const pendingRows = rows.filter(
+//     (r) => r.admin_status === "Pending" && r.fla_status === "Accepted"
+//   );
+
+//   // --- UI Starts Here ---
+//   if (loading) {
+//     return (
+//       <Stack
+//         alignItems="center"
+//         justifyContent="center"
+//         sx={{ height: "80vh" }}
+//       >
+//         <CircularProgress color="primary" size={60} />
+//         <Typography variant="h6" sx={{ mt: 2 }}>
+//           Loading data...
+//         </Typography>
+//       </Stack>
+//     );
+//   }
+
+//   if (error) {
+//     return (
+//       <Stack
+//         alignItems="center"
+//         justifyContent="center"
+//         sx={{ height: "80vh", color: "error.main" }}
+//       >
+//         <GoAlert size={60} />
+//         <Typography variant="h6" sx={{ mt: 2 }}>
+//           {error}
+//         </Typography>
+//       </Stack>
+//     );
+//   }
+
+//   return (
+//     <>
+//       {/* Overview Cards */}
+//       <Stack
+//         direction="row"
+//         spacing={3}
+//         justifyContent="center"
+//         sx={{ mt: 4, mb: 3 }}
+//       >
+//         <Paper sx={{ p: 2, minWidth: 220, backgroundColor: "#e3f2fd" }}>
+//           <Typography variant="subtitle1">Total Pending Requests</Typography>
+//           <Typography variant="h3" color="primary">
+//             {counts.pending}
+//           </Typography>
+//         </Paper>
+
+//         <Paper
+//           sx={{
+//             p: 2,
+//             minWidth: 220,
+//             backgroundColor: "#e8f5e9",
+//             cursor: "pointer",
+//           }}
+//           onClick={() => handleCardClick("accepted")}
+//         >
+//           <Typography variant="subtitle1">Total Approved by FLA</Typography>
+//           <Typography variant="h3" color="success.main">
+//             {counts.accepted}
+//           </Typography>
+//         </Paper>
+
+//         <Paper
+//           sx={{
+//             p: 2,
+//             minWidth: 220,
+//             backgroundColor: "#ffebee",
+//             cursor: "pointer",
+//           }}
+//           onClick={() => handleCardClick("rejected")}
+//         >
+//           <Typography variant="subtitle1">Total Rejected by FLA</Typography>
+//           <Typography variant="h3" color="error.main">
+//             {counts.rejected}
+//           </Typography>
+//         </Paper>
+//       </Stack>
+
+//       {/* Pending Table */}
+//       <Paper
+//         sx={{
+//           width: "90%",
+//           margin: "auto",
+//           p: 3,
+//           borderRadius: "12px",
+//           boxShadow: 4,
+//         }}
+//       >
+//         <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
+//           Pending Approval Requests
+//         </Typography>
+//         <TableContainer sx={{ maxHeight: 500 }}>
+//           <Table stickyHeader>
+//             <TableHead>
+//               <TableCell padding="checkbox">
+//                 <Checkbox
+//                   indeterminate={
+//                     selectedIds.length > 0 &&
+//                     selectedIds.length < pendingRows.length
+//                   }
+//                   checked={
+//                     pendingRows.length > 0 &&
+//                     selectedIds.length === pendingRows.length
+//                   }
+//                   onChange={handleSelectAllClick}
+//                 />
+//               </TableCell>
+//               <TableRow>
+//                 <TableCell padding="checkbox">
+//                   <Checkbox
+//                     checked={selectedRows.includes(req.id)}
+//                     onChange={(e) => {
+//                       if (e.target.checked) {
+//                         setSelectedRows([...selectedRows, req.id]);
+//                       } else {
+//                         setSelectedRows(
+//                           selectedRows.filter((id) => id !== req.id)
+//                         );
+//                       }
+//                     }}
+//                   />
+//                 </TableCell>
+//                 <TableCell>Sr. No.</TableCell>
+//                 <TableCell>Name</TableCell>
+//                 <TableCell>VM Name</TableCell>
+//                 <TableCell>Project</TableCell>
+//                 <TableCell>Image</TableCell>
+//                 <TableCell>Flavor</TableCell>
+//                 <TableCell>Purpose</TableCell>
+//                 <TableCell>FLA Status</TableCell>
+//                 <TableCell>Requested On</TableCell>
+//                 <TableCell align="center">Actions</TableCell>
+//               </TableRow>
+//             </TableHead>
+//             <TableBody>
+//               {pendingRows.map((req, index) => (
+//                 <TableRow key={req.id} hover>
+//                   <TableCell>{page * rowsPerPage + index + 1}</TableCell>
+//                   <TableCell>{req.name}</TableCell>
+//                   <TableCell>{req.vm_name}</TableCell>
+//                   <TableCell>{req.project_name}</TableCell>
+//                   <TableCell>{req.image}</TableCell>
+//                   <TableCell>{req.flavor}</TableCell>
+//                   <TableCell>{req.purpose_of_request}</TableCell>
+//                   <TableCell>{req.fla_status}</TableCell>
+//                   <TableCell>
+//                     {new Date(req.request_timestamp).toLocaleString("en-IN")}
+//                   </TableCell>
+//                   <TableCell align="center">
+//                     <Stack direction="row" spacing={1} justifyContent="center">
+//                       <Button
+//                         variant="contained"
+//                         color="success"
+//                         size="small"
+//                         onClick={() => handleStatusUpdate(req.id, "Accepted")}
+//                       >
+//                         Accept
+//                       </Button>
+//                       <Button
+//                         variant="contained"
+//                         color="error"
+//                         size="small"
+//                         onClick={() =>
+//                           setRejectDialog({
+//                             open: true,
+//                             id: req.id,
+//                             reason: "",
+//                           })
+//                         }
+//                       >
+//                         Reject
+//                       </Button>
+//                     </Stack>
+//                   </TableCell>
+//                 </TableRow>
+//               ))}
+//             </TableBody>
+//           </Table>
+//         </TableContainer>
+
+//         <TablePagination
+//           rowsPerPageOptions={[5, 10, 25]}
+//           count={overview.total_records}
+//           rowsPerPage={rowsPerPage}
+//           page={page}
+//           onPageChange={handleChangePage}
+//           onRowsPerPageChange={handleChangeRowsPerPage}
+//         />
+//       </Paper>
+
+//       {/* Approved/Rejected Dialog */}
+//       <Dialog
+//         open={openDialog}
+//         onClose={() => setOpenDialog(false)}
+//         fullWidth
+//         maxWidth="md"
+//       >
+//         <DialogTitle>
+//           {statusFilter === "accepted"
+//             ? "FLA Approved Requests"
+//             : "FLA Rejected Requests"}
+//         </DialogTitle>
+//         <DialogContent>
+//           <TableContainer>
+//             <Table>
+//               <TableHead>
+//                 <TableRow>
+//                   <TableCell>Name</TableCell>
+//                   <TableCell>Email</TableCell>
+//                   <TableCell>VM Name</TableCell>
+//                   <TableCell>Project</TableCell>
+//                   <TableCell>Status</TableCell>
+//                 </TableRow>
+//               </TableHead>
+//               <TableBody>
+//                 {filteredRows.map((r) => (
+//                   <TableRow key={r.id}>
+//                     <TableCell>{r.name}</TableCell>
+//                     <TableCell>{r.email}</TableCell>
+//                     <TableCell>{r.vm_name}</TableCell>
+//                     <TableCell>{r.project_name}</TableCell>
+//                     <TableCell>{r.fla_status}</TableCell>
+//                   </TableRow>
+//                 ))}
+//               </TableBody>
+//             </Table>
+//           </TableContainer>
+//         </DialogContent>
+//         <DialogActions>
+//           <Button onClick={() => setOpenDialog(false)}>Close</Button>
+//         </DialogActions>
+//       </Dialog>
+
+//       {/* Reject Reason Dialog */}
+//       <Dialog
+//         open={rejectDialog.open}
+//         onClose={() => setRejectDialog({ ...rejectDialog, open: false })}
+//       >
+//         <DialogTitle>Reject Request</DialogTitle>
+//         <DialogContent>
+//           <Typography>Please provide a rejection reason:</Typography>
+//           <TextField
+//             fullWidth
+//             multiline
+//             rows={3}
+//             margin="dense"
+//             value={rejectDialog.reason}
+//             onChange={(e) =>
+//               setRejectDialog({ ...rejectDialog, reason: e.target.value })
+//             }
+//             label="Reason"
+//           />
+//         </DialogContent>
+//         <DialogActions>
+//           <Button onClick={() => setRejectDialog({ open: false })}>
+//             Cancel
+//           </Button>
+//           <Button
+//             variant="contained"
+//             color="error"
+//             disabled={!rejectDialog.reason.trim()}
+//             onClick={() => {
+//               handleStatusUpdate(
+//                 rejectDialog.id,
+//                 "Rejected",
+//                 rejectDialog.reason
+//               );
+//               setRejectDialog({ open: false, id: null, reason: "" });
+//             }}
+//           >
+//             Submit
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
+
+//       {/* Alert Dialog */}
+//       <Dialog
+//         open={alertDialog.open}
+//         onClose={() => setAlertDialog({ ...alertDialog, open: false })}
+//       >
+//         <DialogTitle sx={{ textAlign: "center", p: 2 }}>
+//           {alertDialog.severity === "success" ? (
+//             <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
+//           ) : (
+//             <ErrorIcon color="error" sx={{ fontSize: 60 }} />
+//           )}
+//         </DialogTitle>
+//         <DialogContent sx={{ textAlign: "center" }}>
+//           <Typography variant="h6">{alertDialog.message}</Typography>
+//         </DialogContent>
+//         <DialogActions sx={{ justifyContent: "center" }}>
+//           <Button
+//             variant="contained"
+//             color={alertDialog.severity}
+//             onClick={() => setAlertDialog({ ...alertDialog, open: false })}
+//           >
+//             OK
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
+//     </>
+//   );
+// };
+
+// export default AdminApproval;
 
 // import React, { useEffect, useState } from "react";
 // import apiClient from "../../Axios";
@@ -1055,16 +2019,19 @@ export default AdminApproval;
 //       setLoading(true);
 //       setError(null);
 //       try {
-//         const response = await apiClient.get( `/vmrequests/admin?page=${page + 1}&size=${rowsPerPage}`);
+//         const response = await apiClient.get(
+//           `/vmrequests/admin?page=${page + 1}&size=${rowsPerPage}`
+//         );
 
 //         setRequests(response.data.data || []);
-//         setTotalRecords(typeof response.data.totalRecords === "number"
-//           ? response.data.totalRecords
-//           : (response.data.totalRecords ?? totalRecords)
-//       );
-//          const allRes = await apiClient.get(
-//         `/vmrequests/admin?page=1&size=100000` // large size to get all
-//       );
+//         setTotalRecords(
+//           typeof response.data.totalRecords === "number"
+//             ? response.data.totalRecords
+//             : response.data.totalRecords ?? totalRecords
+//         );
+//         const allRes = await apiClient.get(
+//           `/vmrequests/admin?page=1&size=100000` // large size to get all
+//         );
 //         const allData = allRes.data.data;
 
 //         setRequests(allData);
@@ -1136,7 +2103,7 @@ export default AdminApproval;
 //   };
 
 //   const handleChangeRowsPerPage = (event) => {
-//      const newSize = parseInt(event.target.value, 10);
+//     const newSize = parseInt(event.target.value, 10);
 //     setRowsPerPage(newSize);
 //     setPage(0); // Reset page when rows per page changes
 //   };
@@ -1171,7 +2138,7 @@ export default AdminApproval;
 //     );
 //   }
 
-//     const emptyRows = Math.max(0, rowsPerPage - requests.length);
+//   const emptyRows = Math.max(0, rowsPerPage - requests.length);
 
 //   return (
 //     <>
@@ -1347,35 +2314,34 @@ export default AdminApproval;
 //         />
 //       </Paper>
 //       <Dialog
-//   open={alertDialog.open}
-//   onClose={() => setAlertDialog({ ...alertDialog, open: false })}
-// >
-//   <DialogTitle sx={{ textAlign: "center", p: 3 }}>
-//     {alertDialog.severity === "success" ? (
-//       <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
-//     ) : (
-//       <ErrorIcon color="error" sx={{ fontSize: 60 }} />
-//     )}
-//   </DialogTitle>
-//   <DialogContent sx={{ textAlign: "center", px: 6 }}>
-//     <Typography variant="h6" gutterBottom>
-//       {alertDialog.severity === "success" ? "Success" : "Error"}
-//     </Typography>
-//     <Typography variant="body1" color="text.secondary">
-//       {alertDialog.message}
-//     </Typography>
-//   </DialogContent>
-//   <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
-//     <Button
-//       onClick={() => setAlertDialog({ ...alertDialog, open: false })}
-//       variant="contained"
-//       color={alertDialog.severity}
-//     >
-//       OK
-//     </Button>
-//   </DialogActions>
-// </Dialog>
-
+//         open={alertDialog.open}
+//         onClose={() => setAlertDialog({ ...alertDialog, open: false })}
+//       >
+//         <DialogTitle sx={{ textAlign: "center", p: 3 }}>
+//           {alertDialog.severity === "success" ? (
+//             <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
+//           ) : (
+//             <ErrorIcon color="error" sx={{ fontSize: 60 }} />
+//           )}
+//         </DialogTitle>
+//         <DialogContent sx={{ textAlign: "center", px: 6 }}>
+//           <Typography variant="h6" gutterBottom>
+//             {alertDialog.severity === "success" ? "Success" : "Error"}
+//           </Typography>
+//           <Typography variant="body1" color="text.secondary">
+//             {alertDialog.message}
+//           </Typography>
+//         </DialogContent>
+//         <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
+//           <Button
+//             onClick={() => setAlertDialog({ ...alertDialog, open: false })}
+//             variant="contained"
+//             color={alertDialog.severity}
+//           >
+//             OK
+//           </Button>
+//         </DialogActions>
+//       </Dialog>
 //     </>
 //   );
 // };

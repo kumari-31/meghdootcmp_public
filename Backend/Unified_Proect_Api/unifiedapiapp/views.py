@@ -4184,6 +4184,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     # serializer_class = None
     serializer_class = CustomTokenObtainPairSerializer
     
+    TEST_MODE_ALLOW_ANY_OTP = True
 
 # ---------------------- COOKIE HELPER ----------------------
     def _set_auth_cookies(self, response, access_token_str, refresh_token_str=None, user_data=None):
@@ -4337,13 +4338,26 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             })
 
         # ---------- OTP VERIFICATION ----------
+        # if otp:
+        #     stored_data = cache.get(f'otp_{username}')
+        #     if not stored_data:
+        #         return Response({'detail': 'OTP expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
+
+        #     if otp != stored_data['otp']:
+        #         return Response({'detail': 'Invalid OTP. Please try again.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # ----------Test OTP VERIFICATION ----------
         if otp:
             stored_data = cache.get(f'otp_{username}')
             if not stored_data:
                 return Response({'detail': 'OTP expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
 
-            if otp != stored_data['otp']:
-                return Response({'detail': 'Invalid OTP. Please try again.'}, status=status.HTTP_400_BAD_REQUEST)
+            # TEST MODE: Allow ANY OTP
+            if getattr(settings, 'OTP_TEST_MODE', False):
+                print("⚠️ SECURITY WARNING: OTP validation bypassed from settings.")
+            else:
+                if otp != stored_data['otp']:
+                    return Response({'detail': 'Invalid OTP. Please try again.'}, status=status.HTTP_400_BAD_REQUEST)
 
             # ✅ OTP correct — delete cache and authenticate
             cache.delete(f'otp_{username}')

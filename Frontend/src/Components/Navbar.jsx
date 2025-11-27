@@ -478,71 +478,78 @@ const Navbar = () => {
           </div>
         </div>
         <div className="right-section">
-          <IconButton color="inherit" onClick={handleNotificationClick}>
-            <Badge
-              badgeContent={pendingRequests.length}
-              color="error"
-              invisible={pendingRequests.length === 0}
-            >
-              <NotificationsIcon />
-            </Badge>
-          </IconButton>
-
-          <Menu
-            anchorEl={notificationAnchor}
-            open={Boolean(notificationAnchor)}
-            onClose={handleNotificationClose}
-            PaperProps={{
-              sx: {
-                width: 320,
-                maxHeight: 400,
-                overflowY: "auto",
-                mt: 1.7,
-              },
-            }}
-          >
-            <Box sx={{ px: 2, py: 1 }}>
-              <Typography variant="h6">
-                {userRole === "ADMIN"
-                  ? "Pending VM Requests"
-                  : "Pending FLA Requests"}
-              </Typography>
-            </Box>
-            <Divider />
-
-            {pendingRequests.length === 0 ? (
-              <MenuItem disabled>No pending requests</MenuItem>
-            ) : (
-              pendingRequests.map((req) => (
-                <MenuItem
-                  key={req.id}
-                  onClick={handleApprovalonClick}
-                  sx={{ alignItems: "flex-start" }}
+          {(userRole === "ADMIN" || userRole === "FLA") && (
+            <>
+              <IconButton color="inherit" onClick={handleNotificationClick}>
+                <Badge
+                  badgeContent={pendingRequests.length}
+                  color="error"
+                  invisible={pendingRequests.length === 0}
                 >
-                  <Box>
-                    <Typography variant="body1" noWrap>
-                      <strong>{req.name}</strong> sent request for{" "}
-                      <strong>{req.project_name}</strong>
-                    </Typography>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: "block", mt: 0.5 }}
+                  <NotificationsIcon />
+                </Badge>
+              </IconButton>
+
+              <Menu
+                anchorEl={notificationAnchor}
+                open={Boolean(notificationAnchor)}
+                onClose={handleNotificationClose}
+                PaperProps={{
+                  sx: {
+                    width: 320,
+                    maxHeight: 400,
+                    overflowY: "auto",
+                    mt: 1.7,
+                  },
+                }}
+              >
+                <Box sx={{ px: 2, py: 1 }}>
+                  <Typography variant="h6">
+                    {userRole === "ADMIN"
+                      ? "Pending VM Requests"
+                      : "Pending FLA Requests"}
+                  </Typography>
+                </Box>
+                <Divider />
+
+                {pendingRequests.length === 0 ? (
+                  <MenuItem disabled>No pending requests</MenuItem>
+                ) : (
+                  pendingRequests.map((req) => (
+                    <MenuItem
+                      key={req.id}
+                      onClick={handleApprovalonClick}
+                      sx={{ alignItems: "flex-start" }}
                     >
-                      {new Date(req.request_timestamp).toLocaleString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                        hour12: true,
-                      })}
-                    </Typography>
-                  </Box>
-                </MenuItem>
-              ))
-            )}
-          </Menu>
+                      <Box>
+                        <Typography variant="body1" noWrap>
+                          <strong>{req.name}</strong> sent request for{" "}
+                          <strong>{req.project_name}</strong>
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ display: "block", mt: 0.5 }}
+                        >
+                          {new Date(req.request_timestamp).toLocaleString(
+                            "en-IN",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hour12: true,
+                            }
+                          )}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))
+                )}
+              </Menu>
+            </>
+          )}
           <ThemeSwitch checked={darkMode} onChange={toggleTheme} />
 
           <IconButton onClick={handleProfileClick} title="Account Management">
