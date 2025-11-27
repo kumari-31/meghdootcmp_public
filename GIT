@@ -1,0 +1,26 @@
+git status
+git add .
+git status
+git commit -m "comment for code"
+git push -u origin dev-cmp
+
+
+
+Create new branch "new-branch"
+-----------------------------
+
+git checkout -b dev-cmp
+git status
+git add .
+git branch
+git checkout dev-cmp
+git commit -m "Changes in new-branch"
+git push origin dev-cmp
+
+
+pull changes from remote
+-----------------------------       
+
+git pull origin dev-cmp --no-rebase 
+git log --oneline --graph --decorate --all # View commit history
+git status
