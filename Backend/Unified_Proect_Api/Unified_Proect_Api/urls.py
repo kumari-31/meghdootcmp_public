@@ -19,5 +19,8 @@ from django.urls import path,include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # helpdesk web UI
+    path('helpdesk/', include(('helpdesk.urls', 'helpdesk'), namespace='helpdesk')),
+    
     path('', include('unifiedapiapp.urls')),  # Include app's URLs
 ]

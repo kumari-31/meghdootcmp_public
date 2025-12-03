@@ -13,6 +13,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import AuthenticationFailed
 import pyotp
 from datetime import datetime, timedelta
+from helpdesk_custom.roles import get_user_role
 
 User = get_user_model()
 
@@ -259,10 +260,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         print("===", is_fla)
         role = "ADMIN"
         employee_id = None
-        if is_fla:
+        if is_fla.exists():
             employee_id = Employee.objects.filter(email=user.email).values_list('employee_id', flat=True).first()
             role = "FLA"
-        elif emp_id:
+        elif emp_id.exists():
             employee_id = Employee.objects.filter(email=user.email).values_list('employee_id', flat=True).first()
             role = "EMPLOYEE"
         

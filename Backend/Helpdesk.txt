@@ -1,0 +1,39 @@
+1.pip install django-helpdesk
+2.pip install pinax-teams pinax-invitations
+3.pip install django-bootstrap4
+4.python3 manage.py makemigrations
+5.python3 manage.py migrate
+6.python3 manage.py collectstatic
+7. Add all this in setting.py
+INSTALLED_APPS = [
+                'django.contrib.humanize', 
+                "django.contrib.sites",      # Required for pinax-teams
+                    "account",                   # Required by pinax-invitations
+                    "pinax.invitations",
+                    'pinax.teams', 
+                    "bootstrap4",
+                    'helpdesk',
+]
+SITE_ID = 1
+HELPDESK_ENABLE_PER_QUEUE_TEAMS = False
+HELPDESK_KB_ENABLED = False
+HELPDESK_ENABLE_HISTORY = True
+# HELPDESK_DEFAULT_SETTINGS = True
+# Optional: email notifications (already set your SMTP)
+HELPDESK_EMAIL_FROM_ADDRESS = "rakshanavg20@gmail.com"
+HELPDESK_EMAIL_TEMPLATE_DIR = os.path.join(BASE_DIR, "helpdesk/email_templates")
+
+8.Add urls.py in /home/boss/Desktop/Cmp19nov25/Backend/Unified_Proect_Api/Unified_Proect_Api/urls.py
+from django.contrib import admin
+from django.urls import path,include
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    # helpdesk web UI
+    path('helpdesk/', include(('helpdesk.urls', 'helpdesk'), namespace='helpdesk')),
+    
+    path('', include('unifiedapiapp.urls')),  # Include app's URLs
+]
+9. Replaced this in /home/boss/Desktop/Cmp19nov25/Backend/venv/lib/python3.11/site-packages/helpdesk/templates
+Replaced {{ form|bootstrap4 }} with {% bootstrap_form form %}.
+Replaced {% load i18n bootstrap4form %} with {% load i18n bootstrap4 %}

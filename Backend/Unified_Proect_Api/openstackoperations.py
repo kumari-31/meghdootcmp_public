@@ -153,6 +153,19 @@ def create_vm1(
 #                     project_domain_name=os.getenv('PROJECT_DOMAIN_NAME')
 #                 )
 
+def extract_volume_error(volume):
+    fault = getattr(volume, "fault", None)
+    if fault and fault.get("message"):
+        return fault.get("message")
+
+    if hasattr(volume, "error_reason") and volume.error_reason:
+        return volume.error_reason
+
+    if hasattr(volume, "metadata") and "error_message" in volume.metadata:
+        return volume.metadata["error_message"]
+
+    return "Volume failed due to backend storage error"
+
 
 def create_bootable_volume(
     auth_url,
@@ -167,32 +180,12 @@ def create_bootable_volume(
     flavor_id,
     vm_req_id,
 ):
-    """
-    Create a bootable volume in OpenStack.
-
-
-    Parameters:
-    - auth_url: The authentication URL for OpenStack.
-    - project_name: The project name.
-    - username: The username.
-    - password: The password.
-    - volume_name: The name of the volume to be created.
-    - size_gb: The size of the volume in gigabytes.
-    - volume_type: The type of the volume (default is 'standard').
-    - image_id: The ID of the image to use for the volume.
-
-    Returns:
-    - True if the volume creation is successful, False otherwise.
-    """
     try:
         print("volume type in create boot volume", volume_type)
-        # Establish the OpenStack connection using the provided credentials
 
-        # Use the volume service to find the volume types
+        # Get volume type object
         volume_service = conn.block_storage
         volume_types = list(volume_service.types())
-
-        # Find the specified volume type or use the first one as a default
         volume_type_obj = next(
             (vt for vt in volume_types if vt.name == volume_type), volume_types[0]
         )
@@ -204,66 +197,65 @@ def create_bootable_volume(
             volume_type=volume_type_obj.id,
             imageRef=image_id,
         )
-
         created_volume_id = volume.id
         print(f"Volume Status: {volume.status}")
-        if volume.status != "error":
-            print(
-                f"Bootable volume '{volume_name}' created successfully with ID: {volume.id}"
+
+        # Wait for the volume to reach a final state
+        wait_for_volume_status(conn, created_volume_id)
+        volume = conn.block_storage.get_volume(created_volume_id)  # refresh volume info
+        # volume = conn.block_store.get_volume(created_volume_id)
+
+        # Handle error state
+        if volume.status == "error":
+                error_message = extract_volume_error(volume)
+                print(f"Volume {created_volume_id} entered ERROR state: {error_message}")
+            # Update VM request with error
+                VmRequest.objects.filter(id=vm_req_id).update(
+                creation_status="Failed",
+                creation_error_message=error_message
+                )
+                return None, None, error_message
+
+        # Volume ready, create VM
+        if volume.status == "available":
+            print(f"Bootable volume '{volume_name}' created successfully with ID: {created_volume_id}")
+            vm_instance = create_vm1(
+                conn,
+                vm_name,
+                created_volume_id,
+                flavor_id,
+                image_id,
+                network_name,
+                timeout=600,
             )
-            if created_volume_id:
-                if wait_for_volume_status(conn, created_volume_id):
-                    vm_instance_id = create_vm1(
-                        conn,
-                        vm_name,
-                        created_volume_id,
-                        flavor_id,
-                        image_id,
-                        network_name,
-                        timeout=600,
-                    )
-                    print("vm_instance_id===========>", vm_instance_id)
-                    vm_req_obj = VmRequest.objects.get(id=vm_req_id)
-                    if vm_instance_id["status"]:
-                        print(
-                            f"VM in create bootable volume '{vm_name}' created successfully with ID: {vm_instance_id['server_id']}"
-                        )
-                        vm_req_obj.creation_status = "Created"
-                        vm_req_obj.save()
-                    else:
-                        vm_req_obj.creation_status = vm_instance_id["error"]
-                        vm_req_obj.save()
-                        print(
-                            f"Volume {created_volume_id} attached to VM {vm_name} with ID {vm_instance_id['server_id']}.",
-                            vm_instance_id["error"],
-                        )
-                        # return None
-                        raise Exception(vm_instance_id["error"])
 
-                    # Attach the volume to the VMz
-
-                else:
-                    print(
-                        f"Volume {created_volume_id} did not reach the 'available' state within the timeout."
-                    )
-                    # Delete the volume since it was not attached within the timeout
-                    delete_volume(conn, created_volume_id)
+            vm_req_obj = VmRequest.objects.get(id=vm_req_id)
+            if vm_instance["status"]:
+                vm_req_obj.creation_status = "Created"
+                vm_req_obj.creation_error_message = None
+                vm_req_obj.save()
             else:
-                print("VM not created with volume.")
-            return volume.id, vm_instance_id["server_id"], ""
-            # return volume.id
-        else:
-            print(
-                f"Volume Status is not 'in-use' or 'available'. Current status: {volume.status}"
-            )
-            return None, None, "Volume creation failed"
+                vm_req_obj.creation_status = "Failed"
+                vm_req_obj.creation_error_message = vm_instance.get("error", "Unknown VM error")
+                vm_req_obj.save()
+                return None, None, vm_instance.get("error", "VM creation failed")
+
+            return created_volume_id, vm_instance["server_id"], ""
+
+        # Unexpected status
+        print(f"Volume {created_volume_id} is in unexpected status: {volume.status}")
+        return None, None, f"Volume in unexpected status: {volume.status}"
 
     except Exception as e:
         import traceback
-
         traceback.print_exc()
         print(f"Error creating bootable volume: {e}")
+        VmRequest.objects.filter(id=vm_req_id).update(
+            creation_status="Failed",
+            creation_error_message=str(e)
+        )
         return None, None, str(e)
+
 
 
 def create_data_volume(size, volume_name, data_volume_type):

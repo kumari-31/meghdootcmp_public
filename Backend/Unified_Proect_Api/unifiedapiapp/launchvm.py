@@ -347,8 +347,14 @@ def vm_approve_request(id):
                         )
                     )
 
-                    if created_bootable == None:
-                        raise Exception(error_message)
+                    if created_bootable is None:
+                        VmRequest.objects.filter(id=id).update(
+                            creation_status="Failed",
+                            creation_error_message=error_message
+                        )
+                        print(f"VM creation failed for {current_vm_name}: {error_message}")
+                        # Stop further processing for this request
+                        return {"status": False, "message": error_message}
 
                     created_vm_ids.append(vm_instance_id)
                     volume_id = ""

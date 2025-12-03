@@ -97,9 +97,10 @@ const TicketCreationForm = lazy(() =>
 );
 const TicketDetailView = lazy(() => import("./Pages/Tickets/TicketDetailView"));
 const TicketListPage = lazy(() => import("./Pages/Tickets/TicketListPage"));
+const HelpdeskWrapper = lazy(() => import("./HelpdeskWrapper"));
 
 const App = () => {
-  return (
+  return ( 
     <Router>
       <Suspense fallback={<div>Loading...</div>}>
         <Routes>
@@ -132,6 +133,12 @@ const App = () => {
                 <ProtectedRoute allowedRoles={["ADMIN", "FLA", "EMPLOYEE"]}>
                   <PricePlan />
                 </ProtectedRoute>
+              }
+            />
+            <Route
+              path="helpdesk/dashboard"
+              element={
+                <HelpdeskWrapper path="http://10.184.40.36:8000/helpdesk/" />
               }
             />
             *****************************************/////////////OPENSTACK

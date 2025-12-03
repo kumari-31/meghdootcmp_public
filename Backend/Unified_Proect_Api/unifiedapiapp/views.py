@@ -48,7 +48,6 @@ from django.db import models
 from rest_framework import status
 from django.views.decorators.http import require_GET
 import urllib.parse
-
 from django.utils import timezone
 from kubernetes.client.exceptions import ApiException
 from openstack.exceptions import SDKException,ResourceNotFound  # Import SDKException if using it
@@ -4383,17 +4382,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             }
             print(f"DEBUG 🧾 user_data being sent in cookie: {user_data}")
 
-    # Clean response body and set cookies
+        # Clean response body and set cookies
             response.data = {"detail": "Login successful"}
             self._set_auth_cookies(response, access, refresh, user_data)
             return response
 
-            #     return super().post(request, *args, **kwargs)
-            # else:
-            #     return Response({
-            #         'error': 'Invalid OTP',
-            #         'can_resend': True
-            #     }, status=status.HTTP_400_BAD_REQUEST)
+          
 
         # ---------- Handle initial login (username/password) ----------
 
@@ -4482,6 +4476,23 @@ class CookieTokenRefreshView(APIView):
         except Exception as e:
             print(f"DEBUG 💥 Unexpected error during refresh: {e}")
             return Response({'detail': 'Internal server error.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+from django.shortcuts import redirect
+   
+
+
+def helpdesk_redirect(request):
+    if not request.user.is_authenticated:
+        return redirect("/")
+
+    role = get_user_role(request.user)
+
+    if role == "admin":
+        return redirect("/helpdesk/dashboard/")
+    else:
+        return redirect("/helpdesk/tickets/submit/")
+        
 # =========================================================
 # Logout View (Deletes Cookies + Optional Blacklist)
 # =========================================================
@@ -5183,14 +5194,27 @@ class VmRequestStatusUpdateAPIView(APIView):
                 if fla_status == "Pending" or fla_status == "Rejected":
                     return Response({"error": f"Your VM Request is {fla_status} contact your FLA."}, status=status.HTTP_404_NOT_FOUND)
                 if new_status == "Accepted":
-                    print("vm_request_id-------->",vm_request_id)
-                    vm_creation_status = vm_approve_request(vm_request_id)
-                    if not vm_creation_status['status']:
-                        return Response({"error": vm_creation_status['message']}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)                 
-                    vm_request.admin_status = new_status
+                    vm_response = vm_approve_request(vm_request_id)
+
+                    if not vm_response["status"]:
+                        # VM creation failed, keep pending and store error
+                        vm_request.creation_status = "Failed"
+                        vm_request.creation_error_message = vm_response.get("message", "Unknown error")
+                        vm_request.save()
+                        return Response({
+                            "error": "VM provisioning failed",
+                            "details": vm_response.get("message")
+                        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+                    # VM created successfully
+                    vm_request.admin_status = "Accepted"
+                    vm_request.creation_status = "Success"
+                    vm_request.creation_error_message = None
                     vm_request.admin_approved_timestamp = timezone.now()
                     vm_request.save()
+
                     return Response({"message": "VM status updated and VM created successfully."}, status=status.HTTP_200_OK)
+
                 else:
                     vm_request.admin_status = new_status
                     vm_request.admin_approved_timestamp = timezone.now()
@@ -5222,12 +5246,13 @@ class VmRequestOverviewAPIView(APIView):
             # ROLE-WISE BASE QUERYSET (UNFILTERED DATA)
             # -------------------------------------------------------
             if role == "ADMIN":
-                queryset = VmRequest.objects.all()
+                queryset = VmRequest.objects.filter(fla_status="Accepted")
 
                 status_counts = {
                     "pending": queryset.filter(admin_status="Pending").count(),
                     "accepted": queryset.filter(admin_status="Accepted").count(),
                     "rejected": queryset.filter(admin_status="Rejected").count(),
+                    "failed": queryset.filter(creation_status="Failed").count(),
                 }
 
             elif role == "FLA":
@@ -5261,20 +5286,14 @@ class VmRequestOverviewAPIView(APIView):
             # -------------------------------------------------------
             # PAGINATION (on full dataset)
             # -------------------------------------------------------
-            page = int(request.GET.get("page", 1))
-            size = int(request.GET.get("size", 10))
-            total_records = queryset.count()
-
-            start = (page - 1) * size
-            end = start + size
-
-            paged_qs = queryset.order_by("-request_timestamp")[start:end]
+            queryset = queryset.order_by("-request_timestamp")
+            total_records = queryset.count() 
 
             # -------------------------------------------------------
             # SERIALIZE DATA
             # -------------------------------------------------------
             data = []
-            for vm in paged_qs:
+            for vm in queryset:
                 data.append({
                     "id": vm.id,
                     "name": vm.name,
@@ -5303,6 +5322,8 @@ class VmRequestOverviewAPIView(APIView):
                     "creation_status": getattr(vm, "creation_status", None),
                     "fla_rejection_reason": getattr(vm, "fla_rejection_reason", None),
                     "admin_rejection_reason": getattr(vm, "admin_rejection_reason", None),
+                    "creation_error_message": getattr(vm, "creation_error_message", None),
+
                 })
 
             return Response(
@@ -5310,8 +5331,6 @@ class VmRequestOverviewAPIView(APIView):
                     "role": role,
                     "total_records": total_records,
                     "status_counts": status_counts,
-                    "page": page,
-                    "size": size,
                     "data": data,  # FULL DATA (not filtered)
                 },
                 status=200,

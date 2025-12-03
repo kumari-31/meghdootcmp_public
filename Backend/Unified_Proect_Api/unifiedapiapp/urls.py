@@ -1,9 +1,10 @@
 from django.urls import path, re_path
 from .launchvm import vm_approve_request
 from .views import *
-from . import views
-from rest_framework_simplejwt.views import TokenRefreshView
+from . import views 
 from django.views.generic import TemplateView
+from unifiedapiapp.views import helpdesk_redirect
+from unifiedapiapp.helpdesk_custom import admin_views
 
 urlpatterns = [
     path('api/vminfo/', VMInfoListCreate.as_view(), name='vminfo-list-create'),
@@ -277,6 +278,11 @@ urlpatterns = [
     # path('api/identity/application-credentials/', ApplicationCredentialAPIView.as_view(), name='app_cred_list'),
     path('api/identity/application-credentials/', ApplicationCredentialAPIView.as_view(), name='app_cred_list'),
     path('api/identity/application-credentials/<str:id>/', ApplicationCredentialAPIView.as_view(), name='app_cred_detail'),
+
+    path("api/helpdesk/custom/dashboard/", admin_views.admin_dashboard, name="helpdesk_custom_dashboard"),
+    path("api/helpdesk/custom/ticket/<int:ticket_id>/", admin_views.ticket_detail, name="helpdesk_custom_ticket_detail"),
+
+    path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
 
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
     ]

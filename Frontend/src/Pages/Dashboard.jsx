@@ -526,20 +526,33 @@ const tableStyles = {
   "& .MuiTableCell-root": {
     borderBottom: "none !important",
   },
-  "& .MuiTableRow-root": {
-    background: "rgba(255,255,255,0.65)",
+  "& .MuiTableRow-root": (theme) => ({
+    background:
+      theme.palette.mode === "dark"
+        ? "rgba(40,40,40,0.75)"
+        : "rgba(255,255,255,0.65)",
     borderRadius: "10px",
     transition: "0.2s ease",
-  },
-  "& .MuiTableRow-root:hover": {
-    background: "rgba(255,255,255,0.9)",
-    boxShadow: "0 2px 12px rgba(6, 8, 35, 0.08)",
-  },
-  "& .MuiTableHead-root .MuiTableRow-root": {
-    background: "rgba(240,240,255,0.85)",
+  }),
+  "& .MuiTableRow-root:hover": (theme) => ({
+    background:
+      theme.palette.mode === "dark"
+        ? "rgba(70,70,70,0.9)"
+        : "rgba(255,255,255,0.9)",
+    boxShadow:
+      theme.palette.mode === "dark"
+        ? "0 2px 12px rgba(0,0,0,0.45)"
+        : "0 2px 12px rgba(6, 8, 35, 0.08)",
+  }),
+  "& .MuiTableHead-root .MuiTableRow-root": (theme) => ({
+    background:
+      theme.palette.mode === "dark"
+        ? "rgba(60,60,60,0.85)"
+        : "rgba(240,240,255,0.85)",
     fontWeight: 600,
-  }
+  }),
 };
+
 
 
 
@@ -562,7 +575,9 @@ const tableStyles = {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton aria-label="notifications" size="large">
+          <IconButton aria-label="notifications" size="large"
+          onClick={() => window.location.reload()}
+          >
             <HourglassEmptyIcon />
           </IconButton>
         </Stack>
@@ -911,7 +926,7 @@ const tableStyles = {
           <motion.div {...smallMotion}>
             <StatTile
               icon={<CheckCircleIcon />}
-              title="OS Accepted"
+              title="OpenStack Accepted Request"
               value={openstackReq.accepted}
               sparkData={getDailyTrend(openstackReq.raw, "Accepted")}
               delta={openstackReq.accepted > 0 ? "+3%" : "-"}
@@ -926,7 +941,7 @@ const tableStyles = {
           <motion.div {...smallMotion} transition={{ delay: 0.05 }}>
             <StatTile
               icon={<CheckCircleIcon />}
-              title="K8s Accepted"
+              title="Kubernetes Accepted Request"
               value={k8sReq.accepted}
               sparkData={getDailyTrend(k8sReq.raw, "Accepted")}
               delta={k8sReq.accepted > 0 ? "+2%" : "-"}
@@ -941,7 +956,7 @@ const tableStyles = {
           <motion.div {...smallMotion} transition={{ delay: 0.1 }}>
             <StatTile
               icon={<CancelIcon />}
-              title="OS Rejected"
+              title="OpenStack Rejected Request"
               value={openstackReq.rejected}
               sparkData={getDailyTrend(openstackReq.raw, "Rejected")}
               delta={openstackReq.rejected > 0 ? "+1%" : "-"}
@@ -956,7 +971,7 @@ const tableStyles = {
           <motion.div {...smallMotion} transition={{ delay: 0.15 }}>
             <StatTile
               icon={<CancelIcon />}
-              title="K8s Rejected"
+              title="Kubernetes Rejected Request "
               value={k8sReq.rejected}
               sparkData={getDailyTrend(k8sReq.raw, "Rejected")}
               delta={k8sReq.rejected > 0 ? "+1%" : "-"}
