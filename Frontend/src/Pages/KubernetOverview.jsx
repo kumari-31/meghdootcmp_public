@@ -40,6 +40,29 @@ import SortIcon from "@mui/icons-material/Sort";
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import apiClient from "../Axios";
 
+const CACHE_TTL = 30000; // 30 sec
+
+const setCache = (key, data, ttl = 30000) => { // ttl in ms (30 sec)
+  const item = {
+    data,
+    expiry: Date.now() + ttl,
+  };
+  localStorage.setItem(key, JSON.stringify(item));
+};
+
+const getCache = (key) => {
+  const item = localStorage.getItem(key);
+  if (!item) return null;
+
+  const parsed = JSON.parse(item);
+  if (Date.now() > parsed.expiry) {
+    // expired → remove cache
+    localStorage.removeItem(key);
+    return null;
+  }
+
+  return parsed.data;
+};
 
 /**
  * KubernetOverview.jsx
@@ -185,138 +208,195 @@ const KubernetOverview = () => {
   /* ----------------------------- Data fetching ----------------------------- */
 
   // fetch namespaces for dropdown (from deployments endpoint)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const resp = await apiClient.get("/k8s/deployments/");
-        if (!mounted) return;
-        const allNamespaces = Array.isArray(resp.data) ? resp.data.map((dep) => dep.namespace) : [];
-        const uniqueNamespaces = ["all", "default", ...new Set(allNamespaces)];
-        setNamespaces(uniqueNamespaces);
-        // preserve selection if possible
-        if (!uniqueNamespaces.includes(selectedNamespace)) setSelectedNamespace(uniqueNamespaces[0] || "all");
-      } catch (err) {
-        console.error("Error fetching namespaces:", err);
-        if (mounted) setNamespaces(["all", "default"]);
-      }
-    })();
-    return () => (mounted = false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+ // fetch namespaces for dropdown
+useEffect(() => {
+  let mounted = true;
+
+  // === Try Cache First ===
+  const cachedNamespaces = getCache("k8s_namespaces");
+  if (cachedNamespaces && mounted) {
+    setNamespaces(cachedNamespaces);
+    if (!cachedNamespaces.includes(selectedNamespace))
+      setSelectedNamespace(cachedNamespaces[0] || "all");
+    return;
+  }
+
+  (async () => {
+    try {
+      const resp = await apiClient.get("/k8s/deployments/");
+      if (!mounted) return;
+
+      const allNamespaces = Array.isArray(resp.data)
+        ? resp.data.map((dep) => dep.namespace)
+        : [];
+
+      const uniqueNamespaces = ["all", "default", ...new Set(allNamespaces)];
+
+      setNamespaces(uniqueNamespaces);
+      setCache("k8s_namespaces", uniqueNamespaces);
+
+      if (!uniqueNamespaces.includes(selectedNamespace))
+        setSelectedNamespace(uniqueNamespaces[0] || "all");
+    } catch (err) {
+      console.error("Error fetching namespaces:", err);
+      if (mounted) setNamespaces(["all", "default"]);
+    }
+  })();
+
+  return () => (mounted = false);
+}, []);
+
 
   // fetch pie/donut data
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoadingPieChart(true);
-        const ns = selectedNamespace === "all" ? "" : selectedNamespace;
-        const resp = await apiClient.get(`/k8s/workloads/?namespace=${ns}`);
-        if (mounted) setPieData(resp.data);
-      } catch (err) {
-        console.error("Error fetching pie data:", err);
-        if (mounted) setPieData(null);
-      } finally {
-        if (mounted) setLoadingPieChart(false);
+  // fetch pie/donut data
+useEffect(() => {
+  let mounted = true;
+  setLoadingPieChart(true);
+
+  const ns = selectedNamespace === "all" ? "all" : selectedNamespace;
+  const cacheKey = `k8s_pie_${ns}`;
+
+  // === Try Cache First ===
+  const cachedPie = getCache(cacheKey);
+  if (cachedPie && mounted) {
+    setPieData(cachedPie);
+    setLoadingPieChart(false);
+    return;
+  }
+
+  (async () => {
+    try {
+      const resp = await apiClient.get(`/k8s/workloads/?namespace=${ns}`);
+      if (mounted) {
+        setPieData(resp.data);
+        setCache(cacheKey, resp.data);
       }
-    })();
-    return () => (mounted = false);
-  }, [selectedNamespace]);
+    } catch (err) {
+      console.error("Error fetching pie data:", err);
+      if (mounted) setPieData(null);
+    } finally {
+      if (mounted) setLoadingPieChart(false);
+    }
+  })();
+
+  return () => (mounted = false);
+}, [selectedNamespace]);
+
 
   // fetch tables data (services, pods, nodes, deployments, replicasets)
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        setLoadingTables(true);
-        const [
-          servicesResult,
-          podsResult,
-          nodesResult,
-          deploymentsResult,
-          allReplicaSetsResult,
-        ] = await Promise.all([
-          safePromise(apiClient.get(`/k8s/services/`)),
-          safePromise(apiClient.get(`/k8s/pods/`)),
-          safePromise(apiClient.get(`/k8s/nodes/`)),
-          safePromise(apiClient.get(`/k8s/deployments/`)),
-          safePromise(apiClient.get(`/k8s/replicasets/`)),
-        ]);
+  // fetch tables data (services, pods, nodes, deployments, replicasets)
+useEffect(() => {
+  let mounted = true;
+  setLoadingTables(true);
 
-        const fetchedServices =
-          servicesResult.status === "fulfilled"
-            ? servicesResult.value.data.services ?? []
-            : [];
-        const fetchedAllPods =
-          podsResult.status === "fulfilled" ? podsResult.value.data.pods ?? [] : [];
-        const fetchedNodes =
-          nodesResult.status === "fulfilled"
-            ? nodesResult.value.data.nodes ?? []
-            : [];
-        const fetchedAllDeployments =
-          deploymentsResult.status === "fulfilled"
-            ? deploymentsResult.value.data ?? [] // Assumes data is directly in .data
-            : [];
-        const fetchedAllReplicaSets =
-          allReplicaSetsResult.status === "fulfilled"
-            ? allReplicaSetsResult.value.data ?? []
-            : [];
+  const ns = selectedNamespace === "all" ? "all" : selectedNamespace;
+  const cacheKey = `k8s_tables_${ns}`;
 
-        const filteredServices =
-          selectedNamespace === "all"
-            ? fetchedServices
-            : fetchedServices.filter((svc) => svc.namespace === selectedNamespace);
+  // === Try Cache First ===
+  const cachedTables = getCache(cacheKey);
+  if (cachedTables && mounted) {
+    setData(cachedTables);
+    setLoadingTables(false);
+    return;
+  }
 
-        const filteredPods =
-          selectedNamespace === "all"
-            ? fetchedAllPods
-            : fetchedAllPods.filter((pod) => pod.namespace === selectedNamespace);
+  (async () => {
+    try {
+      const [
+        servicesResult,
+        podsResult,
+        nodesResult,
+        deploymentsResult,
+        allReplicaSetsResult,
+      ] = await Promise.all([
+        safePromise(apiClient.get(`/k8s/services/`)),
+        safePromise(apiClient.get(`/k8s/pods/`)),
+        safePromise(apiClient.get(`/k8s/nodes/`)),
+        safePromise(apiClient.get(`/k8s/deployments/`)),
+        safePromise(apiClient.get(`/k8s/replicasets/`)),
+      ]);
 
-        const filteredDeployments =
-          selectedNamespace === "all"
-            ? fetchedAllDeployments
-            : fetchedAllDeployments.filter(
-                (dep) => dep.namespace === selectedNamespace
-              );
+      const fetchedServices =
+        servicesResult.status === "fulfilled"
+          ? servicesResult.value.data.services ?? []
+          : [];
 
-        const filteredReplicaSets =
-          selectedNamespace === "all"
-            ? fetchedAllReplicaSets
-            : fetchedAllReplicaSets.filter(
-                (rs) => rs.Namespace === selectedNamespace
-              );
+      const fetchedAllPods =
+        podsResult.status === "fulfilled"
+          ? podsResult.value.data.pods ?? []
+          : [];
 
-        if (mounted)
-          setData({
-            services: filteredServices,
-            allPods: fetchedAllPods,
-            filteredPods: filteredPods,
-            nodes: fetchedNodes,
-            allDeployments: fetchedAllDeployments,
-            filteredDeployments: filteredDeployments,
-            allReplicaSets: fetchedAllReplicaSets,
-            filteredReplicaSets: filteredReplicaSets,
-          });
-      } catch (err) {
-        console.error("Error fetching Kubernetes data:", err);
-        if (mounted)
-          setData({
-            services: [],
-            allPods: [],
-            filteredPods: [],
-            nodes: [],
-            allDeployments: [],
-            filteredDeployments: [],
-            allReplicaSets: [],
-            filteredReplicaSets: [],
-          });
-      } finally {
-        if (mounted) setLoadingTables(false);
+      const fetchedNodes =
+        nodesResult.status === "fulfilled"
+          ? nodesResult.value.data.nodes ?? []
+          : [];
+
+      const fetchedAllDeployments =
+        deploymentsResult.status === "fulfilled"
+          ? deploymentsResult.value.data ?? []
+          : [];
+
+      const fetchedAllReplicaSets =
+        allReplicaSetsResult.status === "fulfilled"
+          ? allReplicaSetsResult.value.data ?? []
+          : [];
+
+      const filteredServices =
+        ns === "all"
+          ? fetchedServices
+          : fetchedServices.filter((svc) => svc.namespace === ns);
+
+      const filteredPods =
+        ns === "all"
+          ? fetchedAllPods
+          : fetchedAllPods.filter((pod) => pod.namespace === ns);
+
+      const filteredDeployments =
+        ns === "all"
+          ? fetchedAllDeployments
+          : fetchedAllDeployments.filter((dep) => dep.namespace === ns);
+
+      const filteredReplicaSets =
+        ns === "all"
+          ? fetchedAllReplicaSets
+          : fetchedAllReplicaSets.filter((rs) => rs.Namespace === ns);
+
+      const resultData = {
+        services: filteredServices,
+        allPods: fetchedAllPods,
+        filteredPods: filteredPods,
+        nodes: fetchedNodes,
+        allDeployments: fetchedAllDeployments,
+        filteredDeployments: filteredDeployments,
+        allReplicaSets: fetchedAllReplicaSets,
+        filteredReplicaSets: filteredReplicaSets,
+      };
+
+      if (mounted) {
+        setData(resultData);
+        setCache(cacheKey, resultData);
       }
-    })();
-    return () => (mounted = false);
-  }, [selectedNamespace]);
+    } catch (err) {
+      console.error("Error fetching Kubernetes data:", err);
+      if (mounted)
+        setData({
+          services: [],
+          allPods: [],
+          filteredPods: [],
+          nodes: [],
+          allDeployments: [],
+          filteredDeployments: [],
+          allReplicaSets: [],
+          filteredReplicaSets: [],
+        });
+    } finally {
+      if (mounted) setLoadingTables(false);
+    }
+  })();
+
+  return () => (mounted = false);
+}, [selectedNamespace]);
+
 
   /* ----------------------------- Derived lists (search+filter) ----------------------------- */
 

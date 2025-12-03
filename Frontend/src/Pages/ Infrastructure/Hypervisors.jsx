@@ -170,6 +170,8 @@ const Hypervisors = () => {
 
   useEffect(() => {
     fetchHypervisors();
+    fetchResources();
+    fetchHosts();
   }, []);
 
 
@@ -208,9 +210,8 @@ const Hypervisors = () => {
   };
   const handleTabChange = (_, newValue) => {
     setTab(newValue);
-    if (newValue === 0) fetchHypervisors();
-    if (newValue === 1) fetchHosts();
-    if (newValue === 2) fetchResources();
+    
+   
   };
 
   // ---------------- Render ----------------
