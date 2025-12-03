@@ -2426,21 +2426,35 @@ class InstanceDetailsAPIView(APIView):
                 flavor = conn.compute.find_flavor(flavor_id) if flavor_id else None
                 # print("flavor",flavor)
                 # Get image details
-                image_id = server.image['id'] if server.image else None
-                image_name = "-"
+               
+                image_name ="N/A"
+                # Case 1: Instance booted from image
+                # --- Case 1: Booted from an image ---
+                image_info = getattr(server, "image", None)
+                image_id = image_info.get("id") if isinstance(image_info, dict) else None
+
                 if image_id:
-                    image = conn.compute.find_image(image_id)
-                    image_name = image.name if image else "-"
+                    try:
+                        image = conn.compute.get_image(image_id)
+                        if image:
+                            image_name = image.name or "N/A"
+                    except Exception:
+                        image_name = "N/A"
 
-                # Handle boot from volume case
-                boot_volume_id = None
-                if hasattr(server, "os-extended-volumes:volumes_attached"):
-                    attached_volumes = server.get("os-extended-volumes:volumes_attached", [])
-                    if attached_volumes:
-                        boot_volume_id = attached_volumes[0].get("id")
+                # Case 2: Instance booted from volume
+                # --- Case 2: Booted from volume ---
+                if image_name == "N/A":
+                    attached = server.get("os-extended-volumes:volumes_attached", [])
+                    if attached:
+                        volume_id = attached[0].get("id")
+                        if volume_id:
+                            volume = conn.block_storage.get_volume(volume_id)
 
-                if not image_name and boot_volume_id:
-                    image_name = f"Booted from Volume ({boot_volume_id})"
+                            # Many volumes store originating image info here
+                            if volume and getattr(volume, "volume_image_metadata", None):
+                                image_name = volume.volume_image_metadata.get("image_name", "-")
+                            else:
+                                image_name = f"Boot From Volume ({volume_id})"
                 # print("image_name",image_name)
                 # Get security groups
                 security_groups = [sg['name'] for sg in server.security_groups] if hasattr(server, 'security_groups') else []
