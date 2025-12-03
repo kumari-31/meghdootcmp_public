@@ -167,7 +167,7 @@ const KubernetOverview = () => {
     navigate(`/app/kubernetes/service-details/${name}?namespace=${namespace}`);
   };
   const handlePodClick = (name, namespace) => {
-    navigate(`/app/kubernetes/pod-details/${name}?namespace=${namespace}`);
+    navigate(`/app/kubernetes/pods-details/${name}?namespace=${namespace}`);
   };
   const handleNodeClick = (name) => {
     navigate(`/app/kubernetes/nodes-details/${name}`);

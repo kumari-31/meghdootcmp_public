@@ -1,3 +1,17 @@
+:root {
+  --openstack-color: #f75c5c;
+  --k8s-color: #326ce5; /* Kubernetes Blue */
+}
+
+.badge-openstack {
+  background-color: var(--openstack-color);
+}
+
+.badge-k8s {
+  background-color: var(--k8s-color);
+}
+
+
 /* Glass Neo base */
 .glass-card {
   border-radius: 12px;

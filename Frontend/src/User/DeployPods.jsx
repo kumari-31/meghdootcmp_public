@@ -124,17 +124,32 @@ const categorizedCards = {
 const initialButtonCategories = Object.keys(categorizedCards);
 
 const StyledCard = styled(Card)(({ theme }) => ({
-  borderRadius: 8,
-  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
-  transition: "transform 0.2s ease-in-out",
-  "&:hover": {
-    transform: "scale(1.05)",
-    boxShadow: "0 6px 16px rgba(0, 0, 0, 0.2)",
+  borderRadius: 24,
+  padding: 12,
+  background: theme.palette.mode === "dark"
+  ? "linear-gradient(145deg, #1b1b1b, #262626)"
+  : "linear-gradient(145deg, #ffffff, #eef1ff)",
+  boxShadow:
+  theme.palette.mode === "dark"
+  ? "0 8px 20px rgba(0,0,0,0.35)"
+  : "0 8px 20px rgba(160, 172, 255, 0.35)",
+  border: theme.palette.mode === "dark"
+  ? "1px solid rgba(255,255,255,0.08)"
+  : "1px solid rgba(80, 100, 200, 0.15)",
+  backdropFilter: "blur(8px)",
+  transition: "all 0.35s ease",
+  transform: "translateY(0px)",
+  '&:hover': {
+  transform: "translateY(-10px) scale(1.02)",
+  boxShadow:
+  theme.palette.mode === "dark"
+  ? "0 12px 32px rgba(0,0,0,0.5)"
+  : "0 12px 32px rgba(120,140,255,0.45)",
+  borderColor:
+  theme.palette.mode === "dark"
+  ? "rgba(255,255,255,0.15)"
+  : "rgba(60,80,200,0.35)",
   },
-  height: "100%", // Ensure cards take full height of their Grid2 cell
-  display: "flex",
-  flexDirection: "column",
-  justifyContent: "space-between",
 }));
 
 const StyledButton = styled(Button)(({ theme }) => ({

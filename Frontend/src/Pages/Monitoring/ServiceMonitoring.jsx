@@ -39,8 +39,10 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 const ServiceMonitoring = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [data, setData] = useState({ compute_services: [], network_agents: [], volume_services: [] });
+  // ✅ NEW STATES
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(false);
+
 
   useEffect(() => {
   const fetchData = async () => {
@@ -57,6 +59,35 @@ const ServiceMonitoring = () => {
   fetchData(); 
 }, []);
 
+
+// ⭐⭐⭐⭐⭐ ADD LOADING UI HERE ⭐⭐⭐⭐⭐
+if (loading) {
+  return (
+    <div className="cloud-container">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <path
+          d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-back"
+        />
+        <path
+          d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-front"
+        />
+      </svg>
+      <div className="loading-message">Loading...</div>
+    </div>
+  );
+}
+
+// ⭐⭐⭐⭐⭐ ADD ERROR UI HERE ⭐⭐⭐⭐⭐
+if (error) {
+  return (
+    <div className="error-message">
+      <GoAlert />
+      <h2>❌ Server Down</h2>
+    </div>
+  );
+}
 
   const handleTabChange = (_event, newValue) => {
     setActiveTab(newValue);
@@ -77,8 +108,31 @@ const ServiceMonitoring = () => {
   };  
 
   const renderTable = (data, headers) => (
-    <TableContainer component={Paper} sx={{ mt: 2 }}>
-      <Table>
+    <TableContainer component={Paper}  sx={{
+      width: "fit-content",
+      minWidth: "75%",
+      maxWidth: "100%",
+      margin: "0 auto",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      border: "none !important",
+      boxShadow: "none !important",
+      backgroundColor: "transparent !important"
+    }}>
+      <Table
+      sx={{
+        width: "100%",
+        minWidth: 650,
+        tableLayout: "auto",
+    
+        // REMOVE ALL BORDERS
+        border: "none !important",
+        "& td, & th": { border: "none !important" },
+        "& .MuiTableCell-root": { borderBottom: "none !important" },
+        "& .MuiTableRow-root": { border: "none !important" },
+      }}
+      >
         <TableHead>
           <TableRow >
             {headers.map((header) => (

@@ -406,8 +406,33 @@ const Flavors = () => {
       </Modal>
 
 
-      <TableContainer component={Paper}>
-        <Table stickyHeader>
+      <TableContainer component={Paper}
+      sx={{
+        width: "fit-content",
+        minWidth: "75%",
+        maxWidth: "100%",
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        border: "none !important",
+        boxShadow: "none !important",
+        backgroundColor: "transparent !important"
+      }}
+      >
+        <Table 
+         sx={{
+          width: "100%",
+          minWidth: 650,
+          tableLayout: "auto",
+      
+          // REMOVE ALL BORDERS
+          border: "none !important",
+          "& td, & th": { border: "none !important" },
+          "& .MuiTableCell-root": { borderBottom: "none !important" },
+          "& .MuiTableRow-root": { border: "none !important" },
+        }}
+        >
           <TableHead>
             <TableRow>
               <StyledTableCell padding="checkbox">
@@ -454,16 +479,25 @@ const Flavors = () => {
             ))}
           </TableBody>
         </Table>
+
+         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
+                <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                  <TablePagination
+                    rowsPerPageOptions={[5, 8, 10, 25, { value: -1, label: 'All' }]}
+                    component="div"
+                    count={filteredFlavors.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleRowsPerPageChange}
+                    sx={{
+                      borderTop: "none",
+                      width: "100%",
+                    }}
+                  />
+                </Box>
       </TableContainer>
-      <TablePagination
-        rowsPerPageOptions={[5, 8, 10, 25, { value: -1, label: 'All' }]}
-        component="div"
-        count={filteredFlavors.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handlePageChange}
-        onRowsPerPageChange={handleRowsPerPageChange}
-      />
+      
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}

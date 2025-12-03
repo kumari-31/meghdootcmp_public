@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import apiClient from "../../Axios";
+import "../style.css";
 import {
   Table,
   TableBody,
@@ -77,6 +78,7 @@ const ApprovedvmRequest = () => {
     fetchData();
   }, []);
 
+
   if (loading) {
     return (
       <div className="cloud-container">
@@ -106,6 +108,7 @@ const ApprovedvmRequest = () => {
       </div>
     );
   }
+
 
   const handleOpenDialog = (username) => {
     setSelectedUser(username);
@@ -159,13 +162,18 @@ const ApprovedvmRequest = () => {
 
   return (
     <Paper
-      sx={{
-        width: "90%",
-        margin: "20px auto",
-        padding: "20px",
-        borderRadius: "10px",
-        boxShadow: 3,
-      }}
+    sx={{
+      width: "fit-content",
+      minWidth: "75%",
+      maxWidth: "100%",
+      margin: "0 auto",
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "center",
+      border: "none !important",
+      boxShadow: "none !important",
+      backgroundColor: "transparent !important"
+    }}
     >
       <Typography
         variant="h5"

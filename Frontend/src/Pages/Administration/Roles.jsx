@@ -376,62 +376,105 @@ const Roles = () => {
         </Box>
       </Modal>
 
-      <TableContainer component={Paper}>
-        <Table style={volumesTableStyle}>
-          <TableHead>
-            <TableRow>
-            <StyledTableCell>
-                <input
-                  type="checkbox"
-                  onChange={handleSelectAll}
-                  checked={roles.length > 0 && currentRoles.every(role => selectedRoles.includes(role.id))}
-                />
-              </StyledTableCell>
-              <StyledTableCell>Sr. No.</StyledTableCell>
-              <StyledTableCell>Role Name</StyledTableCell>
-              <StyledTableCell>Role Id</StyledTableCell>
-              <StyledTableCell>Actions</StyledTableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {currentRoles.map((role,index) => (
-              <StyledTableRow key={role.id}>
-                <StyledTableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedRoles.includes(role.id)}
-                    onChange={() => handleSelectRole(role.id)}
-                  />
-                </StyledTableCell>
-                <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell> {/* Sr. No. data is now after the checkbox data */}
-          
-                <StyledTableCell>{role.name}</StyledTableCell>
-                <StyledTableCell>{role.id}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" color="#253848" onClick={() => { setRoleToUpdate(role); setShowUpdateForm(true); }}>
-                      Update
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteRole(role.id)}>
-                      Delete
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+    
+<TableContainer
+component={Paper}
+sx={{
+  width: "fit-content",
+  minWidth: "75%",
+  maxWidth: "100%",
+  margin: "0 auto",
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "center",
+  border: "none !important",
+  boxShadow: "none !important",
+  backgroundColor: "transparent !important"
+}}
+>
+<Table
+  sx={{
+    width: "100%",
+    minWidth: 650,
+    tableLayout: "auto",
 
-      <TablePagination
-        rowsPerPageOptions={[5, 7, 10]}
-        component="div"
-        count={roles.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-      />
+    // REMOVE ALL BORDERS
+    border: "none !important",
+    "& td, & th": { border: "none !important" },
+    "& .MuiTableCell-root": { borderBottom: "none !important" },
+    "& .MuiTableRow-root": { border: "none !important" },
+  }}
+>
+  <TableHead>
+    <TableRow>
+      <StyledTableCell>
+        <input
+          type="checkbox"
+          onChange={handleSelectAll}
+          checked={roles.length > 0 && currentRoles.every(role => selectedRoles.includes(role.id))}
+        />
+      </StyledTableCell>
+      <StyledTableCell>Sr. No.</StyledTableCell>
+      <StyledTableCell>Role Name</StyledTableCell>
+      <StyledTableCell>Role Id</StyledTableCell>
+      <StyledTableCell>Actions</StyledTableCell>
+    </TableRow>
+  </TableHead>
+
+  <TableBody>
+    {currentRoles.map((role, index) => (
+      <StyledTableRow key={role.id}>
+        <StyledTableCell>
+          <input
+            type="checkbox"
+            checked={selectedRoles.includes(role.id)}
+            onChange={() => handleSelectRole(role.id)}
+          />
+        </StyledTableCell>
+
+        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>{role.name}</StyledTableCell>
+        <StyledTableCell>{role.id}</StyledTableCell>
+
+        <StyledTableCell>
+          <Box display="flex" justifyContent="center" gap={1}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setRoleToUpdate(role);
+                setShowUpdateForm(true);
+              }}
+            >
+              Update
+            </Button>
+            <Button variant="outlined" color="error" onClick={() => handleDeleteRole(role.id)}>
+              Delete
+            </Button>
+          </Box>
+        </StyledTableCell>
+      </StyledTableRow>
+    ))}
+  </TableBody>
+</Table>
+
+{/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
+<Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+  <TablePagination
+    rowsPerPageOptions={[5, 7, 10]}
+    component="div"
+    count={roles.length}
+    rowsPerPage={rowsPerPage}
+    page={page}
+    onPageChange={handleChangePage}
+    onRowsPerPageChange={handleChangeRowsPerPage}
+    sx={{
+      borderTop: "none",
+      width: "100%",
+    }}
+  />
+</Box>
+</TableContainer>
+
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
@@ -463,3 +506,5 @@ const headerContainerVolumesStyle = {
 const searchContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
 const volumesTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
 export default Roles;
+
+

@@ -574,7 +574,7 @@ const App = () => {
               element={<DeploymentDetails />}
             />
             <Route
-              path="kubernetes/pods-details/:podsName"
+              path="kubernetes/pods-details/:podName"
               element={<PodDetails />}
             />
             <Route

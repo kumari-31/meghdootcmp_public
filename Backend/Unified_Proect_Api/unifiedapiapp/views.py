@@ -5225,7 +5225,7 @@ class VmRequestOverviewAPIView(APIView):
                 queryset = VmRequest.objects.all()
 
                 status_counts = {
-                    "pending": queryset.filter(fla_status="Accepted", admin_status="Pending").count(),
+                    "pending": queryset.filter(admin_status="Pending").count(),
                     "accepted": queryset.filter(admin_status="Accepted").count(),
                     "rejected": queryset.filter(admin_status="Rejected").count(),
                 }

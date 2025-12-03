@@ -20,6 +20,8 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
+import '../style.css';
+
 
 // ---------------- Styled Table Cells & Rows ----------------
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -50,6 +52,7 @@ const GradientCircularStat = ({ value, label, subLabel, gradientId }) => {
   const normalizedRadius = radius - stroke * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (value / 100) * circumference;
+  
 
   return (
     <Box sx={{ textAlign: "center" }}>
@@ -113,11 +116,14 @@ const Hypervisors = () => {
   const [hypervisors, setHypervisors] = useState([]);
   const [hosts, setHosts] = useState([]);
   const [resources, setResources] = useState([]);
-  const [loading, setLoading] = useState(false);
+  
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState("");
   const [snackbarType, setSnackbarType] = useState("success");
+    // ✅ NEW STATES
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
   const showSnackbar = (msg, type) => {
     setSnackbarMsg(msg);
@@ -166,6 +172,40 @@ const Hypervisors = () => {
     fetchHypervisors();
   }, []);
 
+
+  // ⭐⭐⭐⭐⭐ ADD LOADING UI HERE ⭐⭐⭐⭐⭐
+  if (loading) {
+    return (
+      <div className="cloud-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+          <path
+            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-back"
+          />
+          <path
+            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-front"
+          />
+        </svg>
+        <div className="loading-message">Loading...</div>
+      </div>
+    );
+  }
+
+  // ⭐⭐⭐⭐⭐ ADD ERROR UI HERE ⭐⭐⭐⭐⭐
+  if (error) {
+    return (
+      <div className="error-message">
+        <GoAlert />
+        <h2>❌ Server Down</h2>
+      </div>
+    );
+  }
+
+  const toGB = (value) => {
+    if (!value) return 0;
+    return +(value / 1024).toFixed(2); // MB → GB
+  };
   const handleTabChange = (_, newValue) => {
     setTab(newValue);
     if (newValue === 0) fetchHypervisors();
@@ -181,101 +221,141 @@ const Hypervisors = () => {
       </Typography>
 
       {/* ------------------- SUMMARY SECTION ------------------- */}
-      <Box sx={{ mb: 5 }}>
-        <Grid container spacing={3}>
-          {/* -------- Hypervisor Summary -------- */}
-          <Grid item xs={12} md={6}>
-            <Paper
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                height: "100%",
-                boxShadow: 6,
-                background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
-              }}
-            >
-              <Typography
-                variant="h6"
-                sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
-              >
-                Hypervisor Summary (meghnode)
-              </Typography>
-              <Grid container spacing={3} justifyContent="center">
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((14.5 / 125.4) * 100).toFixed(1)}
-                    label="Memory Usage"
-                    subLabel="14.5 / 125.4 GB"
-                    gradientId="grad-mem"
-                  />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((25 / 457) * 100).toFixed(1)}
-                    label="Disk Usage"
-                    subLabel="25 / 457 GB"
-                    gradientId="grad-disk"
-                  />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((12 / 256) * 100).toFixed(1)}
-                    label="VCPU Usage"
-                    subLabel="12 / 256"
-                    gradientId="grad-vcpu"
-                  />
-                </Grid>
-              </Grid>
-            </Paper>
-          </Grid>
+      {/* ========= SUMMARY SECTION (DYNAMIC) ========= */}
+<Box sx={{ mb: 5 }}>
+  <Grid container spacing={3}>
 
-          {/* -------- Resource Providers Summary -------- */}
-          <Grid item xs={12} md={6}>
-            <Paper
-              sx={{
-                p: 3,
-                borderRadius: 3,
-                height: "100%",
-                boxShadow: 6,
-                background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
-              }}
-            >
-              <Typography
-                variant="h6"
-                sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
-              >
-                Resource Providers Summary (meghnode)
-              </Typography>
-              <Grid container spacing={3} justifyContent="center">
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((12 / 256) * 100).toFixed(1)}
-                    label="VCPU Usage"
-                    subLabel="12 / 256"
-                    gradientId="grad-vcpu2"
-                  />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((14 / 125.4) * 100).toFixed(1)}
-                    label="Memory Usage"
-                    subLabel="14 / 125.4 GB"
-                    gradientId="grad-mem2"
-                  />
-                </Grid>
-                <Grid item xs={6} sm={4}>
-                  <GradientCircularStat
-                    value={((25 / 457) * 100).toFixed(1)}
-                    label="Disk Usage"
-                    subLabel="25 / 457 GB"
-                    gradientId="grad-disk2"
-                  />
-                </Grid>
+    {/* -------- Hypervisor Summary -------- */}
+    <Grid item xs={12} md={6}>
+      <Paper
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          height: "100%",
+          boxShadow: 6,
+          background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
+        }}
+      >
+        <Typography
+          variant="h6"
+          sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
+        >
+          Hypervisor Summary ({hypervisors[0]?.hostname || "N/A"})
+        </Typography>
+
+        {/* Extract first hypervisor */}
+        {hypervisors.length > 0 && (() => {
+          const hv = hypervisors[0];
+
+          const memUsed = hv.ram_used || 0;
+          const memTotal = hv.ram_total || 0;
+
+          const diskUsed = hv.local_storage_used || 0;
+          const diskTotal = hv.local_storage_total || 0;
+
+          const vcpuUsed = hv.vcpus_used || 0;
+          const vcpuTotal = hv.vcpus_total || 0;
+
+          return (
+            <Grid container spacing={3} justifyContent="center">
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={memTotal ? ((memUsed / memTotal) * 100).toFixed(1) : 0}
+                  label="Memory Usage"
+                  subLabel={`${memUsed} / ${memTotal} GB`}
+                  gradientId="grad-mem"
+                />
               </Grid>
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
+
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={diskTotal ? ((diskUsed / diskTotal) * 100).toFixed(1) : 0}
+                  label="Disk Usage"
+                  subLabel={`${diskUsed} / ${diskTotal} GB`}
+                  gradientId="grad-disk"
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={vcpuTotal ? ((vcpuUsed / vcpuTotal) * 100).toFixed(1) : 0}
+                  label="VCPU Usage"
+                  subLabel={`${vcpuUsed} / ${vcpuTotal}`}
+                  gradientId="grad-vcpu"
+                />
+              </Grid>
+            </Grid>
+          );
+        })()}
+      </Paper>
+    </Grid>
+
+    {/* -------- Resource Providers Summary -------- */}
+    <Grid item xs={12} md={6}>
+      <Paper
+        sx={{
+          p: 3,
+          borderRadius: 3,
+          height: "100%",
+          boxShadow: 6,
+          background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
+        }}
+      >
+        <Typography
+          variant="h6"
+          sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
+        >
+          Resource Providers Summary (All Providers)
+        </Typography>
+
+        {/* Aggregate all resource providers */}
+        {resources.length > 0 && (() => {
+          const vcpuUsed = resources.reduce((t, i) => t + i.vcpus_used, 0);
+          const vcpuTotal = resources.reduce((t, i) => t + i.vcpus_total, 0);
+
+          const memUsed = resources.reduce((t, i) => t + i.ram_used, 0);
+          const memTotal = resources.reduce((t, i) => t + i.ram_total, 0);
+
+          const diskUsed = resources.reduce((t, i) => t + i.disk_used, 0);
+          const diskTotal = resources.reduce((t, i) => t + i.disk_total, 0);
+
+          return (
+            <Grid container spacing={3} justifyContent="center">
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={vcpuTotal ? ((vcpuUsed / vcpuTotal) * 100).toFixed(1) : 0}
+                  label="VCPU Usage"
+                  subLabel={`${vcpuUsed} / ${vcpuTotal}`}
+                  gradientId="grad-vcpu2"
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={memTotal ? ((memUsed / memTotal) * 100).toFixed(1) : 0}
+                  label="Memory Usage"
+                  subLabel={`${memUsed} / ${memTotal} GB`}
+                  gradientId="grad-mem2"
+                />
+              </Grid>
+
+              <Grid item xs={6} sm={4}>
+                <GradientCircularStat
+                  value={diskTotal ? ((diskUsed / diskTotal) * 100).toFixed(1) : 0}
+                  label="Disk Usage"
+                  subLabel={`${diskUsed} / ${diskTotal} GB`}
+                  gradientId="grad-disk2"
+                />
+              </Grid>
+            </Grid>
+          );
+        })()}
+      </Paper>
+    </Grid>
+
+  </Grid>
+</Box>
+
 
       {/* ------------------- TABS + TABLES ------------------- */}
       <Paper sx={{ mb: 2 }}>
@@ -294,8 +374,34 @@ const Hypervisors = () => {
         <>
           {/* HYPERVISORS TABLE */}
           {tab === 0 && (
-            <TableContainer component={Paper}>
-              <Table>
+            <TableContainer 
+             component={Paper}
+                   sx={{
+                     width: "fit-content",
+                     minWidth: "75%",
+                     maxWidth: "100%",
+                     margin: "0 auto",
+                     display: "flex",
+                     flexDirection: "column",
+                     justifyContent: "center",
+                     border: "none !important",
+                     boxShadow: "none !important",
+                     backgroundColor: "transparent !important"
+                   }}
+            >
+              <Table
+               sx={{
+                width: "100%",
+                minWidth: 650,
+                tableLayout: "auto",
+            
+                // REMOVE ALL BORDERS
+                border: "none !important",
+                "& td, & th": { border: "none !important" },
+                "& .MuiTableCell-root": { borderBottom: "none !important" },
+                "& .MuiTableRow-root": { border: "none !important" },
+              }}
+              >
                 <TableHead>
                   <TableRow>
                     <StyledTableCell>Hostname</StyledTableCell>
@@ -334,8 +440,32 @@ const Hypervisors = () => {
 
           {/* HOST TABLE */}
           {tab === 1 && (
-            <TableContainer component={Paper}>
-              <Table>
+            <TableContainer  component={Paper}
+                   sx={{
+                     width: "fit-content",
+                     minWidth: "75%",
+                     maxWidth: "100%",
+                     margin: "0 auto",
+                     display: "flex",
+                     flexDirection: "column",
+                     justifyContent: "center",
+                     border: "none !important",
+                     boxShadow: "none !important",
+                     backgroundColor: "transparent !important"
+                   }}>
+              <Table
+              sx={{
+                width: "100%",
+                minWidth: 650,
+                tableLayout: "auto",
+            
+                // REMOVE ALL BORDERS
+                border: "none !important",
+                "& td, & th": { border: "none !important" },
+                "& .MuiTableCell-root": { borderBottom: "none !important" },
+                "& .MuiTableRow-root": { border: "none !important" },
+              }}
+              >
                 <TableHead>
                   <TableRow>
                     <StyledTableCell>Host</StyledTableCell>
@@ -364,8 +494,33 @@ const Hypervisors = () => {
 
           {/* RESOURCE PROVIDER TABLE */}
           {tab === 2 && (
-            <TableContainer component={Paper}>
-              <Table>
+            <TableContainer component={Paper}
+            sx={{
+              width: "fit-content",
+              minWidth: "75%",
+              maxWidth: "100%",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+              border: "none !important",
+              boxShadow: "none !important",
+              backgroundColor: "transparent !important"
+            }}
+            >
+              <Table
+              sx={{
+                width: "100%",
+                minWidth: 650,
+                tableLayout: "auto",
+            
+                // REMOVE ALL BORDERS
+                border: "none !important",
+                "& td, & th": { border: "none !important" },
+                "& .MuiTableCell-root": { borderBottom: "none !important" },
+                "& .MuiTableRow-root": { border: "none !important" },
+              }}
+              >
                 <TableHead>
                   <TableRow>
                     <StyledTableCell>Resource Provider</StyledTableCell>

@@ -296,7 +296,7 @@ const Instance = () => {
     <div className="instance-container">
       <Paper
         sx={{
-          width: "90%",
+          width: "100%",
           margin: "20px auto",
           padding: "20px",
           borderRadius: "10px",
@@ -325,8 +325,32 @@ const Instance = () => {
             />
           </Grid>
         </Grid>
-        <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
-          <Table stickyHeader aria-label="instance table">
+        <TableContainer component={Paper} 
+        sx={{
+          width: "fit-content",
+          minWidth: "75%",
+          maxWidth: "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          border: "none !important",
+          boxShadow: "none !important",
+          backgroundColor: "transparent !important"
+        }}>
+          <Table 
+          sx={{
+            width: "100%",
+            minWidth: 650,
+            tableLayout: "auto",
+        
+            // REMOVE ALL BORDERS
+            border: "none !important",
+            "& td, & th": { border: "none !important" },
+            "& .MuiTableCell-root": { borderBottom: "none !important" },
+            "& .MuiTableRow-root": { border: "none !important" },
+          }}
+          >
             <TableHead>
               <TableRow>
                 <StyledTableCell>Instance Name</StyledTableCell>

@@ -551,8 +551,33 @@ const Volumes = () => {
         </Box>
       </Modal>
 
-      <TableContainer component={Paper}>
-        <Table style={volumesTableStyle}>
+      <TableContainer component={Paper}
+      sx={{
+        width: "fit-content",
+        minWidth: "75%",
+        maxWidth: "100%",
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        border: "none !important",
+        boxShadow: "none !important",
+        backgroundColor: "transparent !important"
+      }}
+      >
+        <Table 
+        sx={{
+          width: "100%",
+          minWidth: 650,
+          tableLayout: "auto",
+      
+          // REMOVE ALL BORDERS
+          border: "none !important",
+          "& td, & th": { border: "none !important" },
+          "& .MuiTableCell-root": { borderBottom: "none !important" },
+          "& .MuiTableRow-root": { border: "none !important" },
+        }}
+        >
           <TableHead>
             <TableRow>
               <StyledTableCell>
@@ -662,17 +687,24 @@ const Volumes = () => {
               ))}
           </TableBody>
         </Table>
+         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
+                <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+                  <TablePagination
+                    rowsPerPageOptions={[5, 7, 10]}
+                    component="div"
+                    count={filteredVolumes.length}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                    sx={{
+                      borderTop: "none",
+                      width: "100%",
+                    }}
+                  />
+                </Box>
       </TableContainer>
 
-      <TablePagination
-        rowsPerPageOptions={[5, 7, 10]}
-        component="div"
-        count={filteredVolumes.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handlePageChange}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-      />
     </div>
   );
 };

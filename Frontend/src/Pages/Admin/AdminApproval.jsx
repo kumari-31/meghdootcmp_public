@@ -18,6 +18,7 @@ import {
   TextField,
   CircularProgress,
 } from "@mui/material";
+import '../style.css';
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { styled } from "@mui/material/styles";
@@ -171,22 +172,25 @@ const AdminApproval = () => {
     (r) => r.admin_status === "Pending" && r.fla_status === "Accepted"
   );
 
-  // --- UI Starts Here ---
   if (loading) {
     return (
-      <Stack
-        alignItems="center"
-        justifyContent="center"
-        sx={{ height: "80vh" }}
-      >
-        <CircularProgress color="primary" size={60} />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Loading data...
-        </Typography>
-      </Stack>
+      <div className="cloud-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+          <path
+            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-back"
+          />
+          <path
+            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-front"
+          />
+        </svg>
+        <div className="loading-message">Loading...</div>
+      </div>
     );
   }
 
+ 
   if (error) {
     return (
       <Stack
@@ -252,18 +256,37 @@ const AdminApproval = () => {
       {/* Pending Table */}
       <Paper
         sx={{
-          width: "90%",
-          margin: "auto",
-          p: 3,
-          borderRadius: "12px",
-          boxShadow: 4,
+          width: "fit-content",
+          minWidth: "75%",
+          maxWidth: "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          border: "none !important",
+          boxShadow: "none !important",
+          backgroundColor: "transparent !important"
         }}
       >
         <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
           Pending Approval Requests
         </Typography>
-        <TableContainer sx={{ maxHeight: 500 }}>
-          <Table stickyHeader>
+        <TableContainer 
+        
+        >
+          <Table 
+          sx={{
+            width: "100%",
+            minWidth: 650,
+            tableLayout: "auto",
+        
+            // REMOVE ALL BORDERS
+            border: "none !important",
+            "& td, & th": { border: "none !important" },
+            "& .MuiTableCell-root": { borderBottom: "none !important" },
+            "& .MuiTableRow-root": { border: "none !important" },
+          }}
+          >
             <TableHead>
               <StyledTableRow>
                 <StyledTableCell>Sr. No.</StyledTableCell>
