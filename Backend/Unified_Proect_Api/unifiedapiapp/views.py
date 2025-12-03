@@ -2444,17 +2444,29 @@ class InstanceDetailsAPIView(APIView):
                 # Case 2: Instance booted from volume
                 # --- Case 2: Booted from volume ---
                 if image_name == "N/A":
-                    attached = server.get("os-extended-volumes:volumes_attached", [])
-                    if attached:
-                        volume_id = attached[0].get("id")
+                     attached_vols = getattr(server, "attached_volumes", [])
+
+                     if attached_vols:
+                        volume_id = attached_vols[0].get("id")
+
                         if volume_id:
                             volume = conn.block_storage.get_volume(volume_id)
 
-                            # Many volumes store originating image info here
-                            if volume and getattr(volume, "volume_image_metadata", None):
-                                image_name = volume.volume_image_metadata.get("image_name", "-")
-                            else:
-                                image_name = f"Boot From Volume ({volume_id})"
+                            if volume:
+                                meta = getattr(volume, "volume_image_metadata", {}) or {}
+
+                                if "image_name" in meta:
+                                    image_name = meta["image_name"]
+
+                                elif "image_id" in meta:
+                                    try:
+                                        img = conn.compute.get_image(meta["image_id"])
+                                        image_name = img.name or "N/A"
+                                    except:
+                                        image_name = f"Volume ({volume_id})"
+                                else:
+                                    image_name = f"Volume ({volume_id})"
+
                 # print("image_name",image_name)
                 # Get security groups
                 security_groups = [sg['name'] for sg in server.security_groups] if hasattr(server, 'security_groups') else []

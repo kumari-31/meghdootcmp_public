@@ -397,9 +397,12 @@ const Instance = () => {
                   </StyledTableCell>
                   <StyledTableCell>{item["RAM"]}</StyledTableCell>
                   <StyledTableCell>{item["Disk"]}</StyledTableCell>
-                  <StyledTableCell>
-                    {item["Image Name"] || "N/A"}
+                 <StyledTableCell>
+                    {item["Image Name"] && item["Image Name"] !== "N/A"
+                      ? item["Image Name"]
+                      : <span style={{ color: "gray" }}>N/A</span>}
                   </StyledTableCell>
+
                   <StyledTableCell>{item["status"]} </StyledTableCell>
                   <StyledTableCell>{item["power_state_str"]} </StyledTableCell>
                   <StyledTableCell>
