@@ -15,7 +15,6 @@ import { Link } from "react-router-dom";
 import "./LoginForm.css";
 import logo from "../../assets/cclogo.png";
 
-
 const MeghdootLogin = () => {
   const [formData, setFormData] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
@@ -26,11 +25,10 @@ const MeghdootLogin = () => {
   const [showOtpModal, setShowOtpModal] = useState(false);
   const navigate = useNavigate();
   const { user, login, setUser } = useAuth();
-
-  
+  const [loadingLogin, setLoadingLogin] = useState(false);
 
   // Check if user is already authenticated and redirect accordingly
-useEffect(() => {
+  useEffect(() => {
     if (!user) return;
     console.log("Redirecting based on user:", user);
 
@@ -42,7 +40,7 @@ useEffect(() => {
     else navigate("/unauthorized", { replace: true });
   }, [user, navigate]);
 
-const maskEmail = (email) => {
+  const maskEmail = (email) => {
     const [user, domain] = email.split("@");
     if (!user || !domain) return email;
     const visible = user.length <= 2 ? 1 : 2;
@@ -70,48 +68,53 @@ const maskEmail = (email) => {
     setError("");
     setSuccess("");
 
-  
+    setOtpUsername(formData.username);
+    setShowOtpModal(true);
+    setSuccess("Sending OTP...");
+    setLoadingLogin(true);
+
     try {
       const data = await login(formData.username, formData.password);
 
       if (data.require_otp) {
         setSuccess(data.message || "OTP sent successfully.");
-        setOtpUsername(data.username || formData.username);
-        setShowOtpModal(true);
       } else if (data.detail === "Login successful") {
+        setShowOtpModal(false);
         setSuccess("Login successful!");
+        setLoadingLogin(false);
         const parsedUser = getUserFromCookie();
         if (parsedUser) setUser(parsedUser);
       }
     } catch (err) {
+      setShowOtpModal(false);
       setError(err.message || "Login failed.");
+      setLoadingLogin(false);
     }
   };
-const handleOtpSubmit = async () => {
-  setOtpError("");
-  try {
-    const response = await login(otpUsername, formData.password, otp);
-    if (response.detail === "Login successful") {
-      setShowOtpModal(false);
-      setSuccess("OTP verified successfully!");
+  const handleOtpSubmit = async () => {
+    setOtpError("");
+    try {
+      const response = await login(otpUsername, formData.password, otp);
+      if (response.detail === "Login successful") {
+        setShowOtpModal(false);
+        setSuccess("OTP verified successfully!");
 
-      // ⏳ Wait a bit for cookies to be stored before reading user_data
-      setTimeout(() => {
-        const parsedUser = getUserFromCookie();
-        if (parsedUser) {
-          setUser(parsedUser);
-        } else {
-          console.warn("No user_data cookie found after OTP login");
-        }
-      }, 500);
-    } else {
-      setOtpError("Invalid OTP. Please try again.");
+        // ⏳ Wait a bit for cookies to be stored before reading user_data
+        setTimeout(() => {
+          const parsedUser = getUserFromCookie();
+          if (parsedUser) {
+            setUser(parsedUser);
+          } else {
+            console.warn("No user_data cookie found after OTP login");
+          }
+        }, 500);
+      } else {
+        setOtpError("Invalid OTP. Please try again.");
+      }
+    } catch (err) {
+      setOtpError(err.message || "OTP verification failed.");
     }
-  } catch (err) {
-    setOtpError(err.message || "OTP verification failed.");
-  }
-};
-
+  };
 
   const handleResendOtp = async () => {
     try {
@@ -124,7 +127,7 @@ const handleOtpSubmit = async () => {
   };
 
   return (
-   <div className="login-page">
+    <div className="login-page">
       <div className="logo-container">
         <div className="login-header">
           <img src={logo} alt="CDAC Meghdoot Logo" className="logo-img" />
@@ -134,7 +137,7 @@ const handleOtpSubmit = async () => {
         <div className="login-form">
           <h2>Sign in to your Account</h2>
           <form onSubmit={handleSubmit}>
-            <input 
+            <input
               type="text"
               name="username"
               placeholder="Username"
@@ -150,7 +153,9 @@ const handleOtpSubmit = async () => {
               onChange={handleChange}
               required
             />
-            <button type="submit">Login</button>
+            <button type="submit" disabled={loadingLogin}>
+              {loadingLogin ? "Sending OTP..." : "Login"}
+            </button>
             {error && <p className="error">{error}</p>}
             {success && <p className="success">{success}</p>}
           </form>
@@ -163,7 +168,11 @@ const handleOtpSubmit = async () => {
         </div>
       </div>
 
-      <Dialog open={showOtpModal} onClose={() => setShowOtpModal(false)}>
+      <Dialog
+        open={showOtpModal}
+        disableEscapeKeyDown
+        onClose={() => {}} // Prevents backdrop click close
+      >
         <DialogTitle>Enter OTP</DialogTitle>
         <DialogContent>
           <Typography>
@@ -175,9 +184,7 @@ const handleOtpSubmit = async () => {
             type="text"
             fullWidth
             value={otp}
-            onChange={(e) =>
-              setOtp(e.target.value.replace(/\D/g, ""))
-            }
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
             inputProps={{
               inputMode: "numeric",
               pattern: "[0-9]*",
@@ -199,7 +206,7 @@ const handleOtpSubmit = async () => {
           {otpError && <Typography color="error">{otpError}</Typography>}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowOtpModal(false)}>Cancel</Button>
+          <Button onClick={() => setShowOtpModal(false)} color="error">Cancel</Button>
           <Button variant="contained" onClick={handleOtpSubmit}>
             Verify OTP
           </Button>

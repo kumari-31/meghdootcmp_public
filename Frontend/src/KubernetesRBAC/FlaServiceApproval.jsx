@@ -272,11 +272,11 @@ const FlaServiceApproval = () => {
                 <StyledTableCell>Sr. No.</StyledTableCell>
                 <StyledTableCell>Name</StyledTableCell>
                 <StyledTableCell>Service</StyledTableCell>
+                <StyledTableCell>App Name</StyledTableCell>
                 <StyledTableCell>Project</StyledTableCell>
                 <StyledTableCell>Designation</StyledTableCell>
                 <StyledTableCell>Purpose</StyledTableCell>
                 <StyledTableCell>Request Time</StyledTableCell>
-                <StyledTableCell>Status</StyledTableCell>
                 <StyledTableCell>Actions</StyledTableCell>
               </TableRow>
             </TableHead>
@@ -292,6 +292,7 @@ const FlaServiceApproval = () => {
                     </StyledTableCell>
                     <StyledTableCell>{request.name}</StyledTableCell>
                     <StyledTableCell>{request.service_name}</StyledTableCell>
+                    <StyledTableCell>{request.app_name}</StyledTableCell>
                     <StyledTableCell>{request.project_name}</StyledTableCell>
                     <StyledTableCell>{request.designation}</StyledTableCell>
                     <StyledTableCell>
@@ -310,7 +311,7 @@ const FlaServiceApproval = () => {
                         }
                       )}
                     </StyledTableCell>
-                    <StyledTableCell>{request.fla_status}</StyledTableCell>
+
 
                     <StyledTableCell>
                       <Stack

@@ -450,6 +450,8 @@ const handleSubMenuClick = async (item) => {
   /* 🧱 Meghdoot Cloud click handler (avoid unauthorized for FLA/EMPLOYEE) */
   const handleLogoClick = (e) => {
     e.preventDefault();
+    setSelectedPlatform("openstack");
+    
     if (userRole === "ADMIN") navigate("/app/dashboard");
     else if (userRole === "FLA") navigate("/app/openstack/fla/approvals");
     else if (userRole === "EMPLOYEE") navigate("/app/openstack/vmrequest");
