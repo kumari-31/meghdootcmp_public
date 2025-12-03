@@ -63,6 +63,8 @@ class VmRequest(models.Model):
     creation_status = models.TextField(blank=True, null=True)
     fla_rejection_reason = models.TextField(blank=True, null=True)
     admin_rejection_reason = models.TextField(blank=True, null=True)
+    creation_error_message = models.TextField(blank=True, null=True)
+
     # Internet Access Registration Form fields
     # internet_access_required = models.BooleanField(default=False)
     # internet_private_ip = models.CharField(

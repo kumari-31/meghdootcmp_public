@@ -17,10 +17,12 @@ import {
   Button,
   TextField,
   CircularProgress,
+  Tooltip,
 } from "@mui/material";
 import '../style.css';
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import { GoAlert } from "react-icons/go";
@@ -81,17 +83,13 @@ const AdminApproval = () => {
   });
 
   // Fetch data from backend
-  const fetchOverview = async (pageNo = 1, size = 10) => {
+  const fetchOverview = async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get(
-        `/vmdetails/overview/?page=${pageNo}&size=${size}`
-      );
+      const res = await apiClient.get(`/vmdetails/overview/`);
       setOverview(res.data);
-      setError(null);
     } catch (err) {
-      console.error("Error fetching overview:", err);
-      setError("Failed to load data. Please try again later.");
+      setError("Failed to load data.");
     } finally {
       setLoading(false);
     }
@@ -111,18 +109,25 @@ const AdminApproval = () => {
   // Handle card click (Approved/Rejected list)
   const handleCardClick = (statusKey) => {
     setStatusFilter(statusKey);
-    const filtered =
-      statusKey === "accepted"
-        ? overview.data.filter(
-            (r) =>
-              r.fla_status?.toLowerCase() === "accepted" &&
-              r.admin_status === "Accepted"
-          )
-        : overview.data.filter(
-            (r) =>
-              r.fla_status?.toLowerCase() === "rejected" ||
-              r.admin_status === "Rejected"
-          );
+
+    let filtered = [];
+
+    if (statusKey === "accepted") {
+      filtered = overview.data.filter(
+        (r) =>
+          r.fla_status?.toLowerCase() === "accepted" &&
+          r.admin_status === "Accepted"
+      );
+    } else if (statusKey === "rejected") {
+      filtered = overview.data.filter(
+        (r) =>
+          r.fla_status?.toLowerCase() === "rejected" ||
+          r.admin_status === "Rejected"
+      );
+    } else if (statusKey === "failed") {
+      filtered = failedRows;
+    }
+
     setFilteredRows(filtered);
     setOpenDialog(true);
   };
@@ -167,9 +172,23 @@ const AdminApproval = () => {
   };
 
   const rows = overview.data || [];
-  const counts = overview.status_counts || {};
-  const pendingRows = rows.filter(
-    (r) => r.admin_status === "Pending" && r.fla_status === "Accepted"
+  const counts = {
+    ...overview.status_counts,
+    failed: overview.data.filter((r) => r.creation_status === "Failed").length,
+  };
+
+  const failedRows = overview.data.filter(
+    (r) => r.creation_status === "Failed"
+  );
+  const pendingRows = overview.data.filter(
+    (r) =>
+      (r.admin_status === "Pending" && r.fla_status === "Accepted") ||
+      r.creation_status === "Failed"
+  );
+
+  const paginatedPendingRows = pendingRows.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
   );
 
   if (loading) {
@@ -251,6 +270,20 @@ const AdminApproval = () => {
             {counts.rejected}
           </Typography>
         </Paper>
+        <Paper
+          sx={{
+            p: 2,
+            minWidth: 220,
+            backgroundColor: "#fff3e0", // Light Orange for failed
+            cursor: "pointer",
+          }}
+          onClick={() => handleCardClick("failed")}
+        >
+          <Typography variant="subtitle1">Total Failed Requests</Typography>
+          <Typography variant="h3" color="warning.main">
+            {counts.failed}
+          </Typography>
+        </Paper>
       </Stack>
 
       {/* Pending Table */}
@@ -290,8 +323,9 @@ const AdminApproval = () => {
             <TableHead>
               <StyledTableRow>
                 <StyledTableCell>Sr. No.</StyledTableCell>
-                <StyledTableCell>Name</StyledTableCell>
+                <StyledTableCell>Email</StyledTableCell>
                 <StyledTableCell>VM Name</StyledTableCell>
+                <StyledTableCell>VM Counts</StyledTableCell>
                 <StyledTableCell>Project</StyledTableCell>
                 <StyledTableCell>Image</StyledTableCell>
                 <StyledTableCell>Flavor</StyledTableCell>
@@ -302,13 +336,38 @@ const AdminApproval = () => {
               </StyledTableRow>
             </TableHead>
             <TableBody>
-              {pendingRows.map((req, index) => (
-                <StyledTableRow key={req.id} hover>
+              {paginatedPendingRows.map((req, index) => (
+                <StyledTableRow
+                  key={req.id}
+                  hover
+                  sx={{
+                    backgroundColor:
+                      req.creation_status === "Failed"
+                        ? "#fae1b8ff !important" // light orange
+                        : "inherit",
+                  }}
+                >
                   <StyledTableCell>
-                    {page * rowsPerPage + index + 1}
+                    {page * rowsPerPage + (index + 1)}
                   </StyledTableCell>
                   <StyledTableCell>{req.name}</StyledTableCell>
-                  <StyledTableCell>{req.vm_name}</StyledTableCell>
+                  <StyledTableCell>
+                    {req.vm_name.split("_").slice(1).join("_")}
+                    {req.creation_status?.toLowerCase() === "failed" && (
+                      <Tooltip title={req.creation_error_message || "Unknown failure"} arrow>
+                      <ErrorOutlineIcon
+                        sx={{
+                          color: "red",
+                          ml: 1,
+                          verticalAlign: "middle",
+                          fontSize: 18,
+                        }}
+                       
+                      />
+                      </Tooltip>
+                    )}
+                  </StyledTableCell>
+                  <StyledTableCell>{req.count_of_vms}</StyledTableCell>
                   <StyledTableCell>{req.project_name}</StyledTableCell>
                   <StyledTableCell>{req.image}</StyledTableCell>
                   <StyledTableCell>{req.flavor}</StyledTableCell>
@@ -378,7 +437,7 @@ const AdminApproval = () => {
             <Table>
               <TableHead>
                 <StyledTableRow>
-                  <StyledTableCell>Name</StyledTableCell>
+                  {/* <StyledTableCell>Name</StyledTableCell> */}
                   <StyledTableCell>Email</StyledTableCell>
                   <StyledTableCell>VM Name</StyledTableCell>
                   <StyledTableCell>Project</StyledTableCell>
@@ -388,9 +447,11 @@ const AdminApproval = () => {
               <TableBody>
                 {filteredRows.map((r) => (
                   <StyledTableRow key={r.id}>
-                    <StyledTableCell>{r.name}</StyledTableCell>
+                    {/* <StyledTableCell>{r.name}</StyledTableCell> */}
                     <StyledTableCell>{r.email}</StyledTableCell>
-                    <StyledTableCell>{r.vm_name}</StyledTableCell>
+                    <StyledTableCell>
+                      {r.vm_name.split("_").slice(1).join("_")}
+                    </StyledTableCell>
                     <StyledTableCell>{r.project_name}</StyledTableCell>
                     <StyledTableCell>{r.fla_status}</StyledTableCell>
                   </StyledTableRow>
@@ -469,6 +530,87 @@ const AdminApproval = () => {
           >
             OK
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Failed Requests Dialog */}
+      <Dialog
+        open={statusFilter === "failed" && openDialog}
+        onClose={() => setOpenDialog(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>Failed VM Requests</DialogTitle>
+        <DialogContent>
+          <TableContainer sx={{ maxHeight: 400 }}>
+            <Table stickyHeader>
+              <TableHead>
+                <StyledTableRow>
+                  <StyledTableCell>Sr. No.</StyledTableCell>
+                  <StyledTableCell>Email</StyledTableCell>
+                  <StyledTableCell>VM Name</StyledTableCell>
+                  <StyledTableCell>Error Message</StyledTableCell>
+                  <StyledTableCell align="center">Actions</StyledTableCell>
+                </StyledTableRow>
+              </TableHead>
+
+              <TableBody>
+                {filteredRows.map((req, index) => (
+                  <StyledTableRow key={req.id} hover>
+                    <StyledTableCell>{index + 1}</StyledTableCell>
+                    <StyledTableCell>{req.name}</StyledTableCell>
+                    <StyledTableCell>
+                      {req.vm_name.split("_").slice(1).join("_")}
+                    </StyledTableCell>
+                    <StyledTableCell>
+                      {req.creation_error_message || "Unknown failure"}
+                    </StyledTableCell>
+
+                    <StyledTableCell align="center">
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        justifyContent="center"
+                      >
+                        {/* Retry / Approve */}
+                        <Button
+                          variant="contained"
+                          color="success"
+                          size="small"
+                          disabled={disabledActions.includes(req.id)}
+                          onClick={() => handleStatusUpdate(req.id, "Accepted")}
+                        >
+                          Retry
+                        </Button>
+
+                        {/* Reject */}
+                        <Button
+                          variant="contained"
+                          color="error"
+                          size="small"
+                          disabled={disabledActions.includes(req.id)}
+                          onClick={() =>
+                            setRejectDialog({
+                              open: true,
+                              id: req.id,
+                              reason: "",
+                              isFailed: true,
+                            })
+                          }
+                        >
+                          Reject
+                        </Button>
+                      </Stack>
+                    </StyledTableCell>
+                  </StyledTableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </>

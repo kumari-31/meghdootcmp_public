@@ -287,22 +287,18 @@ const Navbar = () => {
             ]
           : []),
 
-        {
-          id: 9,
-          name: "Support",
-          subMenu: [
-            ...(role === "ADMIN"
-              ? [{ name: "Ticketing", path: "/app/ticketlist" }]
-              : []),
-            ...(role === "EMPLOYEE" || role === "FLA"
-              ? [
-                  { name: "My Tickets", path: "/app/ticketdetails" },
-                  { name: "Create Ticket", path: "/app/ticketform" },
-                ]
-              : []),
-          ],
-        },
-      ],
+              {
+                id: 9,
+                name: "Support",
+                subMenu: [
+                  {
+                name: "Helpdesk",
+                action: "helpdesk_redirect",  // Instead of path
+                roles: ["ADMIN", "FLA", "EMPLOYEE"],
+                  }
+                ],
+              },
+            ],
 
       kubernetes: [
         {
@@ -409,7 +405,23 @@ const Navbar = () => {
   const handleMenuClick = (menuId) =>
     setSelectedMenu(selectedMenu === menuId ? null : menuId);
 
-  const handleSubMenuClick = (subMenuName) => setSelectedSubMenu(subMenuName);
+  // const handleSubMenuClick = (subMenuName) => setSelectedSubMenu(subMenuName);
+
+const handleSubMenuClick = async (item) => {
+  setSelectedSubMenu(item.name);
+
+  if (item.action === "helpdesk_redirect") {
+    if (userRole === "ADMIN") {
+      navigate("/app/helpdesk/dashboard");
+    } else {
+      navigate("/app/helpdesk/submit");
+    }
+  } else if (item.path) {
+    navigate(item.path);
+  }
+};
+
+
 
   const handlePlatformChange = (platform) => {
     setSelectedPlatform(platform);
@@ -632,7 +644,7 @@ const Navbar = () => {
                   className={`sub-menu-item ${
                     selectedSubMenu === item.name ? "active" : ""
                   }`}
-                  onClick={() => handleSubMenuClick(item.name)}
+                  onClick={() => handleSubMenuClick(item)}
                 >
                   <Link to={item.path} className="link">
                     {isApprovals ? (
