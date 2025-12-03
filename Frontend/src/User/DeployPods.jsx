@@ -255,7 +255,7 @@ const DatabaseCard = ({ card, handleOpen }) => {
     <StyledCard
       sx={{
         width: 400,
-        height: 300, // fixed height
+        height: 320, // fixed height
         display: "flex",
         flexDirection: "column",
       }}

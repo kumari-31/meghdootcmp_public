@@ -325,31 +325,33 @@ const Instance = () => {
             />
           </Grid>
         </Grid>
-        <TableContainer component={Paper} 
-        sx={{
-          width: "fit-content",
-          minWidth: "75%",
-          maxWidth: "100%",
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          border: "none !important",
-          boxShadow: "none !important",
-          backgroundColor: "transparent !important"
-        }}>
-          <Table 
+        <TableContainer
+          component={Paper}
           sx={{
-            width: "100%",
-            minWidth: 650,
-            tableLayout: "auto",
-        
-            // REMOVE ALL BORDERS
+            width: "fit-content",
+            minWidth: "75%",
+            maxWidth: "100%",
+            margin: "0 auto",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
             border: "none !important",
-            "& td, & th": { border: "none !important" },
-            "& .MuiTableCell-root": { borderBottom: "none !important" },
-            "& .MuiTableRow-root": { border: "none !important" },
+            boxShadow: "none !important",
+            backgroundColor: "transparent !important",
           }}
+        >
+          <Table
+            sx={{
+              width: "100%",
+              minWidth: 650,
+              tableLayout: "auto",
+
+              // REMOVE ALL BORDERS
+              border: "none !important",
+              "& td, & th": { border: "none !important" },
+              "& .MuiTableCell-root": { borderBottom: "none !important" },
+              "& .MuiTableRow-root": { border: "none !important" },
+            }}
           >
             <TableHead>
               <TableRow>
@@ -368,10 +370,13 @@ const Instance = () => {
             <TableBody>
               {filteredInstances.map((item, index) => (
                 <StyledTableRow key={item["Instance ID"] || index}>
-                  <StyledTableCell>{item["Instance Name"]}</StyledTableCell>
+                  <StyledTableCell>{item["Instance Name"].split("_").slice(1).join("_")}</StyledTableCell>
                   <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
                   <StyledTableCell>
-                    {item["IP Addresses"]?.["External Network"]?.[0] || "N/A"}
+                    {/* {item["IP Addresses"]?.["demo_net"]?.[0] || "N/A"} */}
+                    {item["IP Addresses"]
+                      ? Object.values(item["IP Addresses"])[0]?.[0] || "N/A"
+                      : "N/A"}
                   </StyledTableCell>
                   <StyledTableCell>{item["RAM"]}</StyledTableCell>
                   <StyledTableCell>{item["Disk"]}</StyledTableCell>

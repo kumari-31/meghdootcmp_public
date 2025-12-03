@@ -290,7 +290,7 @@ const Approval = () => {
                       {page * rowsPerPage + i + 1}
                     </StyledTableCell>
                     <StyledTableCell>{req.name}</StyledTableCell>
-                    <StyledTableCell>{req.vm_name}</StyledTableCell>
+                    <StyledTableCell>{req.vm_name.split("_").slice(1).join("_")}</StyledTableCell>
                     <StyledTableCell>{req.project_name}</StyledTableCell>
                     <StyledTableCell>{req.image}</StyledTableCell>
                     <StyledTableCell>{req.flavor}</StyledTableCell>
@@ -417,7 +417,7 @@ const Approval = () => {
               <TableRow>
                 <StyledTableCell>Sr No.</StyledTableCell>
                 <StyledTableCell>Name</StyledTableCell>
-                <StyledTableCell>VM</StyledTableCell>
+                <StyledTableCell>VM Name</StyledTableCell>
                 <StyledTableCell>Project</StyledTableCell>
                 <StyledTableCell>Status</StyledTableCell>
                 {popup.type === "rejected" && (
@@ -430,7 +430,7 @@ const Approval = () => {
                 <StyledTableRow key={r.id}>
                   <StyledTableCell>{i + 1}</StyledTableCell>
                   <StyledTableCell>{r.name}</StyledTableCell>
-                  <StyledTableCell>{r.vm_name}</StyledTableCell>
+                  <StyledTableCell>{r.vm_name.split("_").slice(1).join("_")}</StyledTableCell>
                   <StyledTableCell>{r.project_name}</StyledTableCell>
                   <StyledTableCell>{r.fla_status}</StyledTableCell>
                   {popup.type === "rejected" && (
