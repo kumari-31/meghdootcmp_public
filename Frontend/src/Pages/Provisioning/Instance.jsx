@@ -17,6 +17,7 @@ import {
   FormControl,
   InputLabel,
 } from "@mui/material";
+import TablePagination from "@mui/material/TablePagination";
 import {
   AreaChart,
   Area,
@@ -121,6 +122,11 @@ const Instance = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState(null);
 
+
+  // ADD PAGINATION STATES
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
   useEffect(() => {
     const fetchProjects = async () => {
       setError(null);
@@ -219,7 +225,25 @@ const Instance = () => {
       )
     );
     setFilteredInstances(filtered);
+    setPage(0); // RESET PAGE WHEN SEARCH
   };
+
+
+  // PAGINATION HANDLERS
+  const handlePageChange = (_, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // APPLY PAGINATION HERE
+  const currentInstances = filteredInstances.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   const handleActionChange = async (event, instanceId) => {
     const action = event.target.value;
@@ -294,15 +318,7 @@ const Instance = () => {
 
   return (
     <div className="instance-container">
-      <Paper
-        sx={{
-          width: "100%",
-          margin: "20px auto",
-          padding: "20px",
-          borderRadius: "10px",
-          boxShadow: 3,
-        }}
-      >
+      
         <Grid
           container
           alignItems="center"
@@ -368,7 +384,8 @@ const Instance = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredInstances.map((item, index) => (
+            {currentInstances.map((item, index) => (
+
                 <StyledTableRow key={item["Instance ID"] || index}>
                   <StyledTableCell>{item["Instance Name"].split("_").slice(1).join("_")}</StyledTableCell>
                   <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
@@ -424,8 +441,18 @@ const Instance = () => {
               ))}
             </TableBody>
           </Table>
+           {/* PAGINATION COMPONENT */}
+        <TablePagination
+          component="div"
+          count={filteredInstances.length}
+          page={page}
+          onPageChange={handlePageChange}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleRowsPerPageChange}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+        />
         </TableContainer>
-      </Paper>
+      
     </div>
   );
 };

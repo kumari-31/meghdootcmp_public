@@ -280,10 +280,10 @@ const HostAggregates = () => {
                  <TextField fullWidth label="Availability Zone" required      sx={{ mt: 2 }} value={newAgg.availability_zone}
                    onChange={(e) => setNewAgg({ ...newAgg, availability_zone: e.target.value })} />
      
-                 <TextField fullWidth label="Metadata (JSON)" sx={{ mt: 2 }} placeholder='{"env":"prod"}'
+                 {/* <TextField fullWidth label="Metadata (JSON)" sx={{ mt: 2 }} placeholder='{"env":"prod"}'
                    onChange={(e) =>
                      setNewAgg({ ...newAgg, metadata: JSON.parse(e.target.value || "{}") })
-                   } />
+                   } /> */}
      
                  <Button type="submit" variant="contained" sx={{ mt: 2 }}>Create</Button>
                </form>
