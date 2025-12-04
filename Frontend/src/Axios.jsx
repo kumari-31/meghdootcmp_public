@@ -14,6 +14,11 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
+      // If request is to login endpoint – don't refresh token
+    if (originalRequest?.url?.includes("/v2/login/")) {
+      return Promise.reject(error); // just return error to UI
+    }
+
     if (
       error.response &&
       error.response.status === 401 &&

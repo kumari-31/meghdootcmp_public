@@ -4317,7 +4317,9 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         # ====================================================
         # ✅ Input Validation Section
         # ====================================================
-
+        if not username:
+            return Response({'error': 'Username is required'}, status=400)
+        
         # --- Username (email format) ---
         email_pattern = r"^[A-Za-z0-9._%+-]+@cdac\.in$"
         if username and not re.match(email_pattern, username):
@@ -4387,14 +4389,31 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             # ✅ OTP correct — delete cache and authenticate
             cache.delete(f'otp_{username}')
             cache.delete(f'credentials_{username}')
-
-            request.data.update(stored_data['credentials'])
-            response = super().post(request, *args, **kwargs)
-
+            # OTP correct — continue to generate tokens
+            try:
+                request.data.update(stored_data['credentials'])
+                response = super().post(request, *args, **kwargs)
+            except Exception as e:
+                if settings.DEBUG:
+                    print("ERROR generating tokens:", e)
+                return Response({'detail': 'Failed to generate tokens.'}, status=500)
+            # Check the token_response
+            if response.status_code != 200:
+                return response
+            
             access = response.data.get('access')
             refresh = response.data.get('refresh')
 
-            user = authenticate(username=username, password=stored_data['credentials']['password'])
+            # Authenticate user object and attach user_data cookie
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+
+                user = authenticate(username=username, password=stored_data['credentials']['password'])
+                if user is None:
+                    return Response({'detail': 'Authentication failed after OTP.'}, status=401)
+            except Exception:
+                return Response({'detail': 'Authentication failed.'}, status=401)
             
             # Use the same serializer logic
             serializer = CustomTokenObtainPairSerializer()
@@ -4417,11 +4436,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
         # ---------- Handle initial login (username/password) ----------
 
-        if not username or not password:
-            return Response({'error': 'Username and password are required'}, status=400)
+        if not password:
+            return Response({'error': 'Password is required'}, status=400)
 
         user = authenticate(username=username, password=password)
         if not user:
+            # CLEARLY return 401 with message (no token code should be reached)
             return Response({'error': 'Invalid username or password'}, status=401)
 
         cache.set(f'credentials_{username}', {'username': username, 'password': password}, timeout=300)
@@ -4544,6 +4564,85 @@ class LogoutView(APIView):
                 pass
 
         return response
+    
+# ------------------------Forgot Password-----------------------
+
+class ForgotPasswordView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"error": "Email is required"}, status=400)
+
+        user = authenticate(username=email, password=None)
+
+        from django.contrib.auth import get_user_model
+
+        User = get_user_model()
+
+        try:
+            user = User.objects.get(username=email)
+        except User.DoesNotExist:
+            return Response({"error": "No account found with this email."}, status=404)
+
+        otp, secret = CustomTokenObtainPairView().generate_otp()
+        print(f"🔐 Password Reset OTP for {email} → {otp}, secret: {secret}")
+        CustomTokenObtainPairView().send_otp_email(user.email, otp, user.username)
+
+        cache.set(f"reset_otp_{email}", {
+            "otp": otp,
+            "secret": secret
+        }, timeout=300)
+
+        return Response({
+            "message": "OTP sent to your email for password reset.",
+            "require_otp": True
+        }, status=200)
+
+
+class ResetPasswordView(APIView):
+    permission_classes = []
+
+    def post(self, request):
+        email = request.data.get("email")
+        otp = request.data.get("otp")
+        new_password = request.data.get("new_password")
+        confirm_password = request.data.get("confirm_password")
+
+        if not (email and otp and new_password and confirm_password):
+            return Response({"error": "All fields are required"}, status=400)
+
+        if new_password != confirm_password:
+            return Response({"error": "Passwords do not match"}, status=400)
+
+        if not re.fullmatch(r'\d{6}', otp):
+            return Response({"error": "OTP must be 6 digits"}, status=400)
+
+        stored_data = cache.get(f"reset_otp_{email}")
+        if not stored_data:
+            return Response({"error": "OTP expired or invalid"}, status=400)
+
+        if getattr(settings, 'OTP_TEST_MODE', False) is False:
+            if otp != stored_data["otp"]:
+                return Response({"error": "Invalid OTP"}, status=400)
+
+        # OK → Update password
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        try:
+            user = User.objects.get(username=email)
+        except User.DoesNotExist:
+            return Response({"error": "Invalid email"}, status=404)
+
+        user.set_password(new_password)  # <- securely updates password
+        user.save()
+
+        # Remove OTP
+        cache.delete(f"reset_otp_{email}")
+
+        return Response({"message": "Password reset successful!"}, status=200)
+
 
 # ------------------------12 Dec 2024-----------------------
 

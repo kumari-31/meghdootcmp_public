@@ -2,6 +2,7 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
 import apiClient from "../../Axios";
 
+
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
@@ -114,10 +115,14 @@ export const AuthProvider = ({ children }) => {
       if (userInfo) setUser(userInfo);
 
       return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.detail || "Login failed");
-    }
-  };
+    } catch (err) {
+    const msg =
+      err.response?.data?.error ||
+      err.response?.data?.detail ||
+      "Invalid username or password";
+    throw new Error(msg);
+  }
+};
 
   // --- Auto logout if cookie is removed (manual session expiry) ---
   useEffect(() => {

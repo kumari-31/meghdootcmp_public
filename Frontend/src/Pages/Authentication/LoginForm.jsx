@@ -66,36 +66,62 @@ const MeghdootLogin = () => {
     }
   };
 
+
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  e.preventDefault();
+  setError("");
+  setSuccess("");
+  setLoadingLogin(true);
 
-    setOtpUsername(formData.username);
-    setShowOtpModal(true);
-    setSuccess("Sending OTP...");
-    setLoadingLogin(true);
+  // Fix username formatting
+  let username = formData.username.trim();
+  if (!username.includes("@")) {
+    username = username + "@cdac.in";
+  }
 
-    try {
-      const data = await login(formData.username, formData.password);
+  // Client validation
+  if (!username.endsWith("@cdac.in")) {
+    setError("Username must be a valid CDAC email (ex: user@cdac.in)");
+    setLoadingLogin(false);
+    return;
+  }
 
-      if (data.require_otp) {
-        setOtpActive(true); // enable verify button
-        setOtpMessage(data.message || "OTP generated successfully!");
-        setSuccess(data.message || "OTP sent successfully.");
-      } else if (data.detail === "Login successful") {
-        setShowOtpModal(false);
-        setSuccess("Login successful!");
-        setLoadingLogin(false);
-        const parsedUser = getUserFromCookie();
-        if (parsedUser) setUser(parsedUser);
-      }
-    } catch (err) {
-      setShowOtpModal(false);
-      setError(err.message || "Login failed.");
+  if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&]).{6,}$/.test(formData.password)) {
+    setError("Password must contain uppercase letter, number & special character");
+    setLoadingLogin(false);
+    return;
+  }
+
+  try {
+    const data = await login(username, formData.password);
+
+    // 🔥 If wrong credentials → show error in login box
+    if (data.error && !data.require_otp) {
+      setError(data.error);
       setLoadingLogin(false);
+      return;
     }
-  };
+
+    // 🔥 Correct → Show OTP modal instantly
+    if (data.require_otp) {
+      setOtpUsername(username);
+      setOtp("");
+      setOtpMessage(data.message || "OTP generated successfully!");
+      setOtpError("");
+      setShowOtpModal(true);
+      setOtpActive(true);
+      setLoadingLogin(false);
+      return;
+    }
+
+  } catch (err) {
+    setError(err.message || "Login failed.");
+  } finally {
+    setLoadingLogin(false);
+  }
+};
+
+
   const handleOtpSubmit = async () => {
     setOtpError("");
     try {
@@ -172,7 +198,7 @@ const MeghdootLogin = () => {
               onChange={handleChange}
               required
             />
-            <button type="submit" disabled={loadingLogin}>
+            <button type="submit" disabled={loadingLogin || !formData.username || !formData.password}>
               {loadingLogin ? "Sending OTP..." : "Login"}
             </button>
             {error && <p className="error">{error}</p>}
@@ -180,6 +206,10 @@ const MeghdootLogin = () => {
           </form>
           <div className="signup-link">
             Don't have an account? <Link to="/registration">Sign Up</Link>
+            <br />
+            <Link to="/forgot-password" className="forgot-password-link">
+              Forgot Password?
+            </Link>
           </div>
           <div className="copyright">
             Copyright © 2024–25 C-DAC. All rights reserved

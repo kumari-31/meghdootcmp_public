@@ -104,7 +104,8 @@ urlpatterns = [
     
     path('api/v2/login/', CustomTokenObtainPairView.as_view(),name='cookie_token_obtain_pair'),
     path('api/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
-    # path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/forgot-password/', ForgotPasswordView.as_view() ,name='forgot_password'),
+    path('api/reset-password/', ResetPasswordView.as_view() ,name='reset_password'),
     path('api/logout/', LogoutView.as_view(), name='logout'),
     
     
