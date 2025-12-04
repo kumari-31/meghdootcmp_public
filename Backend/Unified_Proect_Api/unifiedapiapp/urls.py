@@ -286,6 +286,7 @@ urlpatterns = [
     path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
 
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
+    
     ]
 
 
