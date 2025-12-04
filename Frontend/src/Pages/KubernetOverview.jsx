@@ -40,9 +40,9 @@ import SortIcon from "@mui/icons-material/Sort";
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import apiClient from "../Axios";
 
-const CACHE_TTL = 30000; // 30 sec
+const CACHE_TTL = 60000; // 30 sec
 
-const setCache = (key, data, ttl = 30000) => { // ttl in ms (30 sec)
+const setCache = (key, data, ttl = 60000) => { // ttl in ms (30 sec)
   const item = {
     data,
     expiry: Date.now() + ttl,
