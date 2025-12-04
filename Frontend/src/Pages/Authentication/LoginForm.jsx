@@ -23,9 +23,12 @@ const MeghdootLogin = () => {
   const [otpError, setOtpError] = useState("");
   const [otpUsername, setOtpUsername] = useState("");
   const [showOtpModal, setShowOtpModal] = useState(false);
-  const navigate = useNavigate();
+  const [otpActive, setOtpActive] = useState(false);
+  const [otpMessage, setOtpMessage] = useState("");
+  const [resendingOtp, setResendingOtp] = useState(false);
   const { user, login, setUser } = useAuth();
   const [loadingLogin, setLoadingLogin] = useState(false);
+  const navigate = useNavigate();
 
   // Check if user is already authenticated and redirect accordingly
   useEffect(() => {
@@ -77,6 +80,8 @@ const MeghdootLogin = () => {
       const data = await login(formData.username, formData.password);
 
       if (data.require_otp) {
+        setOtpActive(true); // enable verify button
+        setOtpMessage(data.message || "OTP generated successfully!");
         setSuccess(data.message || "OTP sent successfully.");
       } else if (data.detail === "Login successful") {
         setShowOtpModal(false);
@@ -117,13 +122,27 @@ const MeghdootLogin = () => {
   };
 
   const handleResendOtp = async () => {
+    setResendingOtp(true);
+    setOtpMessage(""); // Clear old messages
+    setOtpError("");
     try {
       const response = await login(otpUsername, formData.password, null, true);
-      setSuccess(response.message || "OTP resent successfully.");
-      setOtpError("");
+      setOtpActive(true);
+      setOtpMessage(response.message || "New OTP generated successfully!");
     } catch (err) {
       setOtpError("Failed to resend OTP. Please try again.");
+    } finally {
+      setResendingOtp(false);
     }
+  };
+
+  const closeOtpModal = () => {
+    setOtp("");
+    setOtpError("");
+    setOtpActive(false);
+    setOtpMessage(""); // reset message
+    setShowOtpModal(false);
+    setLoadingLogin(false);
   };
 
   return (
@@ -194,20 +213,32 @@ const MeghdootLogin = () => {
             Didn’t get the code?{" "}
             <span
               style={{
-                color: "#1976d2",
-                cursor: "pointer",
-                textDecoration: "underline",
+                color: !resendingOtp ? "#1976d2" : "gray",
+                cursor: !resendingOtp ? "pointer" : "not-allowed",
+                textDecoration: !resendingOtp ? "underline" : "none",
+                opacity: resendingOtp ? 0.6 : 1,
               }}
-              onClick={handleResendOtp}
+              onClick={!resendingOtp ? handleResendOtp : undefined}
             >
-              Resend OTP
+              {resendingOtp ? "Resending..." : "Resend OTP"}
             </span>
           </Typography>
           {otpError && <Typography color="error">{otpError}</Typography>}
+          {otpMessage && (
+            <Typography color="green" sx={{ mt: 1, fontWeight: "bold" }}>
+              {otpMessage}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowOtpModal(false)} color="error">Cancel</Button>
-          <Button variant="contained" onClick={handleOtpSubmit}>
+          <Button onClick={closeOtpModal} color="error">
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disabled={!otpActive || otp.length < 6}
+            onClick={handleOtpSubmit}
+          >
             Verify OTP
           </Button>
         </DialogActions>
