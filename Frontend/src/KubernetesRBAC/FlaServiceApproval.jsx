@@ -312,7 +312,6 @@ const FlaServiceApproval = () => {
                       )}
                     </StyledTableCell>
 
-
                     <StyledTableCell>
                       <Stack
                         direction="row"
