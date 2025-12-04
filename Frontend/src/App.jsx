@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import PersistentVolumeDetails from "./Kubernets/PersistentVolumeDetails";
+import { ImageOutlined } from "@mui/icons-material";
 const K8sRequestStatus = lazy(() =>
   import("./KubernetesRBAC/K8sRequestStatus")
 );
@@ -98,14 +99,22 @@ const TicketCreationForm = lazy(() =>
 const TicketDetailView = lazy(() => import("./Pages/Tickets/TicketDetailView"));
 const TicketListPage = lazy(() => import("./Pages/Tickets/TicketListPage"));
 const HelpdeskWrapper = lazy(() => import("./HelpdeskWrapper"));
+const ForgotPassword = lazy(() =>
+  import("./Pages/Authentication/ForgotPassword")
+);
+const ResetPassword = lazy(() =>
+  import("./Pages/Authentication/ResetPassword")
+);
 
 const App = () => {
-  return ( 
+  return (
     <Router>
       <Suspense fallback={<div>Loading...</div>}>
         <Routes>
           {/* Routes that do NOT use the layout */}
           <Route path="/" element={<LoginForm />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/registration" element={<RegistrationForm />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
 

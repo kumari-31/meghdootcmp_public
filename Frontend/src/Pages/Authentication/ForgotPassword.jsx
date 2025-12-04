@@ -1,43 +1,72 @@
-import React from "react";
-import "./ForgotPassword.css";
-import forgetPasswordImage from "../../assets/forgetpassword.png"; // Replace this with the image path you want to use
+import React, { useState } from "react";
+import { TextField, Button, Typography, Paper } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import apiClient from "../../Axios";
 
-function ForgotPassword() {
+const ForgotPassword = () => {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleForgotPassword = async () => {
+    if (!email) return setMessage("Please enter your email");
+
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await apiClient.post("/forgot-password/", {
+        email,
+      });
+
+      setMessage(response.data.message || "OTP sent successfully!");
+
+      // Redirect user to OTP screen after 1s
+      setTimeout(() => {
+        navigate("/reset-password", { state: { email } });
+      }, 1000);
+    } catch (err) {
+      setMessage(
+        err.response?.data?.error || "Failed to send OTP. Try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="forgot-password-container">
-      <div className="forgot-password-card">
-        {/* Left Section with Image */}
-        <div className="forgot-password-image-section">
-          <img
-            src={forgetPasswordImage}
-            alt="Forgot Password Illustration"
-            className="forgot-password-image"
-          />
-        </div>
+    <Paper sx={{ p: 3, maxWidth: 400, mx: "auto", mt: 10 }}>
+      <Typography variant="h5" mb={2}>
+        Forgot Password
+      </Typography>
 
-        {/* Right Section with Form */}
-        <div className="forgot-password-form-section">
-          <h1>Forgot Your Password?</h1>
-          <form className="forgot-password-form">
-            <div className="form-group">
-              <label>Email Address</label>
-              <input
-                type="email"
-                placeholder="Enter your Email Id"
-                className="forgot-password-input"
-              />
-            </div>
-            <button type="submit" className="forgot-password-btn">
-              Reset Password
-            </button>
-            <p className="back-to-signin">
-              <a href="/">Back to Sign In</a>
-            </p>
-          </form>
-        </div>
-      </div>
-    </div>
+      <TextField
+        label="Enter registered email"
+        type="email"
+        fullWidth
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        sx={{ mb: 2 }}
+      />
+
+      <Button
+        variant="contained"
+        fullWidth
+        disabled={loading}
+        onClick={handleForgotPassword}
+      >
+        {loading ? "Sending OTP..." : "Send OTP"}
+      </Button>
+
+      {message && (
+        <Typography sx={{ mt: 2 }} color="primary">
+          {message}
+        </Typography>
+      )}
+    </Paper>
   );
-}
+};
 
 export default ForgotPassword;
