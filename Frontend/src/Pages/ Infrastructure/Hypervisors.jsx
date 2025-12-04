@@ -21,6 +21,23 @@ import {
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import '../style.css';
+const toGB = (value) => {
+  if (!value) return 0;
+
+  // convert "23.5 GB" → "23.5"
+  const clean = String(value).replace(/[^0-9.]/g, "");
+  const num = Number(clean);
+
+  if (!num) return 0;
+
+  // if value contains MB → convert MB → GB
+  if (String(value).toLowerCase().includes("mb")) {
+    return +(num / 1024).toFixed(2);
+  }
+
+  // already in GB
+  return +num.toFixed(2);
+};
 
 
 // ---------------- Styled Table Cells & Rows ----------------
@@ -204,10 +221,7 @@ const Hypervisors = () => {
     );
   }
 
-  const toGB = (value) => {
-    if (!value) return 0;
-    return +(value / 1024).toFixed(2); // MB → GB
-  };
+
   const handleTabChange = (_, newValue) => {
     setTab(newValue);
     
@@ -248,11 +262,11 @@ const Hypervisors = () => {
         {hypervisors.length > 0 && (() => {
           const hv = hypervisors[0];
 
-          const memUsed = hv.ram_used || 0;
-          const memTotal = hv.ram_total || 0;
+          const memUsed = toGB(hv.ram_used);
+          const memTotal = toGB(hv.ram_total);
 
-          const diskUsed = hv.local_storage_used || 0;
-          const diskTotal = hv.local_storage_total || 0;
+          const diskUsed = toGB(hv.local_storage_used);
+          const diskTotal = toGB(hv.local_storage_total);
 
           const vcpuUsed = hv.vcpus_used || 0;
           const vcpuTotal = hv.vcpus_total || 0;
@@ -311,14 +325,17 @@ const Hypervisors = () => {
 
         {/* Aggregate all resource providers */}
         {resources.length > 0 && (() => {
-          const vcpuUsed = resources.reduce((t, i) => t + i.vcpus_used, 0);
-          const vcpuTotal = resources.reduce((t, i) => t + i.vcpus_total, 0);
 
-          const memUsed = resources.reduce((t, i) => t + i.ram_used, 0);
-          const memTotal = resources.reduce((t, i) => t + i.ram_total, 0);
+          const vcpuUsed = resources.reduce((t, i) => t + (i.vcpus_used || 0), 0);
+          const vcpuTotal = resources.reduce((t, i) => t + (i.vcpus_total || 0), 0);
 
-          const diskUsed = resources.reduce((t, i) => t + i.disk_used, 0);
-          const diskTotal = resources.reduce((t, i) => t + i.disk_total, 0);
+          const memUsed = resources.reduce((t, i) => t + toGB(i.ram_used), 0);
+          const memTotal = resources.reduce((t, i) => t + toGB(i.ram_total), 0);
+
+          const diskUsed = resources.reduce((t, i) => t + toGB(i.disk_used), 0);
+          const diskTotal = resources.reduce((t, i) => t + toGB(i.disk_total), 0);
+
+         
 
           return (
             <Grid container spacing={3} justifyContent="center">
