@@ -70,7 +70,7 @@ const MeghdootLogin = () => {
 const handleSubmit = async (e) => {
   e.preventDefault();
   setError("");
-  setSuccess("");
+  // setSuccess("");
   setLoadingLogin(true);
 
   let username = formData.username.trim();
@@ -83,9 +83,11 @@ const handleSubmit = async (e) => {
   }
 
   try {
+  
     // 🌟 Show OTP modal instantly
     setOtpUsername(username);
     setOtp("");
+    setOtpError("");
     setShowOtpModal(true);
     setOtpActive(false);
     setOtpMessage("Generating OTP...");
@@ -95,7 +97,8 @@ const handleSubmit = async (e) => {
 
     if (data.error && !data.require_otp) {
       // ❌ Invalid credentials → hide modal and show login error
-      closeOtpModal();
+      // closeOtpModal();
+      setShowOtpModal(false);
       setError(data.error);
       return;
     }

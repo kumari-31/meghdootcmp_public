@@ -4347,6 +4347,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                                 status=status.HTTP_400_BAD_REQUEST)
 
             otp, secret = self.generate_otp()
+            # Send OTP email asynchronously 🏎️💨
+            from threading import Thread
+            Thread(target=self.send_otp_email, args=(user.email, otp, username)).start()
+
             user = authenticate(username=username, password=stored_data['password'])
             recipient_email = "ptejas@cdac.in" if username.lower() == "admin" else user.email
             self.send_otp_email(recipient_email, otp, username)
@@ -4447,7 +4451,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         cache.set(f'credentials_{username}', {'username': username, 'password': password}, timeout=300)
 
         otp, secret = self.generate_otp()
-        self.send_otp_email(user.email, otp, username)
+
+        # Send OTP email asynchronously 🏎️💨
+        from threading import Thread
+        Thread(target=self.send_otp_email, args=(user.email, otp, username)).start()
 
         cache.set(f'otp_{username}', {
             'otp': otp,
