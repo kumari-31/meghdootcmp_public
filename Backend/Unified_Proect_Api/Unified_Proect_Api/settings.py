@@ -47,7 +47,8 @@ INSTALLED_APPS = [
     "bootstrap4",
     # django-helpdesk
     'helpdesk',
-    'unifiedapiapp'
+    'unifiedapiapp',
+    'unifiedapiapp.helpdesk_custom',
 ]
 
 SITE_ID = 1

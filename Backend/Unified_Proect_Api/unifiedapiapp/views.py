@@ -7969,38 +7969,64 @@ class SendEmailView(View):
             return HttpResponse(f"Error sending email: {str(e)}")
 
 # ------------------------------------26 March 2025--------------------------------\
-
-
-
 class CreateVolumeTypeAPIView(APIView):
-    """
-    API to create a new volume type in OpenStack.
-    """
     permission_classes = [IsAuthenticated]
 
+    def extract_error_message(self, e):
+        """
+        Safely extract OpenStack / HTTP / SDK exception details.
+        """
+        # Case 1: OpenStack SDK exception with .details
+        if hasattr(e, "details") and e.details:
+            return e.details
+
+        # Case 2: HTTP Response error
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                return e.response.json()
+            except Exception:
+                return e.response.text
+
+        # Case 3: str(e) contains JSON
+        try:
+            return json.loads(str(e))
+        except Exception:
+            pass
+
+        # Fallback
+        return str(e)
+
     def post(self, request):
-        # Get volume type name from request body
         volume_type_name = request.data.get("name")
         description = request.data.get("description", "")
 
         if not volume_type_name:
-            return Response({"error": "Volume type name is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "Volume type name is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
-            # Initialize OpenStack connection
             conn = get_openstack_connection()
 
             # Check if volume type already exists
             existing_types = list(conn.block_storage.types())
+
             for vtype in existing_types:
                 if vtype.name.lower() == volume_type_name.lower():
                     return Response(
-                        {"exists": True, "message": f"Volume type '{volume_type_name}' already exists."},
-                        status=status.HTTP_200_OK
+                        {
+                            "exists": True,
+                            "message": f"Volume type '{volume_type_name}' already exists."
+                        },
+                        status=status.HTTP_200_OK      # frontend will detect exists=true
                     )
 
             # Create new volume type
-            volume_type = conn.block_storage.create_type(name=volume_type_name, description=description)
+            volume_type = conn.block_storage.create_type(
+                name=volume_type_name,
+                description=description
+            )
 
             return Response(
                 {
@@ -8013,7 +8039,13 @@ class CreateVolumeTypeAPIView(APIView):
             )
 
         except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            error_message = self.extract_error_message(e)
+
+            return Response(
+                {"error": error_message},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class UpdateVolumeTypeAPIView(APIView):
     """

@@ -14,7 +14,7 @@ from rest_framework.exceptions import AuthenticationFailed
 import pyotp
 from datetime import datetime, timedelta
 from helpdesk_custom.roles import get_user_role
-
+from helpdesk.models import Ticket, Queue
 User = get_user_model()
 
 

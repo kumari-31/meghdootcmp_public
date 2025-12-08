@@ -18,7 +18,7 @@ const ForgotPassword = () => {
     try {
       const response = await apiClient.post("/forgot-password/", {
         email,
-      });
+      }); 
 
       setMessage(response.data.message || "OTP sent successfully!");
 

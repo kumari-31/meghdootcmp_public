@@ -1,4 +1,4 @@
-from django.urls import path, re_path
+from django.urls import include, path, re_path
 from .launchvm import vm_approve_request
 from .views import *
 from . import views 
@@ -284,6 +284,7 @@ urlpatterns = [
     path("api/helpdesk/custom/ticket/<int:ticket_id>/", admin_views.ticket_detail, name="helpdesk_custom_ticket_detail"),
 
     path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
+
 
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
     

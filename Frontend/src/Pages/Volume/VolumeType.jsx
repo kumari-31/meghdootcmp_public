@@ -177,22 +177,37 @@ const VolumeTypes = () => {
     setVolumeToUpdate((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Create volume type
   const handleCreateVolumeType = async (e) => {
     e.preventDefault();
+  
     try {
       const response = await apiClient.post('/create-volume-type/', newVolumeType);
-      if (response.status === 201 || response.status === 200) {
+  
+      // 🔥 Handle duplicate
+      if (response.data.exists) {
+        showSnackbar(response.data.message, 'warning');
+        return;
+      }
+  
+      // 🔥 Only success case
+      if (response.status === 201) {
         showSnackbar('Volume type created successfully', 'success');
         setShowCreateForm(false);
         setNewVolumeType({ name: '', description: '' });
         fetchVolumeTypes();
+        return;
       }
+  
     } catch (err) {
       console.error(err);
-      showSnackbar('Error creating volume type', 'error');
+  
+      showSnackbar(
+        err?.response?.data?.error || "Error creating volume type",
+        "error"
+      );
     }
   };
+  
 
   // Update volume type
   const handleUpdateVolumeType = async (e) => {
