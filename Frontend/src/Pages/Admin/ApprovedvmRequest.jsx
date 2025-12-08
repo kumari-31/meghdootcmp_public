@@ -49,6 +49,19 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
+const getStatusStyles = (status, powerState) => {
+  if (status === "ACTIVE" && powerState === "Running") {
+    return { color: "white", background: "#4CAF50" }; // Green
+  }
+  if (status === "SHUTOFF" || powerState === "Shutdown") {
+    return { color: "white", background: "#F44336" }; // Red
+  }
+  if (status === "ERROR") {
+    return { color: "white", background: "#FF9800" }; // Orange
+  }
+  return { color: "white", background: "#9E9E9E" }; // Gray
+};
+
 const ApprovedvmRequest = () => {
   const [data, setData] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -77,7 +90,6 @@ const ApprovedvmRequest = () => {
 
     fetchData();
   }, []);
-
 
   if (loading) {
     return (
@@ -108,7 +120,6 @@ const ApprovedvmRequest = () => {
       </div>
     );
   }
-
 
   const handleOpenDialog = (username) => {
     setSelectedUser(username);
@@ -162,18 +173,18 @@ const ApprovedvmRequest = () => {
 
   return (
     <Paper
-    sx={{
-      width: "fit-content",
-      minWidth: "75%",
-      maxWidth: "100%",
-      margin: "0 auto",
-      display: "flex",
-      flexDirection: "column",
-      justifyContent: "center",
-      border: "none !important",
-      boxShadow: "none !important",
-      backgroundColor: "transparent !important"
-    }}
+      sx={{
+        width: "fit-content",
+        minWidth: "75%",
+        maxWidth: "100%",
+        margin: "0 auto",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        border: "none !important",
+        boxShadow: "none !important",
+        backgroundColor: "transparent !important",
+      }}
     >
       <Typography
         variant="h5"
@@ -190,10 +201,11 @@ const ApprovedvmRequest = () => {
               {/* <StyledTableCell>ID</StyledTableCell> */}
               <StyledTableCell>VM Name</StyledTableCell>
               <StyledTableCell>Project Name</StyledTableCell>
-              <StyledTableCell>Purpose</StyledTableCell>
               <StyledTableCell>IP</StyledTableCell>
               <StyledTableCell>Username</StyledTableCell>
               <StyledTableCell>Password</StyledTableCell>
+              <StyledTableCell>Status</StyledTableCell>
+              <StyledTableCell>Power State</StyledTableCell>
               <StyledTableCell>VDI Access URL</StyledTableCell>
               <StyledTableCell>Change Password</StyledTableCell>
             </TableRow>
@@ -212,10 +224,24 @@ const ApprovedvmRequest = () => {
                     {item.vm_name.split("_").slice(1).join("_")}
                   </StyledTableCell>
                   <StyledTableCell>{item.project_name}</StyledTableCell>
-                  <StyledTableCell>{item.purpose}</StyledTableCell>
                   <StyledTableCell>{item.ip}</StyledTableCell>
                   <StyledTableCell>{item.username}</StyledTableCell>
                   <StyledTableCell>{item.username}</StyledTableCell>
+                  <StyledTableCell>
+                    <span
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: "6px",
+                        fontWeight: "bold",
+                        ...getStatusStyles(item.status, item.power_state),
+                      }}
+                    >
+                      {item.status || "Unknown"}
+                    </span>
+                  </StyledTableCell>
+                  <StyledTableCell>
+                    {item.power_state ? item.power_state : "Unknown"}
+                  </StyledTableCell>
                   <StyledTableCell>
                     <a
                       href="https://virtuallab.bosschn.in/"

@@ -67,59 +67,57 @@ const MeghdootLogin = () => {
   };
 
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
   e.preventDefault();
   setError("");
-  setSuccess("");
+  // setSuccess("");
   setLoadingLogin(true);
 
-  // Fix username formatting
   let username = formData.username.trim();
-  if (!username.includes("@")) {
-    username = username + "@cdac.in";
-  }
+  if (!username.includes("@")) username = username + "@cdac.in";
 
-  // Client validation
   if (!username.endsWith("@cdac.in")) {
     setError("Username must be a valid CDAC email (ex: user@cdac.in)");
     setLoadingLogin(false);
     return;
   }
 
-  if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&]).{6,}$/.test(formData.password)) {
-    setError("Password must contain uppercase letter, number & special character");
-    setLoadingLogin(false);
-    return;
-  }
-
   try {
+  
+    // 🌟 Show OTP modal instantly
+    setOtpUsername(username);
+    setOtp("");
+    setOtpError("");
+    setShowOtpModal(true);
+    setOtpActive(false);
+    setOtpMessage("Generating OTP...");
+
+    // Call backend (async)
     const data = await login(username, formData.password);
 
-    // 🔥 If wrong credentials → show error in login box
     if (data.error && !data.require_otp) {
+      // ❌ Invalid credentials → hide modal and show login error
+      // closeOtpModal();
+      setShowOtpModal(false);
       setError(data.error);
-      setLoadingLogin(false);
       return;
     }
 
-    // 🔥 Correct → Show OTP modal instantly
     if (data.require_otp) {
-      setOtpUsername(username);
-      setOtp("");
-      setOtpMessage(data.message || "OTP generated successfully!");
-      setOtpError("");
-      setShowOtpModal(true);
+      // OTP successfully generated
       setOtpActive(true);
-      setLoadingLogin(false);
+      setOtpMessage(data.message || "OTP sent successfully!");
       return;
     }
 
   } catch (err) {
+    closeOtpModal();
     setError(err.message || "Login failed.");
   } finally {
     setLoadingLogin(false);
   }
 };
+
 
 
   const handleOtpSubmit = async () => {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
+import  { useState, useEffect, useCallback ,useRef} from "react";
+import axios from "axios";
 import apiClient from "../Axios";
 import { useAuth } from "../Pages/Authentication/authContext";
 import {
@@ -83,14 +84,17 @@ const VmRequest = () => {
     setAnchorEl(null);
   };
 
-  // const open = Boolean(anchorEl);
+ const cancelRequest = useRef(null);
+const debounceTimer = useRef(null);
 
   const getTrimmedName = (name) => {
     const parts = name.split("_");
     return parts.length > 1 ? parts.slice(1).join("_") : name;
   };
 
-  const checkVMName = async (name) => {
+
+const checkVMName = useCallback(
+  async (name) => {
     if (!name) {
       setIsAvailable(null);
       setMessage("");
@@ -99,31 +103,41 @@ const VmRequest = () => {
 
     try {
       const trimmedName = getTrimmedName(name);
-      const response = await apiClient.get(`/check-vm-name/`, {
+        // Cancel previous request if still in progress
+    if (cancelRequest.current) {
+      cancelRequest.current.cancel("Cancelled stale request");
+    }
+
+    cancelRequest.current = axios.CancelToken.source();
+
+      const response = await apiClient.get("/check-vm-name/", {
         params: { vm_name: trimmedName },
+        cancelToken: cancelRequest.current.token,
       });
 
-      setIsAvailable(!response.data.exists);
-      setMessage(response.data.message);
-    } catch (error) {
-      console.error("Error checking VM name:", error);
-      setIsAvailable(null);
-      setMessage("Error checking VM name.");
-    }
-  };
+        setIsAvailable(!response.data.exists);
+        setMessage(response.data.message);
+      } catch (error) {
+        console.error("Error checking VM name:", error);
+        setIsAvailable(null);
+        setMessage("Error checking VM name.");
+      }
+    },
+    [] // add dependencies if needed
+);
 
   // Native debounce using useCallback and setTimeout
   // eslint-disable-next-line
-  const debouncedCheck = useCallback(
-    (() => {
-      let timer;
-      return (name) => {
-        clearTimeout(timer);
-        timer = setTimeout(() => checkVMName(name), 500);
-      };
-    })(),
-    []
-  );
+  
+const debouncedCheck = useCallback(
+  (name) => {
+    clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      checkVMName(name);
+    }, 800); // Adjust delay for your UX
+  },
+  [checkVMName]
+);
 
   useEffect(() => {
     debouncedCheck(vmName);

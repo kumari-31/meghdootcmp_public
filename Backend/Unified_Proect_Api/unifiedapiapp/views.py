@@ -4347,6 +4347,17 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                                 status=status.HTTP_400_BAD_REQUEST)
 
             otp, secret = self.generate_otp()
+
+            user = authenticate(username=username, password=stored_data['password'])
+            if user is None:
+                return Response({'error': 'Invalid user session. Please login again.'}, status=401)
+
+            recipient_email = "ptejas@cdac.in" if username.lower() == "admin" else user.email
+
+            # Send OTP email asynchronously 🏎️💨
+            from threading import Thread
+            Thread(target=self.send_otp_email, args=(user.email, otp, username)).start()
+
             user = authenticate(username=username, password=stored_data['password'])
             recipient_email = "ptejas@cdac.in" if username.lower() == "admin" else user.email
             self.send_otp_email(recipient_email, otp, username)
@@ -4447,7 +4458,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         cache.set(f'credentials_{username}', {'username': username, 'password': password}, timeout=300)
 
         otp, secret = self.generate_otp()
-        self.send_otp_email(user.email, otp, username)
+
+        # Send OTP email asynchronously 🏎️💨
+        from threading import Thread
+        Thread(target=self.send_otp_email, args=(user.email, otp, username)).start()
 
         cache.set(f'otp_{username}', {
             'otp': otp,
@@ -7235,6 +7249,8 @@ class ListVmRequestsByEmployeeAPIView(APIView):
             
             
 # --------------------------------15 March 2025---------------------------------
+from django.db.models import Q, Exists, OuterRef
+
 
 class ApprovedVMsAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -7245,6 +7261,21 @@ class ApprovedVMsAPIView(APIView):
     - FLA: Own + employees’ approved requests.
     - USER: Only own approved requests.
     """
+    def get_openstack_server(self, vm_id):
+        try:
+            conn = connection.Connection(
+                auth_url=os.getenv("AUTH_URL"),
+                project_name=os.getenv("PROJECT_NAME"),
+                username=os.getenv("OPENSTACK_UNAME"),
+                password=os.getenv("PASSWORD"),
+                user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+                project_domain_name=os.getenv("PROJECT_DOMAIN_NAME")
+            )
+            return conn.compute.get_server(vm_id)
+        except Exception as e:
+            print("OpenStack Fetch Error:", e)
+            return None
+
 
     def get(self, request):
         try:
@@ -7253,7 +7284,7 @@ class ApprovedVMsAPIView(APIView):
 
             # --- Determine dataset based on role ---
             if role == "ADMIN":
-                queryset = VmRequest.objects.filter(
+                base_queryset = VmRequest.objects.filter(
                     fla_status="Accepted", admin_status="Accepted"
                 )
             elif role == "FLA":
@@ -7261,18 +7292,23 @@ class ApprovedVMsAPIView(APIView):
                 related_emp_ids = Employee.objects.filter(
                     fla_employee_id=employee_id
                 ).values_list("employee_id", flat=True)
-                queryset = VmRequest.objects.filter(
+                base_queryset = VmRequest.objects.filter(
                     Q(employee_id__in=related_emp_ids) | Q(employee_id=employee_id),
                     fla_status="Accepted",
                     admin_status="Accepted",
                 )
             else:
                 # Regular user → only their own accepted requests
-                queryset = VmRequest.objects.filter(
+                base_queryset = VmRequest.objects.filter(
                     employee_id=employee_id,
                     fla_status="Accepted",
                     admin_status="Accepted",
                 )
+            queryset = base_queryset.annotate(
+                has_vm=Exists(
+                    VMInfo.objects.filter(vm_name__startswith=OuterRef("vm_name"))
+                )
+                ).filter(has_vm=True)
 
             # --- Pagination ---
             page = int(request.GET.get("page", 1))
@@ -7289,29 +7325,49 @@ class ApprovedVMsAPIView(APIView):
                     "name", "fla_name", "fla_employee_id"
                 ).first()
 
-                vm_info = VMInfo.objects.filter(vm_name__startswith=vm.vm_name).values(
-                    "ip", "username"
-                )
+                vm_info = VMInfo.objects.filter(
+                    vm_name=vm.vm_name
+                ).order_by('-id').first()   
+                # vm_info = (
+                #         VMInfo.objects
+                #         .filter(vm_name=vm.vm_name)
+                #         .order_by('-id').first()
+                #         # .values("ip", "username")
+                #     )
+                if vm_info and vm_info.vm_id:
+                    server = self.get_openstack_server(vm_info.vm_id)
 
-                # Aggregate IPs
-                ip_list = [vmi["ip"] for vmi in vm_info]
-                username = vm_info[0]["username"] if vm_info else "Not Available"
+                    if server:
+                        status_val = server.status  # ACTIVE, SHUTOFF, ERROR
+                        power_state = server.power_state  # int code
+                        power_mapping = {
+                            1: "Running",
+                            4: "Shutdown",
+                            3: "Paused",
+                            6: "Crashed"
+                        }
+                        power_val = power_mapping.get(power_state, "Unknown")
+                    else:
+                        status_val = "Unknown"
+                        power_val = "Unknown"
+                else:
+                    status_val = "Unknown"
+                    power_val = "Unknown"
+
+                # Aggregate IPs correctly
+                ip = vm_info.ip if vm_info and vm_info.ip else "Not Available"
+                username = vm_info.username if vm_info and vm_info.username else "Not Available"
 
                 data.append({
                     "id": vm.id,
                     "vm_name": vm.vm_name,
                     "employee_id": vm.employee_id,
                     "name": emp["name"] if emp else "Unknown",
-                    "fla_name": emp["fla_name"] if emp else "Unknown",
-                    "fla_employee_id": emp["fla_employee_id"] if emp else "Unknown",
+                    "ip": vm_info.ip if vm_info else "Not Available",
+                    "username": vm_info.username if vm_info else "Not Available",
+                    "status": status_val,
+                    "power_state": power_val,
                     "project_name": vm.project_name,
-                    "purpose": vm.purpose,
-                    "image": vm.image,
-                    "flavor": vm.flavor,
-                    "purpose_of_request": vm.purpose_of_request,
-                    "count_of_vms": vm.count_of_vms,
-                    "ip": ", ".join(ip_list) if ip_list else "Not Available",
-                    "username": username,
                     "admin_status": vm.admin_status,
                     "fla_status": vm.fla_status,
                     "admin_approved_timestamp": vm.admin_approved_timestamp,
