@@ -248,11 +248,14 @@ EMAIL_HOST = "smtp.gmail.com"
 EMAIL_USE_TLS = False
 EMAIL_USE_SSL = True
 EMAIL_PORT = 465
-EMAIL_HOST_USER = "rakshanavg20@gmail.com"
-EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
+# EMAIL_HOST_USER = "rakshanavg20@gmail.com"
+EMAIL_HOST_USER = "tejascdac97@gmail.com"
+# EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
+EMAIL_HOST_PASSWORD = "aqdx gfas pghz snqi "
 
-DEFAULT_FROM_EMAIL = 'rakshanavg20@gmail.com'
-SERVER_EMAIL = 'rakshanavg20@gmail.com'
+
+DEFAULT_FROM_EMAIL = 'tejascdac97@gmail.com'
+SERVER_EMAIL = 'tejascdac97@gmail.com'
 
 
 ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"

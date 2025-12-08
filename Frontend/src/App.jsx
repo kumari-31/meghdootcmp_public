@@ -150,6 +150,12 @@ const App = () => {
                 <HelpdeskWrapper path="http://10.184.40.36:8000/helpdesk/" />
               }
             />
+             <Route
+              path="helpdesk/submit"
+              element={
+                <HelpdeskWrapper path="http://10.184.40.36:8000/helpdesk/tickets/submit/" />
+              }
+            />
             *****************************************/////////////OPENSTACK
             API\\\\\\\\\\\\\\\\\\\\\\\\\\***********************************************************
             <Route
