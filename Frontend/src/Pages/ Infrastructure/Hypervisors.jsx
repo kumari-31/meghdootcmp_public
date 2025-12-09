@@ -19,6 +19,7 @@ import {
   Grid,
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import '../style.css';
 const toGB = (value) => {
@@ -39,11 +40,13 @@ const toGB = (value) => {
   return +num.toFixed(2);
 };
 
-
-// ---------------- Styled Table Cells & Rows ----------------
+// Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -52,15 +55,34 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
+  },
+
+  "&:last-child td, &:last-child th": {
+    border: 0,
   },
 }));
+
+
 
 // ---------------- Circular Gradient Stat Component ----------------
 const GradientCircularStat = ({ value, label, subLabel, gradientId }) => {
@@ -133,7 +155,7 @@ const Hypervisors = () => {
   const [hypervisors, setHypervisors] = useState([]);
   const [hosts, setHosts] = useState([]);
   const [resources, setResources] = useState([]);
-  
+    const theme = useTheme();
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMsg, setSnackbarMsg] = useState("");
@@ -392,21 +414,22 @@ const Hypervisors = () => {
         <>
           {/* HYPERVISORS TABLE */}
           {tab === 0 && (
-            <TableContainer 
-             component={Paper}
-                   sx={{
-                     width: "fit-content",
-                     minWidth: "75%",
-                     maxWidth: "100%",
-                     margin: "0 auto",
-                     display: "flex",
-                     flexDirection: "column",
-                     justifyContent: "center",
-                     border: "none !important",
-                     boxShadow: "none !important",
-                     backgroundColor: "transparent !important"
-                   }}
-            >
+            <TableContainer
+            component={Paper}
+            sx={(theme) => ({
+              width: "fit-content",
+              minWidth: "75%",
+              maxWidth: "100%",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+          
+              backgroundColor: theme.palette.background.paper,
+              boxShadow: theme.shadows[3],
+            })}
+          >
+          
               <Table
                sx={{
                 width: "100%",
@@ -458,19 +481,22 @@ const Hypervisors = () => {
 
           {/* HOST TABLE */}
           {tab === 1 && (
-            <TableContainer  component={Paper}
-                   sx={{
-                     width: "fit-content",
-                     minWidth: "75%",
-                     maxWidth: "100%",
-                     margin: "0 auto",
-                     display: "flex",
-                     flexDirection: "column",
-                     justifyContent: "center",
-                     border: "none !important",
-                     boxShadow: "none !important",
-                     backgroundColor: "transparent !important"
-                   }}>
+            <TableContainer
+            component={Paper}
+            sx={(theme) => ({
+              width: "fit-content",
+              minWidth: "75%",
+              maxWidth: "100%",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+          
+              backgroundColor: theme.palette.background.paper,
+              boxShadow: theme.shadows[3],
+            })}
+          >
+          
               <Table
               sx={{
                 width: "100%",
@@ -512,8 +538,9 @@ const Hypervisors = () => {
 
           {/* RESOURCE PROVIDER TABLE */}
           {tab === 2 && (
-            <TableContainer component={Paper}
-            sx={{
+            <TableContainer
+            component={Paper}
+            sx={(theme) => ({
               width: "fit-content",
               minWidth: "75%",
               maxWidth: "100%",
@@ -521,11 +548,12 @@ const Hypervisors = () => {
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
-              border: "none !important",
-              boxShadow: "none !important",
-              backgroundColor: "transparent !important"
-            }}
-            >
+          
+              backgroundColor: theme.palette.background.paper,
+              boxShadow: theme.shadows[3],
+            })}
+          >
+          
               <Table
               sx={{
                 width: "100%",

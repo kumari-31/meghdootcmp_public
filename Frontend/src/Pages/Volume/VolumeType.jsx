@@ -21,35 +21,48 @@ import {
   Slide,
   TablePagination,
 } from '@mui/material';
+import { useTheme } from "@mui/material/styles";
+
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
 import { CheckCircleOutline, ErrorOutline, InfoOutlined, WarningOutlined } from '@mui/icons-material';
-
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: '#253848',
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
-    textAlign: 'center',
-    color: '#000',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '200px',
+    textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
-  '&:nth-of-type(odd)': {
-    backgroundColor: theme.palette.grey[300],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
+  "&:nth-of-type(odd)": {
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
-  '&:last-child td, &:last-child th': {
+
+  "&:last-child td, &:last-child th": {
     border: 0,
   },
 }));
@@ -70,6 +83,8 @@ const VolumeTypes = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const theme = useTheme();
+
 
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
@@ -177,22 +192,37 @@ const VolumeTypes = () => {
     setVolumeToUpdate((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Create volume type
   const handleCreateVolumeType = async (e) => {
     e.preventDefault();
+  
     try {
       const response = await apiClient.post('/create-volume-type/', newVolumeType);
-      if (response.status === 201 || response.status === 200) {
+  
+      // 🔥 Handle duplicate
+      if (response.data.exists) {
+        showSnackbar(response.data.message, 'warning');
+        return;
+      }
+  
+      // 🔥 Only success case
+      if (response.status === 201) {
         showSnackbar('Volume type created successfully', 'success');
         setShowCreateForm(false);
         setNewVolumeType({ name: '', description: '' });
         fetchVolumeTypes();
+        return;
       }
+  
     } catch (err) {
       console.error(err);
-      showSnackbar('Error creating volume type', 'error');
+  
+      showSnackbar(
+        err?.response?.data?.error || "Error creating volume type",
+        "error"
+      );
     }
   };
+  
 
   // Update volume type
   const handleUpdateVolumeType = async (e) => {
@@ -251,7 +281,7 @@ const VolumeTypes = () => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 400,
-    bgcolor: 'background.paper',
+    bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
     borderRadius: '8px',
@@ -272,7 +302,14 @@ const VolumeTypes = () => {
         <h1>Volume Types</h1>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <TextField type="text" label="Search..." value={searchTerm} onChange={handleSearchChange} variant="outlined" />
-          <Button variant="contained" style={{ backgroundColor: 'green', color: 'white' }} onClick={() => setShowCreateForm(true)}>
+          <Button variant="contained" onClick={() => setShowCreateForm(true)}
+            sx={{
+              backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+              color: "#fff",
+              "&:hover": {
+                backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+              }
+            }} >
             Create Volume <RiBallPenLine />
           </Button>
           <Button variant="contained" color="error" onClick={handleDeleteSelected}>
@@ -283,7 +320,7 @@ const VolumeTypes = () => {
 
       {/* Create Modal */}
       <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
-        <Box sx={modalStyle}>
+        <Box sx={(theme) => modalStyle(theme)}>
           <h2>Create Volume Type</h2>
           <form onSubmit={handleCreateVolumeType}>
             <FormControl fullWidth margin="normal">
@@ -302,7 +339,8 @@ const VolumeTypes = () => {
 
       {/* Update Modal */}
       <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
-        <Box sx={modalStyle}>
+      <Box sx={(theme) => modalStyle(theme)}>
+
           <h2>Update Volume Type</h2>
           <form onSubmit={handleUpdateVolumeType}>
             <FormControl fullWidth margin="normal">
@@ -320,20 +358,22 @@ const VolumeTypes = () => {
       </Modal>
 
       {/* Volume Types Table */}
-      <TableContainer component={Paper}
-      sx={{
-        width: "fit-content",
-        minWidth: "75%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        border: "none !important",
-        boxShadow: "none !important",
-        backgroundColor: "transparent !important"
-      }}
-      >
+      <TableContainer
+  component={Paper}
+  sx={(theme) => ({
+    width: "fit-content",
+    minWidth: "75%",
+    maxWidth: "100%",
+    margin: "0 auto",
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+
+    backgroundColor: theme.palette.background.paper,
+    boxShadow: theme.shadows[3],
+  })}
+>
+
         <Table 
         sx={{
           width: "100%",

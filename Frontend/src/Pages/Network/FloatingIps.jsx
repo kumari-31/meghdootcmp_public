@@ -23,38 +23,53 @@ import {
   InputLabel,
   TablePagination,
 } from '@mui/material';
+import { useTheme } from "@mui/material/styles";
+
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
 
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: '#253848',
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
-    textAlign: 'center',
-    color: '#000',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '200px',
+    textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
-  '&:nth-of-type(odd)': {
-    backgroundColor: theme.palette.grey[300],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
+  "&:nth-of-type(odd)": {
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
-  '&:last-child td, &:last-child th': {
+
+  "&:last-child td, &:last-child th": {
     border: 0,
   },
 }));
+
 
 const FloatingIps = () => {
   const [floatingIps, setFloatingIps] = useState([]);
@@ -67,6 +82,7 @@ const FloatingIps = () => {
   const [selectedFloatingIps, setSelectedFloatingIps] = useState([]);
   const [projects, setProjects] = useState([]);
   const [networks, setNetworks] = useState([]);
+  const theme = useTheme(); 
   const [associateData, setAssociateData] = useState({
     network_pool: 'External Network 10.184.53.0/24',
     project_name: '',
@@ -337,7 +353,7 @@ const FloatingIps = () => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 400,
-    bgcolor: 'background.paper',
+    bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
     borderRadius: '8px',
@@ -356,7 +372,13 @@ const FloatingIps = () => {
             variant="outlined"
           />
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="contained" style={{ backgroundColor: 'green', color: 'white' }} onClick={() => setShowAssociateForm(true)}>
+            <Button variant="contained"  sx={{
+              backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+              color: "#fff",
+              "&:hover": {
+                backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+              }
+            }}  onClick={() => setShowAssociateForm(true)}>
               Create & Associate Floating IP
             </Button>
             <Button variant="contained" color="error" onClick={() => { }}>

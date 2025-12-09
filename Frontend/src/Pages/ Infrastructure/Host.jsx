@@ -18,16 +18,22 @@ import {
   Alert,
   Slide,
   TablePagination,
+
 } from "@mui/material";
+import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { styled } from "@mui/material/styles";
-import { RiDeleteBin6Line } from "react-icons/ri";
+
 import { tableCellClasses } from "@mui/material/TableCell";
 import '../style.css';
+import { useTheme } from "@mui/material/styles";
 
-
+// Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -36,18 +42,37 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: "#000",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
+
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
+  },
+
+  "&:last-child td, &:last-child th": {
+    border: 0,
   },
 }));
 
+
+
 const HostAggregates = () => {
+  const theme = useTheme();
   const [aggregates, setAggregates] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState("");
@@ -245,7 +270,7 @@ const HostAggregates = () => {
   const modalStyle = {
     position: "absolute", top: "50%", left: "50%",
     transform: "translate(-50%, -50%)", width: 400,
-    bgcolor: "background.paper", boxShadow: 24, p: 4, borderRadius: 3
+    bgcolor: theme.palette.background.paper, boxShadow: 24, p: 4, borderRadius: 3
   };
 
   return (
@@ -254,8 +279,14 @@ const HostAggregates = () => {
         <h1>Host Aggregates</h1>
         <Box display="flex" gap={2}>
           <TextField label="Search" value={search} onChange={handleSearch} size="small" />
-          <Button variant="contained" onClick={() => setShowCreate(true)} style={{ background: "green" }}>
-            Create
+          <Button variant="contained" onClick={() => setShowCreate(true)} sx={{
+                backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+                color: "#fff",
+                "&:hover": {
+                  backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+                }
+              }} >
+            Create<RiBallPenLine />
           </Button>
           <Button
           variant="contained"
@@ -313,20 +344,22 @@ const HostAggregates = () => {
              </Box>
            </Modal>
 
-      <TableContainer component={Paper}
-      sx={{
-        width: "fit-content",
-        minWidth: "75%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        border: "none !important",
-        boxShadow: "none !important",
-        backgroundColor: "transparent !important"
-      }}
-      >
+           <TableContainer
+            component={Paper}
+            sx={(theme) => ({
+              width: "fit-content",
+              minWidth: "75%",
+              maxWidth: "100%",
+              margin: "0 auto",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "center",
+
+              backgroundColor: theme.palette.background.paper,
+              boxShadow: theme.shadows[3],
+            })}
+          >
+
         <Table
         sx={{
           width: "100%",
@@ -375,10 +408,12 @@ const HostAggregates = () => {
                 <StyledTableCell>{ag.hosts?.join(", ") || "-"}</StyledTableCell>
                 <StyledTableCell>{JSON.stringify(ag.metadata || {})}</StyledTableCell>
                 <StyledTableCell>
+                  <Box display="flex" justifyContent="center" gap={1}>
                   <Button variant="outlined" onClick={() => { setAggToUpdate(ag); setShowUpdate(true); }}>Update</Button>
                   <Button variant="outlined" color="error" onClick={() => deleteAggregate(ag.id)}>
                     Delete <RiDeleteBin6Line />
                   </Button>
+                  </Box>
                 </StyledTableCell>
               </StyledTableRow>
             ))}

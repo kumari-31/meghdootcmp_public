@@ -8,11 +8,13 @@ import ErrorIcon from "@mui/icons-material/Error";
 import SentimentSatisfiedAltIcon from "@mui/icons-material/SentimentSatisfiedAlt"; 
 import SentimentDissatisfiedIcon from "@mui/icons-material/SentimentDissatisfied";
 
-
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -21,14 +23,28 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100], // Default background for even rows
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300], // Alternate row color
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
+
   "&:last-child td, &:last-child th": {
     border: 0,
   },

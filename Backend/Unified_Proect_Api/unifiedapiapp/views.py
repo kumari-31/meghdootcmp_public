@@ -808,9 +808,6 @@ class CombinedView(APIView):
             )
 
 
-# from rest_framework.response import Response
-# from rest_framework.views import APIView
-
 
 class CreateHostView(APIView):
     def post(self, request):
@@ -929,7 +926,139 @@ from rest_framework.views import APIView
 from .models import (CdVerifierAndNonce, Employee, ServiceRequest,
                      UserRegistrationRequest)
 from .serializers import ServiceRequestSerializer
+from .kubenetes import deploy_nginx_pod
 
+from rest_framework.views import APIView
+from keystoneauth1 import session
+from keystoneauth1.identity import v3
+from novaclient import client as nova_client
+
+from openstack import connection
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
+from kubernetes import client
+from concurrent.futures import ThreadPoolExecutor
+
+
+# -------------------------
+# PUT THESE FUNCTIONS HERE 👇
+# -------------------------
+
+def parse_cpu(cpu_str):
+    if cpu_str.endswith("m"):
+        return int(cpu_str.rstrip("m")) / 1000
+    return float(cpu_str)
+
+def parse_memory(mem_str):
+    mem_str = str(mem_str).lower()
+    unit_map = {
+        "ki": 1024, "mi": 1024 ** 2, "gi": 1024 ** 3,
+        "ti": 1024 ** 4, "pi": 1024 ** 5, "ei": 1024 ** 6,
+        "k": 1000, "m": 1000 ** 2, "g": 1000 ** 3,
+    }
+
+    for suffix, multiplier in unit_map.items():
+        if mem_str.endswith(suffix):
+            return int(float(mem_str.replace(suffix, "")) * multiplier)
+
+    try:
+        return int(mem_str)
+    except ValueError:
+        return 0
+
+def get_pod_metrics(metrics_api):
+    """Fetch CPU & Memory usage for all pods (requires Metrics API)."""
+    try:
+        metrics = metrics_api.list_cluster_custom_object(
+            "metrics.k8s.io", "v1beta1", "pods"
+        )
+        return {m["metadata"]["name"]: m for m in metrics["items"]}
+    except ApiException as e:
+        raise RuntimeError(f"Kubernetes API error: {e.reason}")
+    except Exception:
+        return {}
+
+def get_k8s_clients():
+    """Initialize Kubernetes clients (Core + Metrics)."""
+    try:
+        config.load_kube_config(config_file=KUBECONFIG_PATH)
+        return client.CoreV1Api(), client.CustomObjectsApi()
+    except Exception as e:
+        raise RuntimeError(f"Failed to load Kubernetes config: {str(e)}")
+
+
+
+def get_k8s_client2():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(BASE_DIR, "admin.conf")
+    config.load_kube_config(config_file=config_path)
+    return client.CoreV1Api(), client.AppsV1Api()  # ✅ this line must return both
+
+
+
+def humanize_age(dt):
+    if not dt:
+        return "N/A"
+    delta = datetime.utcnow() - dt.replace(tzinfo=None)
+    days = delta.days
+    if days == 0:
+        return "Today"
+    elif days == 1:
+        return "1 day ago"
+    return f"{days} days ago"
+    
+def get_k8s_client3():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(BASE_DIR, "admin.conf")
+    config.load_kube_config(config_file=config_path)
+    return client.AppsV1Api(), client.CoreV1Api()
+
+def get_k8s_client1():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(BASE_DIR, "admin.conf")
+    config.load_kube_config(config_file=config_path)
+
+    core_v1 = client.CoreV1Api()
+    apps_v1 = client.AppsV1Api()
+    metrics_client = client.CustomObjectsApi()
+    
+    return core_v1, apps_v1, metrics_client
+
+  
+def get_k8s_client4():
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(BASE_DIR, "admin.conf")
+    config.load_kube_config(config_file=config_path)
+    return client.CoreV1Api(), client.AppsV1Api(), client.NetworkingV1Api()
+
+# -------------------------
+# GLOBAL CONFIG (FAST)
+# -------------------------
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")
+
+try:
+    config.load_incluster_config()
+except config.ConfigException:
+    config.load_kube_config(config_file=KUBECONFIG_PATH)
+
+# Global Clients (Reused Across All APIs)
+v1 = client.CoreV1Api()
+apps_v1 = client.AppsV1Api()
+metrics_client = client.CustomObjectsApi()
+
+logger = logging.getLogger(__name__)
+
+#-------------------------------------------------------
+
+#-------------------------------------------------------
 
 # HMAC Hashing
 def hashHMAChex(key, value):
@@ -1683,8 +1812,6 @@ class CombinedView(APIView):
             )
 
 
-# from rest_framework.response import Response
-# from rest_framework.views import APIView
 
 
 class CreateHostView(APIView):
@@ -1893,9 +2020,7 @@ def get_openstack_connection1(project_name=None):
     )
 
 
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
+
 
 
 def get_openstack_connection(project_name=None):
@@ -9188,45 +9313,63 @@ class SendEmailView(View):
 
 
 # ------------------------------------26 March 2025--------------------------------\
-
-
 class CreateVolumeTypeAPIView(APIView):
-    """
-    API to create a new volume type in OpenStack.
-    """
-
     permission_classes = [IsAuthenticated]
 
+    def extract_error_message(self, e):
+        """
+        Safely extract OpenStack / HTTP / SDK exception details.
+        """
+        # Case 1: OpenStack SDK exception with .details
+        if hasattr(e, "details") and e.details:
+            return e.details
+
+        # Case 2: HTTP Response error
+        if hasattr(e, "response") and e.response is not None:
+            try:
+                return e.response.json()
+            except Exception:
+                return e.response.text
+
+        # Case 3: str(e) contains JSON
+        try:
+            return json.loads(str(e))
+        except Exception:
+            pass
+
+        # Fallback
+        return str(e)
+
     def post(self, request):
-        # Get volume type name from request body
         volume_type_name = request.data.get("name")
         description = request.data.get("description", "")
 
         if not volume_type_name:
             return Response(
                 {"error": "Volume type name is required."},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            # Initialize OpenStack connection
             conn = get_openstack_connection()
 
             # Check if volume type already exists
             existing_types = list(conn.block_storage.types())
+
             for vtype in existing_types:
                 if vtype.name.lower() == volume_type_name.lower():
                     return Response(
                         {
                             "exists": True,
-                            "message": f"Volume type '{volume_type_name}' already exists.",
+                            "message": f"Volume type '{volume_type_name}' already exists."
                         },
-                        status=status.HTTP_200_OK,
+                        status=status.HTTP_200_OK      # frontend will detect exists=true
                     )
 
             # Create new volume type
             volume_type = conn.block_storage.create_type(
-                name=volume_type_name, description=description
+                name=volume_type_name,
+                description=description
             )
 
             return Response(
@@ -9240,8 +9383,11 @@ class CreateVolumeTypeAPIView(APIView):
             )
 
         except Exception as e:
+            error_message = self.extract_error_message(e)
+
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": error_message},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
 
@@ -9832,94 +9978,69 @@ class CPUUtilizationView(APIView):
 #         except Exception as e:
 #             return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
 
-# ---------------------------16 June 2025 ---------------------------
+# # ---------------------------16 June 2025 ---------------------------
+# class KubernetesServiceList(APIView):
+#     """API to list Kubernetes services with detailed metadata and optional namespace filter."""
+#     permission_classes = [IsAuthenticated]
 
+#     def get(self, request):
+#         try:
+#             # Get namespace from query param
+#             namespace = request.query_params.get("namespace", "all")
 
-class KubernetesServiceList(APIView):
-    """API to list Kubernetes services with detailed metadata and optional namespace filter."""
+#             # Fetch services (FAST now)
+#             if namespace.lower() == "all":
+#                 services = v1.list_service_for_all_namespaces()
+#             else:
+#                 services = v1.list_namespaced_service(namespace=namespace)
 
-    permission_classes = [IsAuthenticated]
+#             service_list = []
+#             for svc in services.items:
+#                 internal_endpoints = []
+#                 external_endpoints = []
 
-    def get(self, request):
-        try:
-            # Load kubeconfig
-            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")
-            config.load_kube_config(config_file=KUBECONFIG_PATH)
+#                 ports = svc.spec.ports or []
+#                 for port in ports:
+#                     internal_endpoints.append(f"{port.port}/{port.protocol}")
 
-            v1 = client.CoreV1Api()
+#                     # LoadBalancer endpoints
+#                     if svc.status.load_balancer and svc.status.load_balancer.ingress:
+#                         for ingress in svc.status.load_balancer.ingress:
+#                             ip = getattr(ingress, "ip", None) or getattr(ingress, "hostname", None)
+#                             if ip:
+#                                 external_endpoints.append(f"{ip}:{port.port}/{port.protocol}")
 
-            # Get namespace from query param
-            namespace = request.query_params.get("namespace", "all")
+#                     # External IPs
+#                     external_ips = getattr(svc.spec, "external_ips", []) or []
+#                     for ip in external_ips:
+#                         external_endpoints.append(f"{ip}:{port.port}/{port.protocol}")
 
-            if namespace.lower() == "all":
-                services = v1.list_service_for_all_namespaces()
-            else:
-                services = v1.list_namespaced_service(namespace=namespace)
+#                     # NodePort
+#                     if svc.spec.type in ["NodePort", "LoadBalancer"] and getattr(port, "node_port", None):
+#                         external_endpoints.append(f"<NodeIP>:{port.node_port}/{port.protocol}")
 
-            service_list = []
-            for svc in services.items:
-                internal_endpoints = []
-                external_endpoints = []
+#                 service_list.append({
+#                     "name": svc.metadata.name,
+#                     "namespace": svc.metadata.namespace,
+#                     "labels": svc.metadata.labels or {},
+#                     "selector": svc.spec.selector or {},
+#                     "type": svc.spec.type,
+#                     "cluster_ip": svc.spec.cluster_ip,
+#                     "internal_endpoints": internal_endpoints,
+#                     "external_endpoints": external_endpoints,
+#                     "created": (
+#                         svc.metadata.creation_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+#                         if svc.metadata.creation_timestamp else None
+#                     )
+#                 })
 
-                ports = svc.spec.ports or []
-                for port in ports:
-                    internal_endpoints.append(f"{port.port}/{port.protocol}")
+#             return Response({"services": service_list}, status=200)
 
-                    # LoadBalancer IPs
-                    if svc.status.load_balancer and svc.status.load_balancer.ingress:
-                        for ingress in svc.status.load_balancer.ingress:
-                            ip = getattr(ingress, "ip", None) or getattr(
-                                ingress, "hostname", None
-                            )
-                            if ip:
-                                external_endpoints.append(
-                                    f"{ip}:{port.port}/{port.protocol}"
-                                )
+#         except client.exceptions.ApiException as e:
+#             return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
 
-                    # External IPs
-                    external_ips = getattr(svc.spec, "external_i_ps", []) or getattr(
-                        svc.spec, "external_ips", []
-                    )
-                    for ip in external_ips:
-                        external_endpoints.append(f"{ip}:{port.port}/{port.protocol}")
-
-                    # NodePort
-                    if svc.spec.type in ["NodePort", "LoadBalancer"] and getattr(
-                        port, "node_port", None
-                    ):
-                        external_endpoints.append(
-                            f"<NodeIP>:{port.node_port}/{port.protocol}"
-                        )
-
-                service_list.append(
-                    {
-                        "name": svc.metadata.name,
-                        "namespace": svc.metadata.namespace,
-                        "labels": svc.metadata.labels or {},
-                        "selector": svc.spec.selector or {},
-                        "type": svc.spec.type,
-                        "cluster_ip": svc.spec.cluster_ip,
-                        "internal_endpoints": internal_endpoints,
-                        "external_endpoints": external_endpoints,
-                        "created": (
-                            svc.metadata.creation_timestamp.strftime(
-                                "%Y-%m-%d %H:%M:%S"
-                            )
-                            if svc.metadata.creation_timestamp
-                            else None
-                        ),
-                    }
-                )
-
-            return Response({"services": service_list}, status=200)
-
-        except ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
+#         except Exception as e:
+#             return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
 
 
 # Load Kubernetes configuration securely
@@ -9963,144 +10084,123 @@ def get_k8s_client():
 # -----------------------------16 June 2025------------------------------
 
 
-class ListK8sNodes(APIView):
-    """API View to list Kubernetes nodes with detailed resource and pod info."""
+# class ListK8sNodes(APIView):
+#     """API View to list Kubernetes nodes with detailed resource and pod info."""
 
-    def get(self, request):
-        try:
-            namespace = request.query_params.get("namespace", None)
-            v1 = get_k8s_client()
-            nodes = v1.list_node()
-            pods = (
-                v1.list_pod_for_all_namespaces()
-                if namespace in [None, "", "all"]
-                else v1.list_namespaced_pod(namespace)
-            )
+#     def get(self, request):
+#         try:
+#             namespace = request.query_params.get("namespace", None)
+#             v1 = get_k8s_client()
+#             nodes = v1.list_node()
+#             pods = v1.list_pod_for_all_namespaces() if namespace in [None, "", "all"] else v1.list_namespaced_pod(namespace)
 
-            node_data_list = []
+#             node_data_list = []
 
-            for node in nodes.items:
-                name = node.metadata.name
-                labels = node.metadata.labels
-                created_at = node.metadata.creation_timestamp
+#             for node in nodes.items:
+#                 name = node.metadata.name
+#                 labels = node.metadata.labels
+#                 created_at = node.metadata.creation_timestamp
 
-                # Get conditions and check for Ready state
-                ready_status = "Unknown"
-                for cond in node.status.conditions:
-                    if cond.type == "Ready":
-                        ready_status = cond.status
-                        break
+#                 # Get conditions and check for Ready state
+#                 ready_status = "Unknown"
+#                 for cond in node.status.conditions:
+#                     if cond.type == "Ready":
+#                         ready_status = cond.status
+#                         break
 
-                # Get allocatable and capacity
-                allocatable = node.status.allocatable
-                capacity = node.status.capacity
+#                 # Get allocatable and capacity
+#                 allocatable = node.status.allocatable
+#                 capacity = node.status.capacity
 
-                # Count pods scheduled on this node
-                pods_on_node = [p for p in pods.items if p.spec.node_name == name]
+#                 # Count pods scheduled on this node
+#                 pods_on_node = [p for p in pods.items if p.spec.node_name == name]
 
-                # Calculate CPU & memory requests/limits
-                cpu_req, cpu_lim, mem_req, mem_lim = 0, 0, 0, 0
-                for pod in pods_on_node:
-                    for container in pod.spec.containers:
-                        resources = container.resources
+#                 # Calculate CPU & memory requests/limits
+#                 cpu_req, cpu_lim, mem_req, mem_lim = 0, 0, 0, 0
+#                 for pod in pods_on_node:
+#                     for container in pod.spec.containers:
+#                         resources = container.resources
 
-                        # CPU
-                        if resources.requests and "cpu" in resources.requests:
-                            cpu_req += parse_cpu(resources.requests["cpu"])
-                        if resources.limits and "cpu" in resources.limits:
-                            cpu_lim += parse_cpu(resources.limits["cpu"])
+#                         # CPU
+#                         if resources.requests and "cpu" in resources.requests:
+#                             cpu_req += parse_cpu(resources.requests["cpu"])
+#                         if resources.limits and "cpu" in resources.limits:
+#                             cpu_lim += parse_cpu(resources.limits["cpu"])
 
-                        # Memory
-                        if resources.requests and "memory" in resources.requests:
-                            mem_req += parse_memory(resources.requests["memory"])
-                        if resources.limits and "memory" in resources.limits:
-                            mem_lim += parse_memory(resources.limits["memory"])
+#                         # Memory
+#                         if resources.requests and "memory" in resources.requests:
+#                             mem_req += parse_memory(resources.requests["memory"])
+#                         if resources.limits and "memory" in resources.limits:
+#                             mem_lim += parse_memory(resources.limits["memory"])
 
-                node_data = {
-                    "name": name,
-                    "labels": labels,
-                    "ready": "True" if ready_status == "True" else "False",
-                    "cpu_requests": cpu_req,
-                    "cpu_limits": cpu_lim,
-                    "cpu_capacity": parse_cpu(capacity.get("cpu", "0")),
-                    "memory_requests_bytes": mem_req,
-                    "memory_limits_bytes": mem_lim,
-                    "memory_capacity_bytes": parse_memory(capacity.get("memory", "0")),
-                    "pods": len(pods_on_node),
-                    "created": created_at.strftime("%Y-%m-%d %H:%M:%S"),
-                }
+#                 node_data = {
+#                     "name": name,
+#                     "labels": labels,
+#                     "ready": "True" if ready_status == "True" else "False",
+#                     "cpu_requests": cpu_req,
+#                     "cpu_limits": cpu_lim,
+#                     "cpu_capacity": parse_cpu(capacity.get("cpu", "0")),
+#                     "memory_requests_bytes": mem_req,
+#                     "memory_limits_bytes": mem_lim,
+#                     "memory_capacity_bytes": parse_memory(capacity.get("memory", "0")),
+#                     "pods": len(pods_on_node),
+#                     "created": created_at.strftime("%Y-%m-%d %H:%M:%S"),
+#                 }
 
-                node_data_list.append(node_data)
+#                 node_data_list.append(node_data)
 
-            return Response({"nodes": node_data_list}, status=status.HTTP_200_OK)
+#             return Response({"nodes": node_data_list}, status=status.HTTP_200_OK)
 
-        except ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
+#         except ApiException as e:
+#             return Response({"error": f"Kubernetes API error: {e.reason}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         except Exception as e:
+#             return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # Helpers for parsing CPU and memory units
-def parse_cpu(cpu_str):
-    if cpu_str.endswith("m"):
-        return int(cpu_str.rstrip("m")) / 1000
-    return float(cpu_str)
+
+# def parse_cpu(cpu_str):
+#     if cpu_str.endswith("m"):
+#         return int(cpu_str.rstrip("m")) / 1000
+#     return float(cpu_str)
+
+# def parse_memory(mem_str):
+#     mem_str = str(mem_str).lower()
+#     unit_map = {
+#         "ki": 1024, "mi": 1024 ** 2, "gi": 1024 ** 3,
+#         "ti": 1024 ** 4, "pi": 1024 ** 5, "ei": 1024 ** 6,
+#         "k": 1000, "m": 1000 ** 2, "g": 1000 ** 3,
+#     }
+
+#     for suffix, multiplier in unit_map.items():
+#         if mem_str.endswith(suffix):
+#             return int(float(mem_str.replace(suffix, "")) * multiplier)
+
+#     try:
+#         return int(mem_str)
+#     except ValueError:
+#         return 0
 
 
-def parse_memory(mem_str):
-    mem_str = str(mem_str).lower()
-    unit_map = {
-        "ki": 1024,
-        "mi": 1024**2,
-        "gi": 1024**3,
-        "ti": 1024**4,
-        "pi": 1024**5,
-        "ei": 1024**6,
-        "k": 1000,
-        "m": 1000**2,
-        "g": 1000**3,
-    }
+# def get_pod_metrics(metrics_api):
+#     """Fetch CPU & Memory usage for all pods (requires Metrics API)."""
+#     try:
+#         metrics = metrics_api.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "pods")
+#         pod_metrics = {m["metadata"]["name"]: m for m in metrics["items"]}
+#         return pod_metrics
+#     except ApiException as e:
+#         raise RuntimeError(f"Kubernetes API error: {e.reason}")
+#     except Exception as e:
+#         return {}  # Return empty metrics on failure
 
-    for suffix, multiplier in unit_map.items():
-        if mem_str.endswith(suffix):
-            return int(float(mem_str.replace(suffix, "")) * multiplier)
-
-    try:
-        return int(mem_str)
-    except ValueError:
-        return 0
-
-
-def get_pod_metrics(metrics_api):
-    """Fetch CPU & Memory usage for all pods (requires Metrics API)."""
-    try:
-        metrics = metrics_api.list_cluster_custom_object(
-            "metrics.k8s.io", "v1beta1", "pods"
-        )
-        pod_metrics = {m["metadata"]["name"]: m for m in metrics["items"]}
-        return pod_metrics
-    except ApiException as e:
-        raise RuntimeError(f"Kubernetes API error: {e.reason}")
-    except Exception as e:
-        return {}  # Return empty metrics on failure
-
-
-def get_k8s_clients():
-    """Initialize and return Kubernetes CoreV1Api & Metrics API clients."""
-    try:
-        config.load_kube_config(config_file=KUBECONFIG_PATH)
-        return client.CoreV1Api(), client.CustomObjectsApi()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load Kubernetes config: {str(e)}")
-
-
-# Worked for Gomathis Setup
+# def get_k8s_clients():
+#     """Initialize and return Kubernetes CoreV1Api & Metrics API clients."""
+#     try:
+#         config.load_kube_config(config_file=KUBECONFIG_PATH)
+#         return client.CoreV1Api(), client.CustomObjectsApi()
+#     except Exception as e:
+#         raise RuntimeError(f"Failed to load Kubernetes config: {str(e)}")
+    
+# Worked for Gomathis Setup    
 # def list_pods():
 #     """Retrieve a list of running pods with details and resource usage."""
 #     v1, metrics_api = get_k8s_clients()
@@ -10434,26 +10534,26 @@ class OpenStackDataView(View):
 #         return JsonResponse(mapped_data, safe=False)
 
 
+
+
+
 class KubernetesDeploymentsAPIView(APIView):
     """
     API to list Kubernetes deployments securely.
     """
-
     permission_classes = [IsAuthenticated]  # Enforces authentication
 
     def get(self, request):
         try:
-            BASE_DIR = os.path.dirname(
-                os.path.abspath(__file__)
-            )  # Get the directory of the app
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the app
             KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")  # Path to admin.conf
-            print("KUBECONFIG_PATH", KUBECONFIG_PATH)
+            print("KUBECONFIG_PATH",KUBECONFIG_PATH)
             # Load Kubernetes configuration securely
-            kube_config_path = KUBECONFIG_PATH  # Use env variable
+            kube_config_path =  KUBECONFIG_PATH  # Use env variable
             config.load_kube_config(config_file=kube_config_path)
 
             apps_v1 = client.AppsV1Api()
-
+            
             # Fetch deployments
             deployments = apps_v1.list_deployment_for_all_namespaces()
             deployment_list = [
@@ -10462,7 +10562,7 @@ class KubernetesDeploymentsAPIView(APIView):
                     "namespace": deploy.metadata.namespace,
                     "replicas": deploy.spec.replicas,
                     "available_replicas": deploy.status.available_replicas or 0,
-                    "labels": deploy.metadata.labels,
+                    "labels": deploy.metadata.labels
                 }
                 for deploy in deployments.items
             ]
@@ -10470,14 +10570,11 @@ class KubernetesDeploymentsAPIView(APIView):
             return Response(deployment_list, status=status.HTTP_200_OK)
 
         except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # Determine BASE_DIR dynamically
@@ -10495,15 +10592,36 @@ except Exception as e:
 v1 = client.CoreV1Api()
 
 
+
+# class KubernetesDeploymentsAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def get(self, request):
+#         try:
+#             deployments = apps_v1.list_deployment_for_all_namespaces()
+#             deployment_list = [
+#                 {
+#                     "name": deploy.metadata.name,
+#                     "namespace": deploy.metadata.namespace,
+#                     "replicas": deploy.spec.replicas,
+#                     "available_replicas": deploy.status.available_replicas or 0,
+#                     "labels": deploy.metadata.labels
+#                 }
+#                 for deploy in deployments.items
+#             ]
+#             return Response(deployment_list, status=200)
+
+#         except Exception as e:
+#             return Response({"error": str(e)}, status=500)
+
 class KubernetesPodAPIView(APIView):
     """
     API to manage Kubernetes Pods (list, create, delete).
     """
-
-    permission_classes = [IsAuthenticated]  # Change to IsAuthenticated for production
+    permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """List all running pods."""
+        """List all pods."""
         try:
             pods = v1.list_pod_for_all_namespaces(watch=False)
             pod_list = [
@@ -10511,32 +10629,48 @@ class KubernetesPodAPIView(APIView):
                     "name": pod.metadata.name,
                     "namespace": pod.metadata.namespace,
                     "status": pod.status.phase,
+                    "node": pod.spec.node_name,
+                    "start_time": pod.status.start_time,
                 }
                 for pod in pods.items
             ]
-            return Response(pod_list, status=status.HTTP_200_OK)
+            return Response(pod_list, status=200)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=500)
 
     def post(self, request):
         """Create a new Kubernetes pod."""
-        print(f"🔹 Received request method: {request.method}")  # Debugging
         app_name = request.data.get("app_name")
         image_name = request.data.get("image_name")
-        port = request.data.get("port", None)
+        port = request.data.get("port")
 
         if not app_name or not image_name:
             return Response(
                 {"error": "app_name and image_name are required"},
-                status=status.HTTP_400_BAD_REQUEST,
+                status=400
             )
+
+        pod_name = f"{app_name}-pod"
+
+        # Check if pod already exists
+        try:
+            existing = v1.read_namespaced_pod(name=pod_name, namespace="default")
+            return Response(
+                {"exists": True, "message": f"Pod '{pod_name}' already exists."},
+                status=200
+            )
+        except client.exceptions.ApiException as e:
+            if e.status != 404:
+                return Response({"error": e.reason}, status=e.status)
 
         pod_manifest = {
             "apiVersion": "v1",
             "kind": "Pod",
-            "metadata": {"name": f"{app_name}-pod"},
+            "metadata": {"name": pod_name},
             "spec": {
                 "containers": [
                     {
@@ -10551,13 +10685,15 @@ class KubernetesPodAPIView(APIView):
         try:
             v1.create_namespaced_pod(namespace="default", body=pod_manifest)
             return Response(
-                {"message": f"{app_name} pod created successfully!"},
-                status=status.HTTP_201_CREATED,
+                {"message": f"Pod '{pod_name}' created successfully!"},
+                status=201
             )
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": e.body}, status=e.status)
+
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=500)
 
 
 # Configure logging
@@ -10605,64 +10741,6 @@ def get_first_node_ip():
         return None
 
 
-class DeployNginxPodAPIView(APIView):
-    """
-    API to deploy an Nginx pod securely.
-    """
-
-    permission_classes = [IsAuthenticated]  # Require authentication
-
-    def post(self, request):
-        """Deploy an Nginx pod securely"""
-        logger.info("🔹 POST request received to deploy Nginx Pod.")
-
-        # Extract user inputs
-        pod_name = request.data.get("pod_name", "nginx-pod")  # Default pod name
-        namespace = request.data.get("namespace", "default")  # Default namespace
-
-        # Validate pod_name (only allow alphanumeric and hyphens)
-        if not pod_name.isalnum() and "-" not in pod_name:
-            return Response(
-                {"error": "Invalid pod name. Use only letters, numbers, or hyphens."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Define Pod spec securely
-        pod_manifest = client.V1Pod(
-            metadata=client.V1ObjectMeta(name=pod_name),
-            spec=client.V1PodSpec(
-                containers=[
-                    client.V1Container(
-                        name="nginx",
-                        image="nginx:latest",
-                        ports=[client.V1ContainerPort(container_port=80)],
-                        security_context=client.V1SecurityContext(
-                            read_only_root_filesystem=True,  # Restrict filesystem writes
-                            allow_privilege_escalation=False,  # Prevent privilege escalation
-                        ),
-                    )
-                ]
-            ),
-        )
-
-        try:
-            # Deploy the pod
-            v1.create_namespaced_pod(namespace=namespace, body=pod_manifest)
-            logger.info(
-                f"✅ Pod '{pod_name}' deployed successfully in namespace '{namespace}'."
-            )
-            return Response(
-                {"message": f"Pod '{pod_name}' deployed successfully!"},
-                status=status.HTTP_201_CREATED,
-            )
-
-        except client.ApiException as e:
-            logger.error(f"❌ Kubernetes API error: {e}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
 # --------------------------------------------------------------------------------
 
 
@@ -10670,7 +10748,6 @@ class DeployNginxHAAPIView(APIView):
     """
     API to deploy an Nginx High-Availability Deployment + NodePort Service.
     """
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
@@ -10692,9 +10769,7 @@ class DeployNginxHAAPIView(APIView):
         # 1️⃣ Create Deployment
         # ---------------------------
         deployment = client.V1Deployment(
-            metadata=client.V1ObjectMeta(
-                name=deployment_name, labels={"app": deployment_name}
-            ),
+            metadata=client.V1ObjectMeta(name=deployment_name, labels={"app": deployment_name}),
             spec=client.V1DeploymentSpec(
                 replicas=replicas,
                 selector=client.V1LabelSelector(match_labels={"app": deployment_name}),
@@ -10731,7 +10806,9 @@ class DeployNginxHAAPIView(APIView):
                 selector={"app": deployment_name},
                 ports=[
                     client.V1ServicePort(
-                        port=80, target_port=80, node_port=None  # Auto assign NodePort
+                        port=80,
+                        target_port=80,
+                        node_port=None  # Auto assign NodePort
                     )
                 ],
             ),
@@ -10765,11 +10842,9 @@ class DeployNginxHAAPIView(APIView):
                 "service": service_name,
                 "node_port": node_port,
                 "node_ip": node_ip,
-                "access_url": (
-                    f"http://{node_ip}:{node_port}" if node_ip and node_port else None
-                ),
+                "access_url": f"http://{node_ip}:{node_port}" if node_ip and node_port else None
             },
-            status=201,
+            status=201
         )
 
 
@@ -11245,57 +11320,6 @@ class DeployPodAPIView(APIView):
                 logger.error(f"❌ Error deleting pod '{pod_name}': {e}")
 
 
-class DeletePodAPIView(APIView):
-    """
-    API to delete a Kubernetes pod.
-    """
-
-    permission_classes = [IsAuthenticated]  # Require authentication
-
-    def delete(self, request):
-        """Delete a specified pod in a given namespace."""
-        logger.info("🔹 DELETE request received to delete a pod.")
-
-        # Extract user inputs
-        pod_name = request.data.get("pod_name")
-        namespace = request.data.get(
-            "namespace", "default"
-        )  # Default namespace is 'default'
-
-        # Validate input
-        if not pod_name:
-            return Response(
-                {"error": "pod_name is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            # Delete the pod
-            v1.delete_namespaced_pod(name=pod_name, namespace=namespace)
-            logger.info(
-                f"✅ Pod '{pod_name}' deleted successfully from namespace '{namespace}'."
-            )
-            return Response(
-                {"message": f"Pod '{pod_name}' deleted successfully!"},
-                status=status.HTTP_200_OK,
-            )
-
-        except client.exceptions.ApiException as e:
-            if e.status == 404:
-                logger.error(
-                    f"❌ Pod '{pod_name}' not found in namespace '{namespace}'."
-                )
-                return Response(
-                    {
-                        "error": f"Pod '{pod_name}' not found in namespace '{namespace}'."
-                    },
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-            else:
-                logger.error(f"❌ Kubernetes API error: {e}")
-                return Response(
-                    {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-
 
 # class ListKubernetesEventsAPIView(APIView):
 #     """
@@ -11343,64 +11367,6 @@ class DeletePodAPIView(APIView):
 #             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class ListKubernetesEventsAPIView(APIView):
-    """
-    API to list Kubernetes events.
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        """Retrieve and return Kubernetes events with secure practices."""
-        logger.info("🔹 GET request received to list Kubernetes events.")
-
-        # Get namespace from query parameters (optional)
-        namespace = request.query_params.get("namespace", None)
-        print("namespace", namespace)
-
-        try:
-            # Fetch events
-            if namespace:
-                events = v1.list_namespaced_event(namespace).items
-            else:
-                events = v1.list_event_for_all_namespaces().items
-
-            if not events:
-                return Response(
-                    {"message": "No events found."}, status=status.HTTP_200_OK
-                )
-
-            # Format helper
-            def format_timestamp(ts):
-                return (
-                    ts.strftime("%Y-%m-%d %H:%M:%S")
-                    if isinstance(ts, datetime)
-                    else "Unknown"
-                )
-
-            # Process events
-            event_list = []
-            for event in events:
-                event_data = {
-                    "name": event.metadata.name,
-                    "reason": event.reason or "N/A",
-                    "message": event.message,
-                    "source": event.source.component if event.source else "Unknown",
-                    "object": f"{event.involved_object.kind}/{event.involved_object.name}",
-                    "count": event.count,
-                    "first_seen": format_timestamp(event.first_timestamp),
-                    "last_seen": format_timestamp(event.last_timestamp),
-                }
-                event_list.append(event_data)
-
-            logger.info(f"✅ Retrieved {len(event_list)} Kubernetes events.")
-            return Response({"events": event_list}, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            logger.error(f"❌ Kubernetes API error: {e}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 # ----------------------------------14 Mar 2025 -------------------------------
@@ -11570,125 +11536,121 @@ class ListKubernetesEventsAPIView(APIView):
 #             )
 
 
-class WorkloadDetailsAPIView(APIView):
-    """
-    API to list Kubernetes workload details by namespace (or all).
-    """
+# class WorkloadDetailsAPIView(APIView):
+#     """
+#     API to list Kubernetes workload details by namespace (or all).
+#     """
+#     permission_classes = [IsAuthenticated]
 
-    permission_classes = [IsAuthenticated]
+#     def get(self, request):
+#         namespace = request.query_params.get("namespace", "default")  # default if not provided
 
-    def get(self, request):
-        namespace = request.query_params.get(
-            "namespace", "default"
-        )  # default if not provided
+#         try:
+#             # Load Kubernetes config
+#             config.load_kube_config(config_file=KUBECONFIG_PATH)
 
-        try:
-            # Load Kubernetes config
-            config.load_kube_config(config_file=KUBECONFIG_PATH)
+#             v1 = client.CoreV1Api()
+#             apps_v1 = client.AppsV1Api()
 
-            v1 = client.CoreV1Api()
-            apps_v1 = client.AppsV1Api()
+#             # === DEPLOYMENTS ===
+#             if namespace.lower() == "all":
+#                 deployments = apps_v1.list_deployment_for_all_namespaces()
+#             else:
+#                 deployments = apps_v1.list_namespaced_deployment(namespace=namespace)
 
-            # === DEPLOYMENTS ===
-            if namespace.lower() == "all":
-                deployments = apps_v1.list_deployment_for_all_namespaces()
-            else:
-                deployments = apps_v1.list_namespaced_deployment(namespace=namespace)
+#             # Add before any workload fetch:
+#             try:
+#                 if namespace.lower() != "all":
+#                     v1.read_namespace(name=namespace)  # This will raise an error if namespace doesn't exist
+#             except client.exceptions.ApiException as e:
+#                 return Response(
+#                     {"error": f"Namespace '{namespace}' not found."},
+#                     status=status.HTTP_404_NOT_FOUND
+#                 )
 
-            # Add before any workload fetch:
-            try:
-                if namespace.lower() != "all":
-                    v1.read_namespace(
-                        name=namespace
-                    )  # This will raise an error if namespace doesn't exist
-            except client.exceptions.ApiException as e:
-                return Response(
-                    {"error": f"Namespace '{namespace}' not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
 
-            deployment_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
-            for d in deployments.items:
-                available = d.status.available_replicas or 0
-                desired = d.spec.replicas or 0
-                if available == desired:
-                    deployment_statuses["Running"] += 1
-                elif available == 0:
-                    deployment_statuses["Failed"] += 1
-                else:
-                    deployment_statuses["Pending"] += 1
+#             deployment_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
+#             for d in deployments.items:
+#                 available = d.status.available_replicas or 0
+#                 desired = d.spec.replicas or 0
+#                 if available == desired:
+#                     deployment_statuses["Running"] += 1
+#                 elif available == 0:
+#                     deployment_statuses["Failed"] += 1
+#                 else:
+#                     deployment_statuses["Pending"] += 1
 
-            # === PODS ===
-            if namespace.lower() == "all":
-                pods = v1.list_pod_for_all_namespaces()
-            else:
-                pods = v1.list_namespaced_pod(namespace=namespace)
+#             # === PODS ===
+#             if namespace.lower() == "all":
+#                 pods = v1.list_pod_for_all_namespaces()
+#             else:
+#                 pods = v1.list_namespaced_pod(namespace=namespace)
 
-            pod_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
-            for p in pods.items:
-                phase = p.status.phase
-                if phase == "Running":
-                    pod_statuses["Running"] += 1
-                elif phase == "Failed":
-                    pod_statuses["Failed"] += 1
-                elif phase == "Pending":
-                    pod_statuses["Pending"] += 1
+#             pod_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
+#             for p in pods.items:
+#                 phase = p.status.phase
+#                 if phase == "Running":
+#                     pod_statuses["Running"] += 1
+#                 elif phase == "Failed":
+#                     pod_statuses["Failed"] += 1
+#                 elif phase == "Pending":
+#                     pod_statuses["Pending"] += 1
 
-            # === REPLICASETS ===
-            if namespace.lower() == "all":
-                replicasets = apps_v1.list_replica_set_for_all_namespaces()
-            else:
-                replicasets = apps_v1.list_namespaced_replica_set(namespace=namespace)
+#             # === REPLICASETS ===
+#             if namespace.lower() == "all":
+#                 replicasets = apps_v1.list_replica_set_for_all_namespaces()
+#             else:
+#                 replicasets = apps_v1.list_namespaced_replica_set(namespace=namespace)
 
-            replicaset_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
-            for rs in replicasets.items:
-                available = rs.status.available_replicas or 0
-                desired = rs.spec.replicas or 0
-                if available == desired:
-                    replicaset_statuses["Running"] += 1
-                elif available == 0:
-                    replicaset_statuses["Failed"] += 1
-                else:
-                    replicaset_statuses["Pending"] += 1
+#             replicaset_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
+#             for rs in replicasets.items:
+#                 available = rs.status.available_replicas or 0
+#                 desired = rs.spec.replicas or 0
+#                 if available == desired:
+#                     replicaset_statuses["Running"] += 1
+#                 elif available == 0:
+#                     replicaset_statuses["Failed"] += 1
+#                 else:
+#                     replicaset_statuses["Pending"] += 1
 
-            # === STATEFULSETS ===
-            if namespace.lower() == "all":
-                statefulsets = apps_v1.list_stateful_set_for_all_namespaces()
-            else:
-                statefulsets = apps_v1.list_namespaced_stateful_set(namespace=namespace)
+#             # === STATEFULSETS ===
+#             if namespace.lower() == "all":
+#                 statefulsets = apps_v1.list_stateful_set_for_all_namespaces()
+#             else:
+#                 statefulsets = apps_v1.list_namespaced_stateful_set(namespace=namespace)
 
-            statefulset_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
-            for sts in statefulsets.items:
-                ready = sts.status.ready_replicas or 0
-                desired = sts.spec.replicas or 0
-                if ready == desired:
-                    statefulset_statuses["Running"] += 1
-                elif ready == 0:
-                    statefulset_statuses["Failed"] += 1
-                else:
-                    statefulset_statuses["Pending"] += 1
+#             statefulset_statuses = {"Running": 0, "Failed": 0, "Pending": 0}
+#             for sts in statefulsets.items:
+#                 ready = sts.status.ready_replicas or 0
+#                 desired = sts.spec.replicas or 0
+#                 if ready == desired:
+#                     statefulset_statuses["Running"] += 1
+#                 elif ready == 0:
+#                     statefulset_statuses["Failed"] += 1
+#                 else:
+#                     statefulset_statuses["Pending"] += 1
 
-            # === RESPONSE ===
-            response_data = {
-                "Namespace": namespace,
-                "Deployments": deployment_statuses,
-                "Pods": pod_statuses,
-                "Replica Sets": replicaset_statuses,
-                "Stateful Sets": statefulset_statuses,
-            }
+#             # === RESPONSE ===
+#             response_data = {
+#                 "Namespace": namespace,
+#                 "Deployments": deployment_statuses,
+#                 "Pods": pod_statuses,
+#                 "Replica Sets": replicaset_statuses,
+#                 "Stateful Sets": statefulset_statuses
+#             }
 
-            return Response(response_data, status=status.HTTP_200_OK)
+#             return Response(response_data, status=status.HTTP_200_OK)
 
-        except client.exceptions.ApiException as api_exc:
-            return Response(
-                {"error": f"Kubernetes API error: {api_exc.reason}"},
-                status=api_exc.status,
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to fetch workload details: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+#         except client.exceptions.ApiException as api_exc:
+#             return Response(
+#                 {"error": f"Kubernetes API error: {api_exc.reason}"},
+#                 status=api_exc.status
+#             )
+#         except Exception as e:
+#             return Response(
+#                 {"error": f"Failed to fetch workload details: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
 
 
 class KubernetesResourcesDetailAPIView(APIView):
@@ -11954,463 +11916,58 @@ class ReplicaSetDetailAPIView(APIView):
                 {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
             )
         except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-class ReplicaSetDetailsAPIView(APIView):
-    def get(self, request):
-        try:
-            namespace = request.query_params.get("namespace", "all")
-
-            # Load Kubernetes config
-            try:
-                config.load_incluster_config()
-            except config.ConfigException:
-                config.load_kube_config(config_file=KUBECONFIG_PATH)
-
-            apps_v1 = client.AppsV1Api()
-
-            # Fetch replica sets from all namespaces if 'all' is passed
-            if namespace.lower() == "all":
-                replica_sets = apps_v1.list_replica_set_for_all_namespaces()
-            else:
-                replica_sets = apps_v1.list_namespaced_replica_set(namespace=namespace)
-
-            rs_data = []
-            for rs in replica_sets.items:
-                images = (
-                    [c.image for c in rs.spec.template.spec.containers]
-                    if rs.spec.template and rs.spec.template.spec
-                    else []
-                )
-
-                rs_data.append(
-                    {
-                        "Name": rs.metadata.name,
-                        "Namespace": rs.metadata.namespace,
-                        "Images": images,
-                        "Labels": rs.metadata.labels or {},
-                        "Pods": rs.status.replicas or 0,
-                        "Created": (
-                            rs.metadata.creation_timestamp.isoformat()
-                            if rs.metadata.creation_timestamp
-                            else None
-                        ),
-                    }
-                )
-
-            return Response(rs_data, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-# -------------------------------------15 Mar 2025--------------------------------------------
-
-
-logger = logging.getLogger(__name__)
-
-
-class DeployPodOnKnode2APIView(APIView):
-    def post(self, request):
-        logger.info("🔹 Received request to deploy a pod on knode2.")
-        print(request.data)
-        appln_name = request.data.get("appln_name")
-        appln_type = request.data.get("appln_type")
-
-        if not appln_name or not appln_type:
-            return Response(
-                {"error": "Both 'appln_name' and 'appln_type' are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Check if application type is supported
-        if appln_type not in APPLICATION_IMAGES:
-            return Response(
-                {"error": f"Application type '{appln_type}' is not supported."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Fetch application details from dictionary
-        app_config = APPLICATION_IMAGES[appln_type]
-        image_name = app_config["image"]
-        port = app_config.get("port", None)  # Default to None if not found
-        env_vars = app_config.get("env", {})  # Default to empty dict if no env vars
-
-        # Deploy directly to knode2
-        node_name = "knode2"
-        success = self.create_pod(appln_name, image_name, port, env_vars, node_name)
-
-        if success:
-            return Response(
-                {
-                    "message": f"✅ Pod '{appln_name}-pod' successfully deployed on {node_name}."
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        return Response(
-            {"error": f"❌ Pod '{appln_name}-pod' failed to deploy on {node_name}."},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        )
-
-    def create_pod(self, appln_name, image_name, port, env_vars, node_name):
-        """Create and launch a Kubernetes pod on knode2."""
-        pod_manifest = {
-            "apiVersion": "v1",
-            "kind": "Pod",
-            "metadata": {"name": f"{appln_name}-pod"},
-            "spec": {
-                "nodeSelector": {
-                    "kubernetes.io/hostname": node_name
-                },  # Force scheduling on knode2
-                "containers": [
-                    {
-                        "name": appln_name,
-                        "image": image_name,
-                        "ports": [{"containerPort": port}] if port else [],
-                        "env": [{"name": k, "value": v} for k, v in env_vars.items()],
-                    }
-                ],
-            },
-        }
-
-        try:
-            v1.create_namespaced_pod(namespace="default", body=pod_manifest)
-            logger.info(f"✅ {appln_name}-pod created successfully on {node_name}!")
-            return True
-        except Exception as e:
-            logger.error(f"❌ Error creating pod on {node_name}: {str(e)}")
-            return False
-
-
-apps_v1 = client.AppsV1Api()  # Apps API client for Deployments, ReplicaSets, etc.
-
-
-class CreateReplicaSetAPIView(APIView):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.v1 = v1  # CoreV1Api instance
-        self.apps_v1 = apps_v1  # AppsV1Api instance
-
-    def post(self, request):
-        """Create a ReplicaSet from an existing pod."""
-        print("\n📌 Received request to create a ReplicaSet...")
-
-        pod_name = request.data.get("pod_name")
-        namespace = request.data.get("namespace")
-        replicas = request.data.get("replicas", 1)
-
-        if not pod_name or not namespace:
-            print("❌ Missing required fields: 'pod_name' and 'namespace'")
-            return Response(
-                {"error": "Both 'pod_name' and 'namespace' are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            replicas = int(replicas)
-            if replicas < 1:
-                print("❌ Replica count must be greater than 0!")
-                return Response(
-                    {"error": "Replica count must be greater than 0"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        except ValueError:
-            print("❌ Invalid replica count!")
-            return Response(
-                {"error": "Invalid replica count. Must be an integer."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Get the existing pod details
-            pod = self.v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-        except Exception as e:
-            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
-            return Response(
-                {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Ensure pod has labels
-        pod_labels = pod.metadata.labels or {"app": pod_name}
-
-        # Clean the pod spec (remove service account & unwanted volume mounts)
-        pod_spec = self.clean_pod_spec(pod.spec)
-
-        # Define ReplicaSet
-        rs_manifest = {
-            "apiVersion": "apps/v1",
-            "kind": "ReplicaSet",
-            "metadata": {"name": f"{pod_name}-rs"},
-            "spec": {
-                "replicas": replicas,
-                "selector": {"matchLabels": pod_labels},
-                "template": {
-                    "metadata": {"labels": pod_labels},
-                    "spec": pod_spec,
-                },
-            },
-        }
-
-        try:
-            # Create the ReplicaSet using self.apps_v1
-            self.apps_v1.create_namespaced_replica_set(
-                namespace=namespace, body=rs_manifest
-            )
-            print(
-                f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'"
-            )
-            return Response(
-                {
-                    "message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        except Exception as e:
-            print(f"❌ Error creating ReplicaSet: {str(e)}")
-            return Response(
-                {"error": "Failed to create ReplicaSet"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def get(self, request):
-        """List all available pods in all namespaces."""
-        print("\n📌 Fetching available pods...")
-
-        try:
-            pods = v1.list_pod_for_all_namespaces(watch=False)
-            pod_list = [
-                {
-                    "name": pod.metadata.name,
-                    "namespace": pod.metadata.namespace,
-                    "labels": pod.metadata.labels or {},
-                }
-                for pod in pods.items
-            ]
-        except Exception as e:
-            print(f"❌ Error fetching pods: {str(e)}")
-            return Response(
-                {"error": "Failed to fetch pods"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        if not pod_list:
-            print("⚠️ No pods found in the cluster!")
-            return Response(
-                {"message": "No pods found in the cluster"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        print(f"✅ Found {len(pod_list)} pods.")
-        return Response({"pods": pod_list}, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        """Create a ReplicaSet from an existing pod."""
-        print("\n📌 Received request to create a ReplicaSet...")
-
-        pod_name = request.data.get("pod_name")
-        namespace = request.data.get("namespace")
-        replicas = request.data.get("replicas", 1)
-
-        if not pod_name or not namespace:
-            print("❌ Missing required fields: 'pod_name' and 'namespace'")
-            return Response(
-                {"error": "Both 'pod_name' and 'namespace' are required"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            replicas = int(replicas)
-            if replicas < 1:
-                print("❌ Replica count must be greater than 0!")
-                return Response(
-                    {"error": "Replica count must be greater than 0"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-        except ValueError:
-            print("❌ Invalid replica count!")
-            return Response(
-                {"error": "Invalid replica count. Must be an integer."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        try:
-            # Get the existing pod details
-            pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-        except Exception as e:
-            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
-            return Response(
-                {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        # Ensure pod has labels
-        pod_labels = pod.metadata.labels or {"app": pod_name}
-
-        # Clean the pod spec (remove service account & unwanted volume mounts)
-        pod_spec = self.clean_pod_spec(pod.spec)
-
-        # Define ReplicaSet
-        rs_manifest = {
-            "apiVersion": "apps/v1",
-            "kind": "ReplicaSet",
-            "metadata": {"name": f"{pod_name}-rs"},
-            "spec": {
-                "replicas": replicas,
-                "selector": {"matchLabels": pod_labels},
-                "template": {
-                    "metadata": {"labels": pod_labels},
-                    "spec": pod_spec,
-                },
-            },
-        }
-
-        try:
-            # Create the ReplicaSet
-            apps_v1.create_namespaced_replica_set(namespace=namespace, body=rs_manifest)
-            print(
-                f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'"
-            )
-            return Response(
-                {
-                    "message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        except Exception as e:
-            print(f"❌ Error creating ReplicaSet: {str(e)}")
-            return Response(
-                {"error": "Failed to create ReplicaSet"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-    def clean_pod_spec(self, pod_spec):
-        """Remove unwanted fields like 'serviceAccount' and 'kube-api-access' volume mounts."""
-        print("🔹 Cleaning pod spec...")
-
-        for container in pod_spec.containers:
-            if container.volume_mounts:
-                container.volume_mounts = [
-                    v
-                    for v in container.volume_mounts
-                    if not v.name.startswith("kube-api-access")
-                ]
-
-        if pod_spec.service_account_name:
-            pod_spec.service_account_name = None
-
-        return pod_spec
-
-
-# ------------------------------------18 March 2025 ----------------------------
-
-
-class WorkloadStatsAPIView(APIView):
-    """
-    API to fetch workload statistics from Kubernetes.
-    Returns the count of DaemonSets, Pods, Deployments, and ReplicaSets.
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        try:
-            # Load Kubernetes configuration (works for both inside a cluster and kubeconfig)
-            try:
-                config.load_incluster_config()  # When running inside a cluster
-            except config.ConfigException:
-                config.load_kube_config(config_file=KUBECONFIG_PATH)
-
-            v1_apps = client.AppsV1Api()
-            v1_core = client.CoreV1Api()
-
-            # Get counts
-            daemonsets_count = sum(
-                1 for _ in v1_apps.list_daemon_set_for_all_namespaces().items
-            )
-            pods_count = sum(1 for _ in v1_core.list_pod_for_all_namespaces().items)
-            deployments_count = sum(
-                1 for _ in v1_apps.list_deployment_for_all_namespaces().items
-            )
-            replicasets_count = sum(
-                1 for _ in v1_apps.list_replica_set_for_all_namespaces().items
-            )
-
-            return Response(
-                {
-                    "daemonsets": daemonsets_count,
-                    "pods": pods_count,
-                    "deployments": deployments_count,
-                    "replicasets": replicasets_count,
-                },
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
-class DaemonSetListAPIView(APIView):
-    """
-    API to list all DaemonSets in Kubernetes.
-    Returns Name, Namespace, Images, Labels, Pod Count, and Creation Timestamp.
-    """
-
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        try:
-            # Load Kubernetes config (works for both inside cluster and kubeconfig)
-            try:
-                config.load_incluster_config()  # When running inside a cluster
-            except config.ConfigException:
-                config.load_kube_config(
-                    config_file=KUBECONFIG_PATH
-                )  # When running outside (local development)
-
-            v1_apps = client.AppsV1Api()
-
-            # Fetch all DaemonSets
-            daemonsets = v1_apps.list_daemon_set_for_all_namespaces().items
-            daemonset_list = []
-
-            for ds in daemonsets:
-                daemonset_data = {
-                    "name": ds.metadata.name,
-                    "namespace": ds.metadata.namespace,
-                    "images": [
-                        container.image
-                        for container in ds.spec.template.spec.containers
-                    ],
-                    "labels": ds.metadata.labels,
-                    "pods": ds.status.number_available,  # Number of available pods in DaemonSet
-                    "created": ds.metadata.creation_timestamp.strftime(
-                        "%Y-%m-%d %H:%M:%S"
-                    ),
-                }
-                daemonset_list.append(daemonset_data)
-
-            return Response(daemonset_list, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+ 
+            
+# class ReplicaSetDetailsAPIView(APIView):
+#     def get(self, request):
+#         try:
+#             namespace = request.query_params.get('namespace', 'all')
+
+#             # Load Kubernetes config
+#             try:
+#                 config.load_incluster_config()
+#             except config.ConfigException:
+#                 config.load_kube_config(config_file=KUBECONFIG_PATH)
+
+#             apps_v1 = client.AppsV1Api()
+
+#             # Fetch replica sets from all namespaces if 'all' is passed
+#             if namespace.lower() == 'all':
+#                 replica_sets = apps_v1.list_replica_set_for_all_namespaces()
+#             else:
+#                 replica_sets = apps_v1.list_namespaced_replica_set(namespace=namespace)
+
+#             rs_data = []
+#             for rs in replica_sets.items:
+#                 images = [c.image for c in rs.spec.template.spec.containers] if rs.spec.template and rs.spec.template.spec else []
+
+#                 rs_data.append({
+#                     "Name": rs.metadata.name,
+#                     "Namespace": rs.metadata.namespace,
+#                     "Images": images,
+#                     "Labels": rs.metadata.labels or {},
+#                     "Pods": rs.status.replicas or 0,
+#                     "Created": rs.metadata.creation_timestamp.isoformat() if rs.metadata.creation_timestamp else None
+#                 })
+
+#             return Response(rs_data, status=status.HTTP_200_OK)
+
+#         except client.exceptions.ApiException as e:
+#             return Response(
+#                 {"error": f"Kubernetes API error: {e.reason}"},
+#                 status=e.status
+#             )
+#         except Exception as e:
+#             return Response(
+#                 {"error": f"Unexpected error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
+
+# # -------------------------------------15 Mar 2025--------------------------------------------
+  
+# ------------------------------------18 March 2025 ---------------------------- 
 
 # ceph_views.py or views.py
 
@@ -12929,11 +12486,6 @@ class ListVolumeTypesAPIView(APIView):
 
 # ---------------------16 May 2025-----------------------------------------------
 
-from keystoneauth1 import session
-from keystoneauth1.identity import v3
-from novaclient import client as nova_client
-from rest_framework.response import Response
-from rest_framework.views import APIView
 
 
 class HypervisorDataAPIView(APIView):
@@ -13617,169 +13169,7 @@ class FLAEmployeesListAPIView(APIView):
 #             return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
 
 
-class DeploymentDetailAPIView(APIView):
-    """
-    Get detailed information about a Kubernetes Deployment using its name.
-    Usage: ?name=<deployment_name>&namespace=<namespace>
-    """
 
-    def get(self, request):
-        deployment_name = request.query_params.get("name")
-        namespace = request.query_params.get("namespace", "default")
-
-        if not deployment_name:
-            return Response({"error": "Deployment name is required."}, status=400)
-
-        try:
-            # Load kubeconfig
-            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(BASE_DIR, "admin.conf")
-            config.load_kube_config(config_file=config_path)
-
-            apps_v1 = client.AppsV1Api()
-            autoscaling_v1 = client.AutoscalingV1Api()
-            core_v1 = client.CoreV1Api()
-
-            # Fetch deployment
-            deployment = apps_v1.read_namespaced_deployment(
-                name=deployment_name, namespace=namespace
-            )
-
-            # Metadata
-            metadata = deployment.metadata
-            deployment_info = {
-                "name": metadata.name,
-                "namespace": metadata.namespace,
-                "created": metadata.creation_timestamp.strftime("%b %d, %Y"),
-                "age": f"{(datetime.utcnow() - metadata.creation_timestamp.replace(tzinfo=None)).days} days ago",
-                "uid": metadata.uid,
-                "labels": metadata.labels,
-                "annotations": metadata.annotations,
-            }
-
-            # Pod Status
-            status_info = deployment.status
-            deployment_info["pod_status"] = {
-                "updated": status_info.updated_replicas or 0,
-                "total": status_info.replicas or 0,
-                "available": status_info.available_replicas or 0,
-            }
-
-            # Conditions
-            conditions = []
-            if status_info.conditions:
-                for cond in status_info.conditions:
-                    conditions.append(
-                        {
-                            "type": cond.type,
-                            "status": cond.status,
-                            "last_transition_time": cond.last_transition_time,
-                            "reason": cond.reason,
-                            "message": cond.message,
-                        }
-                    )
-            deployment_info["conditions"] = conditions
-
-            # ReplicaSets
-            replica_sets = apps_v1.list_namespaced_replica_set(namespace=namespace)
-
-            new_rs = None
-            for rs in replica_sets.items:
-                if rs.metadata.owner_references:
-                    for owner in rs.metadata.owner_references:
-                        if owner.kind == "Deployment" and owner.name == deployment_name:
-                            new_rs = rs
-                            break
-
-            if new_rs:
-                deployment_info["new_replica_set"] = {
-                    "name": new_rs.metadata.name,
-                    "namespace": new_rs.metadata.namespace,
-                    "age": f"{(datetime.utcnow() - new_rs.metadata.creation_timestamp.replace(tzinfo=None)).days} days ago",
-                    "pods": f"{new_rs.status.replicas or 0} / {new_rs.spec.replicas or 0}",
-                    "labels": new_rs.metadata.labels,
-                    "images": [c.image for c in new_rs.spec.template.spec.containers],
-                }
-
-            # Old Replica Sets
-            old_rs_list = []
-            for rs in replica_sets.items:
-                if rs.metadata.owner_references:
-                    for owner in rs.metadata.owner_references:
-                        if (
-                            owner.name == deployment.metadata.name
-                            and rs.metadata.name != new_rs.metadata.name
-                        ):
-                            old_rs_list.append(rs.metadata.name)
-            if not old_rs_list:
-                old_rs_list = ["No resources found."]
-            deployment_info["old_replica_sets"] = old_rs_list
-
-            # Horizontal Pod Autoscalers
-            hpas = autoscaling_v1.list_namespaced_horizontal_pod_autoscaler(
-                namespace=namespace
-            )
-            related_hpas = [
-                h.metadata.name
-                for h in hpas.items
-                if h.spec.scale_target_ref.name == deployment_name
-            ]
-            if not related_hpas:
-                related_hpas = ["No resources found."]
-            deployment_info["horizontal_pod_autoscalers"] = related_hpas
-
-            # Events (Optional)
-            events = core_v1.list_namespaced_event(namespace=namespace)
-            related_events = [
-                e.message
-                for e in events.items
-                if e.involved_object.name == deployment_name
-            ]
-            if not related_events:
-                related_events = ["No resources found."]
-            deployment_info["events"] = related_events
-
-            # Resource Info
-            spec = deployment.spec
-            selector_str = ", ".join(
-                f"{k}: {v}" for k, v in spec.selector.match_labels.items()
-            )
-
-            deployment_info["resource_info"] = {
-                "strategy": spec.strategy.type if spec.strategy else "RollingUpdate",
-                "min_ready_seconds": spec.min_ready_seconds or 0,
-                "revision_history_limit": spec.revision_history_limit or 10,
-                "selector": selector_str,
-            }
-
-            # Rolling Update Strategy
-            rolling = (
-                spec.strategy.rolling_update
-                if spec.strategy and spec.strategy.rolling_update
-                else None
-            )
-            deployment_info["rolling_update_strategy"] = {
-                "max_surge": (
-                    str(rolling.max_surge) if rolling and rolling.max_surge else "25%"
-                ),
-                "max_unavailable": (
-                    str(rolling.max_unavailable)
-                    if rolling and rolling.max_unavailable
-                    else "25%"
-                ),
-            }
-
-            return Response(deployment_info, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
 
 
 # --------------------------------20 June 2025------------------------------
@@ -13879,471 +13269,73 @@ class DeploymentDetailAPIView(APIView):
 #         except Exception as e:
 #             return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+  
+    
+    
+# class ListPodsAPIView(APIView):
+#     """
+#     API View to list all pods with their details including CPU and memory usage.
+#     """
 
-def humanize_age(dt):
-    delta = datetime.utcnow() - dt.replace(tzinfo=None)
-    days = delta.days
-    if days == 0:
-        return "Today"
-    elif days == 1:
-        return "1 day ago"
-    else:
-        return f"{days} days ago"
+#     def get(self, request):
+#         try:
+#             v1 = get_k8s_client()
+#             metrics_client = client.CustomObjectsApi()
+#             pods = v1.list_pod_for_all_namespaces().items
 
+#             pod_list = []
+#             for pod in pods:
+#                 name = pod.metadata.name
+#                 namespace = pod.metadata.namespace
+#                 labels = pod.metadata.labels
+#                 node_name = pod.spec.node_name
+#                 status_phase = pod.status.phase
+#                 restarts = sum([cs.restart_count for cs in pod.status.container_statuses or []])
+#                 creation_time = pod.metadata.creation_timestamp
 
-class ListPodsAPIView(APIView):
-    """
-    API View to list all pods with their details including CPU and memory usage.
-    """
+#                 # Try to fetch metrics (may fail if Metrics Server not installed)
+#                 try:
+#                     metrics = metrics_client.get_namespaced_custom_object(
+#                         group="metrics.k8s.io",
+#                         version="v1beta1",
+#                         namespace=namespace,
+#                         plural="pods",
+#                         name=name
+#                     )
+#                     containers = metrics.get("containers", [])
+#                     total_cpu = sum([float(c["usage"]["cpu"].rstrip("n")) / 1e9 for c in containers])
+#                     total_mem = sum([
+#                         int(c["usage"]["memory"].rstrip("Ki")) * 1024
+#                         for c in containers if "memory" in c["usage"]
+#                     ])
+#                 except Exception:
+#                     total_cpu = None
+#                     total_mem = None
 
-    def get(self, request):
-        try:
-            v1 = get_k8s_client()
-            metrics_client = client.CustomObjectsApi()
-            pods = v1.list_pod_for_all_namespaces().items
+#                 images = [c.image for c in pod.spec.containers]
 
-            pod_list = []
-            for pod in pods:
-                name = pod.metadata.name
-                namespace = pod.metadata.namespace
-                labels = pod.metadata.labels
-                node_name = pod.spec.node_name
-                status_phase = pod.status.phase
-                restarts = sum(
-                    [cs.restart_count for cs in pod.status.container_statuses or []]
-                )
-                creation_time = pod.metadata.creation_timestamp
+#                 pod_list.append({
+#                     "name": name,
+#                     "namespace": namespace,
+#                     "images": images,
+#                     "labels": labels,
+#                     "node": node_name,
+#                     "status": status_phase,
+#                     "restarts": restarts,
+#                     "cpu_usage": round(total_cpu, 4) if total_cpu is not None else "N/A",
+#                     "memory_usage": total_mem if total_mem is not None else "N/A",
+#                     "created_at": creation_time.strftime("%b %d, %Y %H:%M:%S"),
+#                     "created_ago": humanize_age(creation_time)
+#                  })
+#                 # print("pod list---->",pod_list)
+#             return Response({"pods": pod_list}, status=status.HTTP_200_OK)
 
-                # Try to fetch metrics (may fail if Metrics Server not installed)
-                try:
-                    metrics = metrics_client.get_namespaced_custom_object(
-                        group="metrics.k8s.io",
-                        version="v1beta1",
-                        namespace=namespace,
-                        plural="pods",
-                        name=name,
-                    )
-                    containers = metrics.get("containers", [])
-                    total_cpu = sum(
-                        [float(c["usage"]["cpu"].rstrip("n")) / 1e9 for c in containers]
-                    )
-                    total_mem = sum(
-                        [
-                            int(c["usage"]["memory"].rstrip("Ki")) * 1024
-                            for c in containers
-                            if "memory" in c["usage"]
-                        ]
-                    )
-                except Exception:
-                    total_cpu = None
-                    total_mem = None
-
-                images = [c.image for c in pod.spec.containers]
-
-                pod_list.append(
-                    {
-                        "name": name,
-                        "namespace": namespace,
-                        "images": images,
-                        "labels": labels,
-                        "node": node_name,
-                        "status": status_phase,
-                        "restarts": restarts,
-                        "cpu_usage": (
-                            round(total_cpu, 4) if total_cpu is not None else "N/A"
-                        ),
-                        "memory_usage": total_mem if total_mem is not None else "N/A",
-                        "created_at": creation_time.strftime("%b %d, %Y %H:%M:%S"),
-                        "created_ago": humanize_age(creation_time),
-                    }
-                )
-                # print("pod list---->",pod_list)
-            return Response({"pods": pod_list}, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-# ------------------------------23 June 2025 ----------------------------------
-
-
-logger = logging.getLogger(__name__)
-
-
-class ListNamespacesAPIView(APIView):
-    def get(self, request):
-        try:
-            # Use the shared get_k8s_client function
-            v1 = get_k8s_client()
-            namespaces = v1.list_namespace()
-            namespace_names = [ns.metadata.name for ns in namespaces.items]
-
-            logger.debug(f"Namespaces retrieved: {namespace_names}")
-
-            return Response(
-                {"status": "success", "namespaces": namespace_names},
-                status=status.HTTP_200_OK,
-            )
-
-        except Exception as e:
-            logger.exception("Error retrieving namespaces")
-            return Response(
-                {"status": "error", "message": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-class ListStatefulSetsAPIView(APIView):
-    """
-    API to list all StatefulSets in the cluster (or specific namespace).
-    Query param:
-      - ?namespace=<name> (default: all namespaces)
-    """
-
-    def get(self, request):
-        try:
-            # Load kubeconfig
-            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(BASE_DIR, "admin.conf")
-            config.load_kube_config(config_file=config_path)
-
-            namespace = request.query_params.get("namespace")
-
-            apps_v1 = client.AppsV1Api()
-
-            if namespace and namespace.lower() != "all":
-                sts_list = apps_v1.list_namespaced_stateful_set(
-                    namespace=namespace
-                ).items
-            else:
-                sts_list = apps_v1.list_stateful_set_for_all_namespaces().items
-
-            response = []
-
-            for sts in sts_list:
-                name = sts.metadata.name
-                ns = sts.metadata.namespace
-                labels = sts.metadata.labels
-                created = humanize_age(sts.metadata.creation_timestamp)
-                replicas = sts.status.replicas or 0
-                ready = sts.status.ready_replicas or 0
-                images = [c.image for c in sts.spec.template.spec.containers]
-
-                response.append(
-                    {
-                        "name": name,
-                        "namespace": ns,
-                        "images": images,
-                        "labels": labels,
-                        "pods": f"{ready}/{replicas}",
-                        "created": created,
-                    }
-                )
-
-            return Response({"stateful_sets": response}, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-def get_k8s_client1():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(BASE_DIR, "admin.conf")
-    config.load_kube_config(config_file=config_path)
-
-    core_v1 = client.CoreV1Api()
-    apps_v1 = client.AppsV1Api()
-    metrics_client = client.CustomObjectsApi()
-
-    return core_v1, apps_v1, metrics_client
-
-
-class StatefulSetDetailAPIView(APIView):
-    def get(self, request):
-        name = request.query_params.get("name")
-        namespace = request.query_params.get("namespace", "default")
-
-        if not name:
-            return Response({"error": "StatefulSet name is required."}, status=400)
-
-        try:
-            core_v1, apps_v1, metrics_client = get_k8s_client1()
-            sts = apps_v1.read_namespaced_stateful_set(name=name, namespace=namespace)
-
-            metadata = sts.metadata
-            spec = sts.spec
-            status_data = sts.status
-
-            # Pods status
-            running = status_data.ready_replicas or 0
-            desired = spec.replicas or 0
-
-            # Collect pod details
-            pods = core_v1.list_namespaced_pod(
-                namespace=namespace,
-                label_selector=",".join(
-                    [f"{k}={v}" for k, v in spec.selector.match_labels.items()]
-                ),
-            )
-            pod_info = []
-            for pod in pods.items:
-                pod_metrics = None
-                try:
-                    pod_metrics = metrics_client.get_namespaced_custom_object(
-                        group="metrics.k8s.io",
-                        version="v1beta1",
-                        namespace=namespace,
-                        plural="pods",
-                        name=pod.metadata.name,
-                    )
-                except Exception:
-                    pass
-
-                total_cpu = (
-                    sum(
-                        [
-                            float(c["usage"]["cpu"].rstrip("n")) / 1e9
-                            for c in pod_metrics.get("containers", [])
-                        ]
-                    )
-                    if pod_metrics
-                    else 0
-                )
-
-                total_mem = (
-                    sum(
-                        [
-                            int(c["usage"]["memory"].rstrip("Ki")) * 1024
-                            for c in pod_metrics.get("containers", [])
-                            if "memory" in c["usage"]
-                        ]
-                    )
-                    if pod_metrics
-                    else 0
-                )
-
-                pod_info.append(
-                    {
-                        "name": pod.metadata.name,
-                        "namespace": pod.metadata.namespace,
-                        "images": [c.image for c in pod.spec.containers],
-                        "labels": pod.metadata.labels,
-                        "node": pod.spec.node_name,
-                        "status": pod.status.phase,
-                        "restarts": sum(
-                            [
-                                cs.restart_count
-                                for cs in pod.status.container_statuses or []
-                            ]
-                        ),
-                        "cpu_usage": round(total_cpu * 1000, 2),  # in millicores
-                        "memory_usage": total_mem,
-                        "created": humanize_age(pod.metadata.creation_timestamp),
-                    }
-                )
-
-            # Events
-            events = core_v1.list_namespaced_event(namespace=namespace)
-            related_events = [
-                e.message for e in events.items if e.involved_object.name == name
-            ]
-            if not related_events:
-                related_events = ["No resources found."]
-
-            data = {
-                "metadata": {
-                    "name": metadata.name,
-                    "namespace": metadata.namespace,
-                    "created": metadata.creation_timestamp.strftime("%b %d, %Y"),
-                    "age": humanize_age(metadata.creation_timestamp),
-                    "uid": metadata.uid,
-                    "annotations": metadata.annotations,
-                },
-                "resource_info": {
-                    "images": [c.image for c in spec.template.spec.containers]
-                },
-                "pods_status": {"running": running, "desired": desired},
-                "pods": pod_info,
-                "events": related_events,
-            }
-
-            return Response(data, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
-class ReplicaSetDetailAPIView(APIView):
-    def get(self, request):
-        name = request.query_params.get("name")
-        namespace = request.query_params.get("namespace", "default")
-
-        if not name:
-            return Response({"error": "ReplicaSet name is required."}, status=400)
-
-        try:
-            core_v1, apps_v1, metrics_client = get_k8s_client1()
-            rs = apps_v1.read_namespaced_replica_set(name=name, namespace=namespace)
-
-            # Metadata
-            metadata = rs.metadata
-            info = {
-                "name": metadata.name,
-                "namespace": metadata.namespace,
-                "created": metadata.creation_timestamp.strftime("%b %d, %Y"),
-                "age": humanize_age(metadata.creation_timestamp),
-                "uid": metadata.uid,
-                "labels": metadata.labels,
-                "annotations": metadata.annotations,
-            }
-
-            # Selector and Images
-            info["resource_info"] = {
-                "selector": ", ".join(
-                    f"{k}: {v}" for k, v in rs.spec.selector.match_labels.items()
-                ),
-                "images": [c.image for c in rs.spec.template.spec.containers],
-                "init_images": [
-                    c.image for c in rs.spec.template.spec.init_containers or []
-                ],
-            }
-
-            # Pod Status
-            info["pod_status"] = {
-                "running": rs.status.ready_replicas or 0,
-                "desired": rs.spec.replicas or 0,
-            }
-
-            # Pods
-            pods = core_v1.list_namespaced_pod(
-                namespace=namespace,
-                label_selector=",".join(
-                    f"{k}={v}" for k, v in rs.spec.selector.match_labels.items()
-                ),
-            ).items
-            pod_list = []
-            for pod in pods:
-                images = [c.image for c in pod.spec.containers]
-                restarts = sum(
-                    [cs.restart_count for cs in pod.status.container_statuses or []]
-                )
-                try:
-                    metrics = metrics_client.get_namespaced_custom_object(
-                        group="metrics.k8s.io",
-                        version="v1beta1",
-                        namespace=namespace,
-                        plural="pods",
-                        name=pod.metadata.name,
-                    )
-                    containers = metrics.get("containers", [])
-                    total_cpu = sum(
-                        float(c["usage"]["cpu"].rstrip("n")) / 1e9 for c in containers
-                    )
-                    total_mem = sum(
-                        int(c["usage"]["memory"].rstrip("Ki")) * 1024
-                        for c in containers
-                    )
-                except Exception:
-                    total_cpu = None
-                    total_mem = None
-
-                pod_list.append(
-                    {
-                        "name": pod.metadata.name,
-                        "namespace": pod.metadata.namespace,
-                        "images": images,
-                        "labels": pod.metadata.labels,
-                        "node": pod.spec.node_name,
-                        "status": pod.status.phase,
-                        "restarts": restarts,
-                        "created": humanize_age(pod.metadata.creation_timestamp),
-                        "cpu_usage_cores": (
-                            round(total_cpu, 4) if total_cpu is not None else "N/A"
-                        ),
-                        "memory_usage_bytes": (
-                            total_mem if total_mem is not None else "N/A"
-                        ),
-                    }
-                )
-            info["pods"] = pod_list
-
-            # Services (Optional)
-            services = core_v1.list_namespaced_service(namespace=namespace).items
-            related_services = []
-            for svc in services:
-                selector = svc.spec.selector or {}
-                if all(
-                    rs.spec.selector.match_labels.get(k) == v
-                    for k, v in selector.items()
-                ):
-                    related_services.append(
-                        {
-                            "name": svc.metadata.name,
-                            "namespace": svc.metadata.namespace,
-                            "labels": svc.metadata.labels,
-                            "type": svc.spec.type,
-                            "cluster_ip": svc.spec.cluster_ip,
-                            "internal_endpoints": [
-                                f"{port.name or name}:{port.port} {port.protocol}"
-                                for port in svc.spec.ports
-                            ],
-                            "external_endpoints": [
-                                f"{svc.metadata.name}:{port.node_port} {port.protocol}"
-                                for port in svc.spec.ports
-                                if port.node_port
-                            ],
-                            "created": humanize_age(svc.metadata.creation_timestamp),
-                        }
-                    )
-            info["services"] = related_services or ["No services found"]
-
-            # Events (Optional)
-            events = core_v1.list_namespaced_event(namespace=namespace).items
-            related_events = []
-            for e in events:
-                if e.involved_object.name == name:
-                    related_events.append(
-                        {
-                            "name": e.metadata.name,
-                            "reason": e.reason,
-                            "message": e.message,
-                            "source": e.source.component,
-                            "count": e.count,
-                            "first_seen": humanize_age(e.first_timestamp),
-                            "last_seen": humanize_age(e.last_timestamp),
-                        }
-                    )
-            info["events"] = related_events or ["No events found"]
-
-            return Response(info, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
+#         except Exception as e:
+#             return Response(
+#                 {"error": f"Unexpected error: {str(e)}"},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
+# # ------------------------------23 June 2025 ----------------------------------
 
 # -----------------------------------------24 June 2025------------------------------
 
@@ -14439,22 +13431,20 @@ class ReplicaSetDetailAPIView(APIView):
 #             return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 def get_k8s_client2():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     config_path = os.path.join(BASE_DIR, "admin.conf")
     config.load_kube_config(config_file=config_path)
     return client.CoreV1Api(), client.AppsV1Api()  # ✅ this line must return both
 
-
 class PodDetailAPIView(APIView):
     def get(self, request):
-        name = request.query_params.get("name")
-        namespace = request.query_params.get("namespace", "default")
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
 
         if not name:
-            return Response(
-                {"error": "Pod name is required."}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": "Pod name is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             core_v1, apps_v1 = get_k8s_client2()
@@ -14468,152 +13458,86 @@ class PodDetailAPIView(APIView):
             controlled_by = {}
             if owner_refs:
                 ref = owner_refs[0]
-                controlled_by = {"name": ref.name, "kind": ref.kind}
+                controlled_by = {
+                    "name": ref.name,
+                    "kind": ref.kind
+                }
 
             # PVCs
-            pvcs = core_v1.list_namespaced_persistent_volume_claim(
-                namespace=namespace
-            ).items
-            pod_volumes = {
-                vol.name: vol.persistent_volume_claim.claim_name
-                for vol in spec.volumes
-                if vol.persistent_volume_claim
-            }
+            pvcs = core_v1.list_namespaced_persistent_volume_claim(namespace=namespace).items
+            pod_volumes = {vol.name: vol.persistent_volume_claim.claim_name for vol in spec.volumes if vol.persistent_volume_claim}
             pvc_info = []
             for pvc in pvcs:
                 if pvc.metadata.name in pod_volumes.values():
-                    pvc_info.append(
-                        {
-                            "name": pvc.metadata.name,
-                            "labels": pvc.metadata.labels,
-                            "status": pvc.status.phase,
-                            "volume": pvc.spec.volume_name,
-                            "capacity": pvc.status.capacity.get("storage", "-"),
-                            "access_modes": pvc.spec.access_modes,
-                            "storage_class": pvc.metadata.annotations.get(
-                                "volume.beta.kubernetes.io/storage-class", "-"
-                            ),
-                            "created": humanize_age(pvc.metadata.creation_timestamp),
-                        }
-                    )
+                    pvc_info.append({
+                        "name": pvc.metadata.name,
+                        "labels": pvc.metadata.labels,
+                        "status": pvc.status.phase,
+                        "volume": pvc.spec.volume_name,
+                        "capacity": pvc.status.capacity.get("storage", "-"),
+                        "access_modes": pvc.spec.access_modes,
+                        "storage_class": pvc.metadata.annotations.get("volume.beta.kubernetes.io/storage-class", "-"),
+                        "created": humanize_age(pvc.metadata.creation_timestamp)
+                    })
 
             # Init containers
             init_containers = []
             for c in spec.init_containers or []:
                 env_vars = {}
                 for e in c.env or []:
-                    env_vars[e.name] = (
-                        e.value
-                        if e.value
-                        else (
-                            os.environ.get(e.value_from.secret_key_ref.name, "")
-                            if e.value_from and e.value_from.secret_key_ref
-                            else ""
-                        )
-                    )
-                init_containers.append(
-                    {
-                        "name": c.name,
-                        "image": c.image,
-                        "env": env_vars,
-                        "commands": c.command,
-                        "args": c.args,
-                        "mounts": [
-                            {
-                                "name": m.name,
-                                "read_only": m.read_only,
-                                "mount_path": m.mount_path,
-                                "sub_path": m.sub_path or "-",
-                                "source_type": (
-                                    "PersistentVolumeClaim"
-                                    if "persistent" in m.name
-                                    else "Projected"
-                                ),
-                                "source_name": pod_volumes.get(m.name, "-"),
-                            }
-                            for m in c.volume_mounts
-                        ],
-                    }
-                )
+                    env_vars[e.name] = e.value if e.value else os.environ.get(e.value_from.secret_key_ref.name, "") if e.value_from and e.value_from.secret_key_ref else ""
+                init_containers.append({
+                    "name": c.name,
+                    "image": c.image,
+                    "env": env_vars,
+                    "commands": c.command,
+                    "args": c.args,
+                    "mounts": [{
+                        "name": m.name,
+                        "read_only": m.read_only,
+                        "mount_path": m.mount_path,
+                        "sub_path": m.sub_path or "-",
+                        "source_type": "PersistentVolumeClaim" if "persistent" in m.name else "Projected",
+                        "source_name": pod_volumes.get(m.name, "-")
+                    } for m in c.volume_mounts]
+                })
 
             # Containers
             containers_info = []
             for c in spec.containers:
-                container_status = next(
-                    (
-                        cs
-                        for cs in status_obj.container_statuses or []
-                        if cs.name == c.name
-                    ),
-                    None,
-                )
+                container_status = next((cs for cs in status_obj.container_statuses or [] if cs.name == c.name), None)
                 env_vars = {}
                 for e in c.env or []:
-                    env_vars[e.name] = (
-                        e.value
-                        if e.value
-                        else (
-                            os.environ.get(e.value_from.secret_key_ref.name, "")
-                            if e.value_from and e.value_from.secret_key_ref
-                            else ""
-                        )
-                    )
-                containers_info.append(
-                    {
-                        "name": c.name,
-                        "image": c.image,
-                        "status": (
-                            "Ready"
-                            if container_status and container_status.ready
-                            else "Not Ready"
-                        ),
-                        "ready": container_status.ready if container_status else False,
-                        "started": (
-                            container_status.started if container_status else False
-                        ),
-                        "started_at": (
-                            container_status.state.running.started_at.isoformat()
-                            if container_status
-                            and container_status.state
-                            and container_status.state.running
-                            else None
-                        ),
-                        "env": env_vars,
-                        "mounts": [
-                            {
-                                "name": m.name,
-                                "read_only": m.read_only,
-                                "mount_path": m.mount_path,
-                                "sub_path": m.sub_path or "-",
-                                "source_type": (
-                                    "PersistentVolumeClaim"
-                                    if "persistent" in m.name
-                                    else "Projected"
-                                ),
-                                "source_name": pod_volumes.get(m.name, "-"),
-                            }
-                            for m in c.volume_mounts
-                        ],
-                    }
-                )
+                    env_vars[e.name] = e.value if e.value else os.environ.get(e.value_from.secret_key_ref.name, "") if e.value_from and e.value_from.secret_key_ref else ""
+                containers_info.append({
+                    "name": c.name,
+                    "image": c.image,
+                    "status": "Ready" if container_status and container_status.ready else "Not Ready",
+                    "ready": container_status.ready if container_status else False,
+                    "started": container_status.started if container_status else False,
+                    "started_at": container_status.state.running.started_at.isoformat() if container_status and container_status.state and container_status.state.running else None,
+                    "env": env_vars,
+                    "mounts": [{
+                        "name": m.name,
+                        "read_only": m.read_only,
+                        "mount_path": m.mount_path,
+                        "sub_path": m.sub_path or "-",
+                        "source_type": "PersistentVolumeClaim" if "persistent" in m.name else "Projected",
+                        "source_name": pod_volumes.get(m.name, "-")
+                    } for m in c.volume_mounts]
+                })
 
             # Conditions
             conditions = []
             for cond in status_obj.conditions or []:
-                conditions.append(
-                    {
-                        "type": cond.type,
-                        "status": cond.status,
-                        "last_probe_time": getattr(cond, "last_probe_time", "-") or "-",
-                        "last_transition_time": (
-                            humanize_age(cond.last_transition_time)
-                            if cond.last_transition_time
-                            else "-"
-                        ),
-                        "reason": getattr(cond, "reason", "-") or "-",
-                        "message": getattr(cond, "message", "-") or "-",
-                    }
-                )
+                conditions.append({
+                    "type": cond.type,
+                    "status": cond.status,
+                    "last_probe_time": getattr(cond, 'last_probe_time', '-') or '-',
+                    "last_transition_time": humanize_age(cond.last_transition_time) if cond.last_transition_time else '-',
+                    "reason": getattr(cond, 'reason', '-') or '-',
+                    "message": getattr(cond, 'message', '-') or '-'
+                })
 
             data = {
                 "name": metadata.name,
@@ -14627,29 +13551,22 @@ class PodDetailAPIView(APIView):
                 "status": status_obj.phase,
                 "ip": status_obj.pod_ip,
                 "qos_class": status_obj.qos_class,
-                "restarts": sum(
-                    [cs.restart_count for cs in status_obj.container_statuses or []]
-                ),
+                "restarts": sum([cs.restart_count for cs in status_obj.container_statuses or []]),
                 "service_account": spec.service_account_name,
                 "controlled_by": controlled_by,
                 "containers": containers_info,
                 "init_containers": init_containers,
                 "persistent_volume_claims": pvc_info,
                 "conditions": conditions,
-                "events": [],
+                "events": []
             }
 
             return Response(data, status=status.HTTP_200_OK)
 
         except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
         except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class PodLogsAPIView(APIView):
@@ -14660,18 +13577,14 @@ class PodLogsAPIView(APIView):
                 name=pod_name,
                 namespace=namespace,
                 tail_lines=100,  # You can make this a query param if needed
-                follow=False,
+                follow=False
             )
             return Response({"logs": log_response}, status=status.HTTP_200_OK)
         except ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"error": f"Kubernetes API error: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 # -------------------------------------30 June 2025------------------------------------------
@@ -14780,26 +13693,14 @@ def get_k8s_client3():
     config.load_kube_config(config_file=config_path)
     return client.AppsV1Api(), client.CoreV1Api()
 
-
 class DeployMongoDBAPIView(APIView):
     def post(self, request):
         data = request.data
-        required_fields = [
-            "replica",
-            "app_name",
-            "root_password",
-            "username",
-            "password",
-            "database",
-            "node_port",
-        ]
+        required_fields = ["replica", "app_name", "root_password", "username", "password", "database", "node_port"]
 
         for field in required_fields:
             if field not in data:
-                return Response(
-                    {"error": f"'{field}' is required."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": f"'{field}' is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         app_name = data["app_name"]
         namespace = "default"
@@ -14814,34 +13715,28 @@ class DeployMongoDBAPIView(APIView):
                 image="mongo:latest",
                 ports=[client.V1ContainerPort(container_port=27017)],
                 env=[
-                    client.V1EnvVar(
-                        name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]
-                    ),
-                    client.V1EnvVar(
-                        name="MONGO_INITDB_ROOT_PASSWORD", value=data["root_password"]
-                    ),
-                    client.V1EnvVar(
-                        name="MONGO_INITDB_DATABASE", value=data["database"]
-                    ),
-                ],
+                    client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]),
+                    client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=data["root_password"]),
+                    client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=data["database"]),
+                ]
             )
 
             template = client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(labels=labels),
-                spec=client.V1PodSpec(containers=[container]),
+                spec=client.V1PodSpec(containers=[container])
             )
 
             spec = client.V1DeploymentSpec(
                 replicas=int(data["replica"]),
                 selector=client.V1LabelSelector(match_labels=labels),
-                template=template,
+                template=template
             )
 
             deployment = client.V1Deployment(
                 api_version="apps/v1",
                 kind="Deployment",
                 metadata=client.V1ObjectMeta(name=app_name),
-                spec=spec,
+                spec=spec
             )
 
             apps_v1.create_namespaced_deployment(namespace=namespace, body=deployment)
@@ -14856,29 +13751,21 @@ class DeployMongoDBAPIView(APIView):
                         client.V1ServicePort(
                             port=27017,
                             target_port=27017,
-                            node_port=int(data["node_port"]),
+                            node_port=int(data["node_port"])
                         )
-                    ],
-                ),
+                    ]
+                )
             )
 
             core_v1.create_namespaced_service(namespace=namespace, body=service)
 
-            return Response(
-                {"message": f"MongoDB '{app_name}' deployed successfully."},
-                status=status.HTTP_201_CREATED,
-            )
+            return Response({"message": f"MongoDB '{app_name}' deployed successfully."}, status=status.HTTP_201_CREATED)
 
         except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}", "details": e.body},
-                status=e.status,
-            )
+            return Response({"error": f"Kubernetes API error: {e.reason}", "details": e.body}, status=e.status)
         except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class TicketListAPIView(APIView):
@@ -14976,8 +13863,8 @@ class TicketCreateAPIView(APIView):
             )
             return Response(TicketSerializer(ticket).data, status=201)
         return Response(serializer.errors, status=400)
-
-
+    
+    
 # -------------------------------------4 july 2025----------------------------------------------------------
 def get_k8s_client4():
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14985,30 +13872,19 @@ def get_k8s_client4():
     config.load_kube_config(config_file=config_path)
     return client.CoreV1Api(), client.AppsV1Api(), client.NetworkingV1Api()
 
-
 class ServiceDetailAPIView(APIView):
     def get(self, request):
-        name = request.query_params.get("name")
-        namespace = request.query_params.get("namespace", "default")
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
 
         if not name:
-            return Response(
-                {"error": "Service name is required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"error": "Service name is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             core_v1, apps_v1, net_v1 = get_k8s_client4()
             service = core_v1.read_namespaced_service(name=name, namespace=namespace)
-            endpoints = core_v1.read_namespaced_endpoints(
-                name=name, namespace=namespace
-            )
-            pods = core_v1.list_namespaced_pod(
-                namespace=namespace,
-                label_selector=",".join(
-                    [f"{k}={v}" for k, v in (service.spec.selector or {}).items()]
-                ),
-            )
+            endpoints = core_v1.read_namespaced_endpoints(name=name, namespace=namespace)
+            pods = core_v1.list_namespaced_pod(namespace=namespace, label_selector=','.join([f"{k}={v}" for k, v in (service.spec.selector or {}).items()]))
             ingresses = net_v1.list_namespaced_ingress(namespace=namespace)
 
             created = service.metadata.creation_timestamp
@@ -15017,20 +13893,20 @@ class ServiceDetailAPIView(APIView):
 
             ports = []
             for p in service.spec.ports:
-                ports.append(
-                    {
-                        "name": p.name or "<unset>",
-                        "port": p.port,
-                        "protocol": p.protocol,
-                    }
-                )
+                ports.append({
+                    "name": p.name or "<unset>",
+                    "port": p.port,
+                    "protocol": p.protocol
+                })
 
             endpoints_data = []
             for subset in endpoints.subsets or []:
                 for address in subset.addresses or []:
-                    endpoints_data.append(
-                        {"host": address.ip, "node": address.node_name, "ready": True}
-                    )
+                    endpoints_data.append({
+                        "host": address.ip,
+                        "node": address.node_name,
+                        "ready": True
+                    })
 
             pod_data = []
             for pod in pods.items:
@@ -15038,39 +13914,28 @@ class ServiceDetailAPIView(APIView):
                 usage_cpu = "2.00m"  # Placeholder
                 usage_memory = "251.49Mi"  # Placeholder
 
-                pod_data.append(
-                    {
-                        "name": pod.metadata.name,
-                        "images": [c.image for c in pod.spec.containers],
-                        "labels": pod.metadata.labels,
-                        "node": pod.spec.node_name,
-                        "status": pod_status,
-                        "restarts": sum(
-                            cs.restart_count
-                            for cs in (pod.status.container_statuses or [])
-                        ),
-                        "cpu_usage": usage_cpu,
-                        "memory_usage": usage_memory,
-                        "created": humanize_age(pod.metadata.creation_timestamp),
-                    }
-                )
+                pod_data.append({
+                    "name": pod.metadata.name,
+                    "images": [c.image for c in pod.spec.containers],
+                    "labels": pod.metadata.labels,
+                    "node": pod.spec.node_name,
+                    "status": pod_status,
+                    "restarts": sum(cs.restart_count for cs in (pod.status.container_statuses or [])),
+                    "cpu_usage": usage_cpu,
+                    "memory_usage": usage_memory,
+                    "created": humanize_age(pod.metadata.creation_timestamp)
+                })
 
             ingress_data = []
             for ing in ingresses.items:
                 for rule in ing.spec.rules or []:
-                    ingress_data.append(
-                        {
-                            "name": ing.metadata.name,
-                            "labels": ing.metadata.labels,
-                            "endpoints": (
-                                ing.status.load_balancer.ingress[0].ip
-                                if ing.status.load_balancer.ingress
-                                else "-"
-                            ),
-                            "hosts": rule.host,
-                            "created": humanize_age(ing.metadata.creation_timestamp),
-                        }
-                    )
+                    ingress_data.append({
+                        "name": ing.metadata.name,
+                        "labels": ing.metadata.labels,
+                        "endpoints": ing.status.load_balancer.ingress[0].ip if ing.status.load_balancer.ingress else "-",
+                        "hosts": rule.host,
+                        "created": humanize_age(ing.metadata.creation_timestamp)
+                    })
 
             data = {
                 "name": service.metadata.name,
@@ -15087,20 +13952,15 @@ class ServiceDetailAPIView(APIView):
                 "endpoints": endpoints_data,
                 "pods": pod_data,
                 "ingresses": ingress_data,
-                "events": [],
+                "events": []
             }
 
             return Response(data, status=status.HTTP_200_OK)
 
         except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
         except Exception as e:
-            return Response(
-                {"error": f"Unexpected error: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ServiceRequestAPIView(APIView):
@@ -17545,100 +16405,6 @@ class ApplicationCredentialAPIView(APIView):
 # ---------------------------------------10 Nov 2025----------------------------
 
 
-class NodeDetailAPIView(APIView):
-    def get(self, request, name):
-        try:
-            core_v1, apps_v1, net_v1 = get_k8s_client4()
-
-            # Get Node
-            node = core_v1.read_node(name)
-
-            created = node.metadata.creation_timestamp
-
-            # System / kube info
-            node_info = node.status.node_info
-
-            # Conditions
-            conditions = []
-            for cond in node.status.conditions or []:
-                conditions.append(
-                    {
-                        "type": cond.type,
-                        "status": cond.status,
-                        "last_heartbeat_time": cond.last_heartbeat_time,
-                        "last_transition_time": cond.last_transition_time,
-                        "reason": cond.reason,
-                        "message": cond.message,
-                    }
-                )
-
-            # Pods running on this node
-            pod_list = core_v1.list_pod_for_all_namespaces(
-                field_selector=f"spec.nodeName={name}"
-            )
-            pods = []
-            for p in pod_list.items:
-                pods.append(
-                    {
-                        "name": p.metadata.name,
-                        "namespace": p.metadata.namespace,
-                        "status": p.status.phase,
-                        "restarts": sum(
-                            (
-                                cs.restart_count
-                                for cs in (p.status.container_statuses or [])
-                            )
-                        ),
-                        "images": [c.image for c in p.spec.containers],
-                        "created": humanize_age(p.metadata.creation_timestamp),
-                    }
-                )
-
-            data = {
-                "name": node.metadata.name,
-                "created": created.strftime("%b %d, %Y"),
-                "age": humanize_age(created),
-                "uid": node.metadata.uid,
-                "labels": node.metadata.labels or {},
-                "annotations": node.metadata.annotations or {},
-                "resource": {
-                    "cpu_capacity": node.status.capacity.get("cpu", "0"),
-                    "memory_capacity": node.status.capacity.get("memory", "0"),
-                    "pods_capacity": node.status.capacity.get("pods", "0"),
-                },
-                "addresses": [
-                    {"type": addr.type, "address": addr.address}
-                    for addr in node.status.addresses or []
-                ],
-                "system_info": {
-                    "machine_id": node_info.machine_id,
-                    "system_uuid": node_info.system_uuid,
-                    "boot_id": node_info.boot_id,
-                    "kernel_version": node_info.kernel_version,
-                    "os_image": node_info.os_image,
-                    "container_runtime_version": node_info.container_runtime_version,
-                    "kubelet_version": node_info.kubelet_version,
-                    "kube_proxy_version": node_info.kube_proxy_version,
-                    "operating_system": node_info.operating_system,
-                    "architecture": node_info.architecture,
-                },
-                "conditions": conditions,
-                "pods": pods,
-                "events": [],
-            }
-
-            return Response(data, status=status.HTTP_200_OK)
-
-        except client.exceptions.ApiException as e:
-            return Response(
-                {"error": f"Kubernetes API error: {e.reason}"}, status=e.status
-            )
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
 class StorageClassListView(APIView):
     """
     Fetch Kubernetes StorageClass details.
@@ -17657,18 +16423,1978 @@ class StorageClassListView(APIView):
                 parameters = sc.parameters or {}
                 created = sc.metadata.creation_timestamp
 
-                storage_list.append(
-                    {
-                        "name": name,
-                        "provisioner": provisioner,
-                        "parameters": parameters,
-                        "created": created.strftime("%b %d, %Y"),
-                    }
-                )
+                storage_list.append({
+                    "name": name,
+                    "provisioner": provisioner,
+                    "parameters": parameters,
+                    "created": created.strftime("%b %d, %Y"),
+                })
 
             return Response(storage_list, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+  
+  
+        
+ ################################################################################################################
+ ##############################################################################################
+ ############################################################################################################################
+ 
+#--------------------------------------------------------------------------------------------
+#                               Deployement                      
+#---------------------------------------------------------------------------------------------------
+
+class KubernetesDeploymentsAPIView(APIView):
+    permission_classes = []
+
+    def get(self, request):
+        try:
+            deployments = apps_v1.list_deployment_for_all_namespaces()
+            deployment_list = [
+                {
+                    "name": deploy.metadata.name,
+                    "namespace": deploy.metadata.namespace,
+                    "replicas": deploy.spec.replicas,
+                    "available_replicas": deploy.status.available_replicas or 0,
+                    "labels": deploy.metadata.labels or {}
+                }
+                for deploy in deployments.items
+            ]
+            return Response(deployment_list, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class DeploymentDetailAPIView(APIView):
+    """
+    Get detailed information about a Kubernetes Deployment using its name.
+    Usage: ?name=<deployment_name>&namespace=<namespace>
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        deployment_name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
+
+        if not deployment_name:
+            return Response({"error": "Deployment name is required."}, status=400)
+
+        try:
+            # Use global clients
+            apps_v1_client = apps_v1
+            core_v1_client = v1
+            autoscaling_v1_client = client.AutoscalingV1Api()
+
+            # Fetch deployment
+            deployment = apps_v1_client.read_namespaced_deployment(
+                name=deployment_name, namespace=namespace
+            )
+
+            metadata = deployment.metadata
+            deployment_info = {
+                "name": metadata.name,
+                "namespace": metadata.namespace,
+                "created": metadata.creation_timestamp.strftime("%b %d, %Y") if metadata.creation_timestamp else None,
+                "age": humanize_age(metadata.creation_timestamp) if metadata.creation_timestamp else None,
+                "uid": metadata.uid,
+                "labels": metadata.labels or {},
+                "annotations": metadata.annotations or {},
+            }
+
+            # Pod status
+            status_info = deployment.status
+            deployment_info["pod_status"] = {
+                "updated": status_info.updated_replicas or 0,
+                "total": status_info.replicas or 0,
+                "available": status_info.available_replicas or 0,
+            }
+
+            # Conditions
+            deployment_info["conditions"] = [
+                {
+                    "type": cond.type,
+                    "status": cond.status,
+                    "last_transition_time": cond.last_transition_time,
+                    "reason": cond.reason,
+                    "message": cond.message,
+                }
+                for cond in status_info.conditions or []
+            ]
+
+            # ReplicaSets (use label selector)
+            label_selector = ",".join(f"{k}={v}" for k, v in deployment.spec.selector.match_labels.items())
+            replica_sets = apps_v1_client.list_namespaced_replica_set(
+                namespace=namespace,
+                label_selector=label_selector
+            ).items
+
+            new_rs = None
+            for rs in replica_sets:
+                if rs.metadata.creation_timestamp and (not new_rs or rs.metadata.creation_timestamp > new_rs.metadata.creation_timestamp):
+                    new_rs = rs
+
+            if new_rs:
+                deployment_info["new_replica_set"] = {
+                    "name": new_rs.metadata.name,
+                    "namespace": new_rs.metadata.namespace,
+                    "age": humanize_age(new_rs.metadata.creation_timestamp),
+                    "pods": f"{new_rs.status.replicas or 0} / {new_rs.spec.replicas or 0}",
+                    "labels": new_rs.metadata.labels or {},
+                    "images": [c.image for c in new_rs.spec.template.spec.containers],
+                }
+
+            old_rs_list = [rs.metadata.name for rs in replica_sets if rs != new_rs] or ["No resources found."]
+            deployment_info["old_replica_sets"] = old_rs_list
+
+            # Horizontal Pod Autoscalers
+            hpas = autoscaling_v1_client.list_namespaced_horizontal_pod_autoscaler(
+                namespace=namespace,
+
+            ).items
+            related_hpas = [h.metadata.name for h in hpas if h.spec.scale_target_ref.name == deployment_name] or ["No resources found."]
+            deployment_info["horizontal_pod_autoscalers"] = related_hpas
+
+            # Events
+            events = core_v1_client.list_namespaced_event(
+                namespace=namespace,
+                field_selector=f"involvedObject.name={deployment_name},involvedObject.kind=Deployment"
+            ).items
+            deployment_info["events"] = [e.message for e in events] or ["No resources found."]
+
+            # Resource info
+            spec = deployment.spec
+            deployment_info["resource_info"] = {
+                "strategy": spec.strategy.type if spec.strategy else "RollingUpdate",
+                "min_ready_seconds": spec.min_ready_seconds or 0,
+                "revision_history_limit": spec.revision_history_limit or 10,
+                "selector": label_selector
+            }
+
+            rolling = spec.strategy.rolling_update if spec.strategy and spec.strategy.rolling_update else None
+            deployment_info["rolling_update_strategy"] = {
+                "max_surge": str(rolling.max_surge) if rolling and rolling.max_surge else "25%",
+                "max_unavailable": str(rolling.max_unavailable) if rolling and rolling.max_unavailable else "25%"
+            }
+
+            return Response(deployment_info, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# -------------------------------------15 Mar 2025--------------------------------------------
+#--------------------------------------------------------------------------------------------
+#                               Replica sets                       
+#---------------------------------------------------------------------------------------------------
+
+class ReplicaSetDetailsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        namespace = request.query_params.get('namespace', 'all')
+
+        try:
+            # Use global client
+            apps_v1_client = apps_v1
+
+            # Fetch replica sets
+            if namespace.lower() == 'all':
+                replica_sets = apps_v1_client.list_replica_set_for_all_namespaces().items
+            else:
+                replica_sets = apps_v1_client.list_namespaced_replica_set(namespace=namespace).items
+
+            rs_data = []
+            for rs in replica_sets:
+                images = [c.image for c in rs.spec.template.spec.containers] if rs.spec.template and rs.spec.template.spec else []
+                rs_data.append({
+                    "Name": rs.metadata.name,
+                    "Namespace": rs.metadata.namespace,
+                    "Images": images,
+                    "Labels": rs.metadata.labels or {},
+                    "Pods": rs.status.replicas or 0,
+                    "Created": rs.metadata.creation_timestamp.isoformat() if rs.metadata.creation_timestamp else None
+                })
+
+            return Response(rs_data, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ReplicaSetDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
+
+        if not name:
+            return Response({"error": "ReplicaSet name is required."}, status=400)
+
+        try:
+            core_v1_client, apps_v1_client, metrics_client = get_k8s_client1()
+            rs = apps_v1_client.read_namespaced_replica_set(name=name, namespace=namespace)
+
+            metadata = rs.metadata
+            info = {
+                "name": metadata.name,
+                "namespace": metadata.namespace,
+                "created": metadata.creation_timestamp.strftime("%b %d, %Y") if metadata.creation_timestamp else None,
+                "age": humanize_age(metadata.creation_timestamp) if metadata.creation_timestamp else None,
+                "uid": metadata.uid,
+                "labels": metadata.labels or {},
+                "annotations": metadata.annotations or {}
+            }
+
+            # Resource info
+            selector_str = ",".join(f"{k}={v}" for k, v in rs.spec.selector.match_labels.items())
+            info["resource_info"] = {
+                "selector": selector_str,
+                "images": [c.image for c in rs.spec.template.spec.containers],
+                "init_images": [c.image for c in rs.spec.template.spec.init_containers or []]
+            }
+
+            # Pod Status
+            info["pod_status"] = {
+                "running": rs.status.ready_replicas or 0,
+                "desired": rs.spec.replicas or 0
+            }
+
+            # Fetch pods using label selector
+            pods = core_v1_client.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=selector_str
+            ).items
+
+            pod_list = []
+            for pod in pods:
+                images = [c.image for c in pod.spec.containers]
+                restarts = sum(cs.restart_count for cs in pod.status.container_statuses or [])
+                # Pod metrics
+                try:
+                    metrics = metrics_client.get_namespaced_custom_object(
+                        group="metrics.k8s.io",
+                        version="v1beta1",
+                        namespace=namespace,
+                        plural="pods",
+                        name=pod.metadata.name
+                    )
+                    containers = metrics.get("containers", [])
+                    total_cpu = sum(float(c["usage"]["cpu"].rstrip("n")) / 1e9 for c in containers)
+                    total_mem = sum(int(c["usage"]["memory"].rstrip("Ki")) * 1024 for c in containers)
+                except Exception:
+                    total_cpu = None
+                    total_mem = None
+
+                pod_list.append({
+                    "name": pod.metadata.name,
+                    "namespace": pod.metadata.namespace,
+                    "images": images,
+                    "labels": pod.metadata.labels or {},
+                    "node": pod.spec.node_name,
+                    "status": pod.status.phase,
+                    "restarts": restarts,
+                    "created": humanize_age(pod.metadata.creation_timestamp),
+                    "cpu_usage_cores": round(total_cpu, 4) if total_cpu is not None else "N/A",
+                    "memory_usage_bytes": total_mem if total_mem is not None else "N/A"
+                })
+            info["pods"] = pod_list
+
+            # Related Services
+            services = core_v1_client.list_namespaced_service(namespace=namespace).items
+            related_services = []
+            for svc in services:
+                selector = svc.spec.selector or {}
+                if all(rs.spec.selector.match_labels.get(k) == v for k, v in selector.items()):
+                    related_services.append({
+                        "name": svc.metadata.name,
+                        "namespace": svc.metadata.namespace,
+                        "labels": svc.metadata.labels or {},
+                        "type": svc.spec.type,
+                        "cluster_ip": svc.spec.cluster_ip,
+                        "internal_endpoints": [f"{port.name or name}:{port.port} {port.protocol}" for port in svc.spec.ports],
+                        "external_endpoints": [f"{svc.metadata.name}:{port.node_port} {port.protocol}" for port in svc.spec.ports if port.node_port],
+                        "created": humanize_age(svc.metadata.creation_timestamp)
+                    })
+            info["services"] = related_services or ["No services found"]
+
+            # Events
+            events = core_v1_client.list_namespaced_event(namespace=namespace).items
+            related_events = [
+                {
+                    "name": e.metadata.name,
+                    "reason": e.reason,
+                    "message": e.message,
+                    "source": e.source.component,
+                    "count": e.count,
+                    "first_seen": humanize_age(e.first_timestamp),
+                    "last_seen": humanize_age(e.last_timestamp)
+                }
+                for e in events if e.involved_object.name == name
+            ]
+            info["events"] = related_events or ["No events found"]
+
+            return Response(info, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+#-------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------
+#                               Nodes                       
+#---------------------------------------------------------------------------------------------------
+class ListK8sNodes(APIView):
+    """API View to list Kubernetes nodes with detailed resource and pod info."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            namespace = request.query_params.get("namespace", None)
+            v1 = get_k8s_client()
+
+            nodes = v1.list_node().items
+            pods = (
+                v1.list_pod_for_all_namespaces().items
+                if namespace in [None, "", "all"]
+                else v1.list_namespaced_pod(namespace).items
+            )
+
+            # Build a map of node_name -> pods to avoid multiple iterations
+            pods_by_node = {}
+            for pod in pods:
+                pods_by_node.setdefault(pod.spec.node_name, []).append(pod)
+
+            node_data_list = []
+
+            for node in nodes:
+                name = node.metadata.name
+                labels = node.metadata.labels or {}
+                created_at = node.metadata.creation_timestamp
+
+                # Node ready condition
+                ready_status = next(
+                    (cond.status for cond in node.status.conditions if cond.type == "Ready"), "Unknown"
+                )
+
+                # Allocatable and capacity
+                allocatable = node.status.allocatable or {}
+                capacity = node.status.capacity or {}
+
+                # Pods scheduled on this node
+                pods_on_node = pods_by_node.get(name, [])
+
+                # CPU & memory requests/limits
+                cpu_req = cpu_lim = mem_req = mem_lim = 0
+                for pod in pods_on_node:
+                    for container in pod.spec.containers:
+                        resources = container.resources
+                        if resources.requests:
+                            cpu_req += parse_cpu(resources.requests.get("cpu", "0"))
+                            mem_req += parse_memory(resources.requests.get("memory", "0"))
+                        if resources.limits:
+                            cpu_lim += parse_cpu(resources.limits.get("cpu", "0"))
+                            mem_lim += parse_memory(resources.limits.get("memory", "0"))
+
+                node_data_list.append({
+                    "name": name,
+                    "labels": labels,
+                    "ready": "True" if ready_status == "True" else "False",
+                    "cpu_requests": cpu_req,
+                    "cpu_limits": cpu_lim,
+                    "cpu_capacity": parse_cpu(capacity.get("cpu", "0")),
+                    "memory_requests_bytes": mem_req,
+                    "memory_limits_bytes": mem_lim,
+                    "memory_capacity_bytes": parse_memory(capacity.get("memory", "0")),
+                    "pods": len(pods_on_node),
+                    "created": created_at.strftime("%Y-%m-%d %H:%M:%S") if created_at else None
+                })
+
+            return Response({"nodes": node_data_list}, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class NodeDetailAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, name):
+        try:
+            core_v1, apps_v1, net_v1 = get_k8s_client4()
+
+            node = core_v1.read_node(name)
+            created = node.metadata.creation_timestamp
+            node_info = node.status.node_info
+
+            # Conditions
+            conditions = [
+                {
+                    "type": cond.type,
+                    "status": cond.status,
+                    "last_heartbeat_time": cond.last_heartbeat_time,
+                    "last_transition_time": cond.last_transition_time,
+                    "reason": cond.reason,
+                    "message": cond.message
+                }
+                for cond in node.status.conditions or []
+            ]
+
+            # Pods on node using field_selector for speed
+            pods = core_v1.list_pod_for_all_namespaces(field_selector=f"spec.nodeName={name}").items
+            pod_list = []
+            for p in pods:
+                pod_list.append({
+                    "name": p.metadata.name,
+                    "namespace": p.metadata.namespace,
+                    "status": p.status.phase,
+                    "restarts": sum(cs.restart_count for cs in (p.status.container_statuses or [])),
+                    "images": [c.image for c in p.spec.containers],
+                    "created": humanize_age(p.metadata.creation_timestamp)
+                })
+
+            # Build response
+            data = {
+                "name": node.metadata.name,
+                "created": created.strftime("%b %d, %Y") if created else None,
+                "age": humanize_age(created) if created else None,
+                "uid": node.metadata.uid,
+                "labels": node.metadata.labels or {},
+                "annotations": node.metadata.annotations or {},
+                "resource": {
+                    "cpu_capacity": node.status.capacity.get("cpu", "0"),
+                    "memory_capacity": node.status.capacity.get("memory", "0"),
+                    "pods_capacity": node.status.capacity.get("pods", "0"),
+                },
+                "addresses": [{"type": addr.type, "address": addr.address} for addr in node.status.addresses or []],
+                "system_info": {
+                    "machine_id": node_info.machine_id,
+                    "system_uuid": node_info.system_uuid,
+                    "boot_id": node_info.boot_id,
+                    "kernel_version": node_info.kernel_version,
+                    "os_image": node_info.os_image,
+                    "container_runtime_version": node_info.container_runtime_version,
+                    "kubelet_version": node_info.kubelet_version,
+                    "kube_proxy_version": node_info.kube_proxy_version,
+                    "operating_system": node_info.operating_system,
+                    "architecture": node_info.architecture,
+                },
+                "conditions": conditions,
+                "pods": pod_list,
+                "events": []  # optional: fetch node events if needed
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+#--------------------------------------------------------------------------------------------
+#                               Pods
+#--------------------------------------------------------------------------------------------        
+class ListPodsAPIView(APIView):
+    """FAST: List all pods with CPU/Mem using 1 metrics call."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            core_v1 = get_k8s_client()
+            metrics_client = client.CustomObjectsApi()
+
+            # 1️⃣ Fetch pods
+            pods = core_v1.list_pod_for_all_namespaces(watch=False).items
+
+            # 2️⃣ Fetch all pod metrics ONCE (super fast)
+            try:
+                metrics_data = metrics_client.list_cluster_custom_object(
+                    group="metrics.k8s.io",
+                    version="v1beta1",
+                    plural="pods"
+                )
+                metrics_map = {
+                    f"{m['metadata']['namespace']}/{m['metadata']['name']}": m
+                    for m in metrics_data.get("items", [])
+                }
+            except Exception:
+                metrics_map = {}
+
+            pod_list = []
+
+            for pod in pods:
+                name = pod.metadata.name
+                namespace = pod.metadata.namespace
+                key = f"{namespace}/{name}"
+
+                # Default CPU/Mem
+                cpu_usage = "N/A"
+                memory_usage = "N/A"
+
+                # 3️⃣ Extract metrics quickly from map
+                if key in metrics_map:
+                    containers = metrics_map[key].get("containers", [])
+                    cpu_sum = 0
+                    mem_sum = 0
+
+                    for c in containers:
+                        # CPU nano → core
+                        cpu_val = c["usage"]["cpu"]
+                        if cpu_val.endswith("n"):
+                            cpu_sum += float(cpu_val[:-1]) / 1e9
+
+                        # Memory Ki → bytes
+                        mem_val = c["usage"]["memory"]
+                        if mem_val.endswith("Ki"):
+                            mem_sum += int(mem_val[:-2]) * 1024
+
+                    cpu_usage = round(cpu_sum, 4)
+                    memory_usage = mem_sum
+
+                # Pod basic details
+                pod_list.append({
+                    "name": name,
+                    "namespace": namespace,
+                    "images": [c.image for c in pod.spec.containers],
+                    "labels": pod.metadata.labels or {},
+                    "node": pod.spec.node_name,
+                    "status": pod.status.phase,
+                    "restarts": sum(cs.restart_count for cs in (pod.status.container_statuses or [])),
+                    "cpu_usage": cpu_usage,
+                    "memory_usage": memory_usage,
+                    "created_at": pod.metadata.creation_timestamp.strftime("%b %d, %Y %H:%M:%S"),
+                    "created_ago": humanize_age(pod.metadata.creation_timestamp),
+                })
+
+            return Response({"pods": pod_list}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class PodDetailAPIView(APIView):
+    """Get detailed info of a pod, including containers, init containers, PVCs, and conditions."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
+
+        if not name:
+            return Response({"error": "Pod name is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            core_v1, apps_v1 = get_k8s_client2()
+            pod = core_v1.read_namespaced_pod(name=name, namespace=namespace)
+            metadata = pod.metadata
+            spec = pod.spec
+            status_obj = pod.status
+
+            # Controller
+            controlled_by = {}
+            owner_refs = metadata.owner_references or []
+            if owner_refs:
+                ref = owner_refs[0]
+                controlled_by = {"name": ref.name, "kind": ref.kind}
+
+            # PVC mapping
+            pod_volumes = {v.name: v.persistent_volume_claim.claim_name for v in spec.volumes if v.persistent_volume_claim}
+            pvcs = {p.metadata.name: p for p in core_v1.list_namespaced_persistent_volume_claim(namespace=namespace).items}
+
+            pvc_info = []
+            for vol_name, pvc_name in pod_volumes.items():
+                pvc = pvcs.get(pvc_name)
+                if pvc:
+                    pvc_info.append({
+                        "name": pvc.metadata.name,
+                        "labels": pvc.metadata.labels or {},
+                        "status": pvc.status.phase,
+                        "volume": pvc.spec.volume_name,
+                        "capacity": pvc.status.capacity.get("storage", "-"),
+                        "access_modes": pvc.spec.access_modes,
+                        "storage_class": pvc.metadata.annotations.get("volume.beta.kubernetes.io/storage-class", "-"),
+                        "created": humanize_age(pvc.metadata.creation_timestamp)
+                    })
+
+            # Helper to extract env vars
+            def extract_env(container):
+                env_vars = {}
+                for e in container.env or []:
+                    env_vars[e.name] = (
+                        e.value
+                        if e.value else
+                        os.environ.get(e.value_from.secret_key_ref.name, "")
+                        if e.value_from and e.value_from.secret_key_ref else ""
+                    )
+                return env_vars
+
+            # Init containers
+            init_containers = []
+            for c in spec.init_containers or []:
+                init_containers.append({
+                    "name": c.name,
+                    "image": c.image,
+                    "env": extract_env(c),
+                    "commands": c.command,
+                    "args": c.args,
+                    "mounts": [
+                        {
+                            "name": m.name,
+                            "read_only": m.read_only,
+                            "mount_path": m.mount_path,
+                            "sub_path": m.sub_path or "-",
+                            "source_type": "PersistentVolumeClaim" if "persistent" in m.name else "Projected",
+                            "source_name": pod_volumes.get(m.name, "-")
+                        } for m in c.volume_mounts
+                    ]
+                })
+
+            # Containers
+            containers_info = []
+            for c in spec.containers:
+                cs = next((x for x in status_obj.container_statuses or [] if x.name == c.name), None)
+                containers_info.append({
+                    "name": c.name,
+                    "image": c.image,
+                    "status": "Ready" if cs and cs.ready else "Not Ready",
+                    "ready": cs.ready if cs else False,
+                    "started": cs.started if cs else False,
+                    "started_at": cs.state.running.started_at.isoformat() if cs and cs.state and cs.state.running else None,
+                    "env": extract_env(c),
+                    "mounts": [
+                        {
+                            "name": m.name,
+                            "read_only": m.read_only,
+                            "mount_path": m.mount_path,
+                            "sub_path": m.sub_path or "-",
+                            "source_type": "PersistentVolumeClaim" if "persistent" in m.name else "Projected",
+                            "source_name": pod_volumes.get(m.name, "-")
+                        } for m in c.volume_mounts
+                    ]
+                })
+
+            # Conditions
+            conditions = [
+                {
+                    "type": cond.type,
+                    "status": cond.status,
+                    "last_probe_time": getattr(cond, 'last_probe_time', '-') or '-',
+                    "last_transition_time": humanize_age(cond.last_transition_time) if cond.last_transition_time else '-',
+                    "reason": getattr(cond, 'reason', '-') or '-',
+                    "message": getattr(cond, 'message', '-') or '-'
+                } for cond in status_obj.conditions or []
+            ]
+
+            data = {
+                "name": metadata.name,
+                "namespace": metadata.namespace,
+                "created": metadata.creation_timestamp.strftime("%b %d, %Y"),
+                "age": humanize_age(metadata.creation_timestamp),
+                "uid": metadata.uid,
+                "labels": metadata.labels or {},
+                "annotations": metadata.annotations or {},
+                "node": spec.node_name,
+                "status": status_obj.phase,
+                "ip": status_obj.pod_ip,
+                "qos_class": status_obj.qos_class,
+                "restarts": sum(cs.restart_count for cs in status_obj.container_statuses or []),
+                "service_account": spec.service_account_name,
+                "controlled_by": controlled_by,
+                "containers": containers_info,
+                "init_containers": init_containers,
+                "persistent_volume_claims": pvc_info,
+                "conditions": conditions,
+                "events": []
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class PodLogsAPIView(APIView):
+    """Fetch pod logs efficiently."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, namespace, pod_name):
+        try:
+            v1 = get_k8s_client()
+            log_response = v1.read_namespaced_pod_log(
+                name=pod_name,
+                namespace=namespace,
+                tail_lines=100,
+                follow=False
+            )
+            return Response({"logs": log_response}, status=status.HTTP_200_OK)
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+#--------------------------------------------------------------------------------------------
+#                               Services                      
+#---------------------------------------------------------------------------------------------------
+class KubernetesServiceList(APIView):
+    """API to list Kubernetes services with detailed metadata and optional namespace filter."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            v1 = get_k8s_client()   # ⭐ ADD THIS LINE
+
+            namespace = request.query_params.get("namespace", "all")
+
+            if namespace.lower() == "all":
+                services = v1.list_service_for_all_namespaces()
+            else:
+                services = v1.list_namespaced_service(namespace=namespace)
+
+            service_list = []
+            for svc in services.items:
+                internal_endpoints = []
+                external_endpoints = []
+
+                ports = svc.spec.ports or []
+                for port in ports:
+                    internal_endpoints.append(f"{port.port}/{port.protocol}")
+
+                    if svc.status.load_balancer and svc.status.load_balancer.ingress:
+                        for ingress in svc.status.load_balancer.ingress:
+                            ip = getattr(ingress, "ip", None) or getattr(ingress, "hostname", None)
+                            if ip:
+                                external_endpoints.append(f"{ip}:{port.port}/{port.protocol}")
+
+                    external_ips = getattr(svc.spec, "external_ips", []) or []
+                    for ip in external_ips:
+                        external_endpoints.append(f"{ip}:{port.port}/{port.protocol}")
+
+                    if svc.spec.type in ["NodePort", "LoadBalancer"] and getattr(port, "node_port", None):
+                        external_endpoints.append(f"<NodeIP>:{port.node_port}/{port.protocol}")
+
+                service_list.append({
+                    "name": svc.metadata.name,
+                    "namespace": svc.metadata.namespace,
+                    "labels": svc.metadata.labels or {},
+                    "selector": svc.spec.selector or {},
+                    "type": svc.spec.type,
+                    "cluster_ip": svc.spec.cluster_ip,
+                    "internal_endpoints": internal_endpoints,
+                    "external_endpoints": external_endpoints,
+                    "created": (
+                        svc.metadata.creation_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                        if svc.metadata.creation_timestamp else None
+                    )
+                })
+
+            return Response({"services": service_list}, status=200)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
+
+
+
+class ServiceDetailAPIView(APIView):
+    def get(self, request):
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
+
+        if not name:
+            return Response({"error": "Service name is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # ⭐ FIXED: Correct clients
+            core_v1 = client.CoreV1Api()
+            apps_v1 = client.AppsV1Api()
+            net_v1 = client.NetworkingV1Api()
+
+            service = core_v1.read_namespaced_service(name=name, namespace=namespace)
+            endpoints = core_v1.read_namespaced_endpoints(name=name, namespace=namespace)
+
+            selector = service.spec.selector or {}
+
+            pods = core_v1.list_namespaced_pod(
+                namespace=namespace,
+                label_selector=",".join([f"{k}={v}" for k, v in selector.items()])
+            )
+
+            ingresses = net_v1.list_namespaced_ingress(namespace=namespace)
+
+            created = service.metadata.creation_timestamp
+            annotations = service.metadata.annotations or {}
+
+            ports = [
+                {
+                    "name": p.name or "<unset>",
+                    "port": p.port,
+                    "protocol": p.protocol
+                }
+                for p in service.spec.ports or []
+            ]
+
+            # Endpoints
+            endpoints_data = []
+            for subset in endpoints.subsets or []:
+                for address in subset.addresses or []:
+                    endpoints_data.append({
+                        "host": address.ip,
+                        "node": address.node_name,
+                        "ready": True
+                    })
+
+            # Pod details (FAST)
+            pod_data = []
+            for pod in pods.items:
+                pod_data.append({
+                    "name": pod.metadata.name,
+                    "images": [c.image for c in pod.spec.containers],
+                    "labels": pod.metadata.labels,
+                    "node": pod.spec.node_name,
+                    "status": pod.status.phase,
+                    "restarts": sum(cs.restart_count for cs in (pod.status.container_statuses or [])),
+                    "cpu_usage": "N/A",
+                    "memory_usage": "N/A",
+                    "created": humanize_age(pod.metadata.creation_timestamp)
+                })
+
+            # Ingress
+            ingress_data = []
+            for ing in ingresses.items:
+                for rule in ing.spec.rules or []:
+                    ingress_data.append({
+                        "name": ing.metadata.name,
+                        "labels": ing.metadata.labels,
+                        "endpoints": (
+                            ing.status.load_balancer.ingress[0].ip
+                            if ing.status.load_balancer and ing.status.load_balancer.ingress else "-"
+                        ),
+                        "hosts": rule.host,
+                        "created": humanize_age(ing.metadata.creation_timestamp)
+                    })
+
+            data = {
+                "name": service.metadata.name,
+                "namespace": service.metadata.namespace,
+                "created": created.strftime("%b %d, %Y"),
+                "age": humanize_age(created),
+                "uid": service.metadata.uid,
+                "annotations": annotations,
+                "type": service.spec.type,
+                "cluster_ip": service.spec.cluster_ip,
+                "session_affinity": service.spec.session_affinity,
+                "selector": selector,
+                "ports": ports,
+                "endpoints": endpoints_data,
+                "pods": pod_data,
+                "ingresses": ingress_data,
+                "events": []
+            }
+
+            return Response(data, status=200)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+   
+ #-------------------------------------------------------------------------------------------------------
+ #                                     Workload Details             
+ #------------------------------------------------------------------------------------------------------- 
+
+
+@method_decorator(cache_page(5), name='dispatch')  # 30s cache for heavy all-namespace calls
+class WorkloadDetailsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        namespace = request.query_params.get("namespace", "default").lower()
+
+        try:
+            v1 = client.CoreV1Api()
+            apps_v1 = client.AppsV1Api()
+
+            # -----------------------------
+            # Define fetch functions
+            # -----------------------------
+            def fetch_deploy():
+                if namespace == "all":
+                    return apps_v1.list_deployment_for_all_namespaces(watch=False)
+                return apps_v1.list_namespaced_deployment(namespace)
+
+            def fetch_pods():
+                if namespace == "all":
+                    return v1.list_pod_for_all_namespaces(watch=False)
+                return v1.list_namespaced_pod(namespace)
+
+            def fetch_rs():
+                if namespace == "all":
+                    return apps_v1.list_replica_set_for_all_namespaces(watch=False)
+                return apps_v1.list_namespaced_replica_set(namespace)
+
+            def fetch_sts():
+                if namespace == "all":
+                    return apps_v1.list_stateful_set_for_all_namespaces(watch=False)
+                return apps_v1.list_namespaced_stateful_set(namespace)
+
+            # -----------------------------
+            # Parallel fetch
+            # -----------------------------
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                deployments, pods, replicasets, statefulsets = executor.map(
+                    lambda fn: fn(), [fetch_deploy, fetch_pods, fetch_rs, fetch_sts]
+                )
+
+            # -----------------------------
+            # Status counting function
+            # -----------------------------
+            def count_status(items, get_ready, get_desired):
+                status = {"Running": 0, "Failed": 0, "Pending": 0}
+                for i in items:
+                    ready = get_ready(i) or 0
+                    desired = get_desired(i) or 0
+                    if desired == 0: continue
+                    if ready == desired:
+                        status["Running"] += 1
+                    elif ready == 0:
+                        status["Failed"] += 1
+                    else:
+                        status["Pending"] += 1
+                return status
+
+            deployment_status = count_status(
+                deployments.items, lambda d: d.status.available_replicas, lambda d: d.spec.replicas
+            )
+
+            pod_status = {"Running":0,"Failed":0,"Pending":0}
+            for p in pods.items:
+                ph = p.status.phase
+                if ph in pod_status:
+                    pod_status[ph] += 1
+
+            replicaset_status = count_status(
+                replicasets.items, lambda r: r.status.available_replicas, lambda r: r.spec.replicas
+            )
+
+            statefulset_status = count_status(
+                statefulsets.items, lambda s: s.status.ready_replicas, lambda s: s.spec.replicas
+            )
+
+            return Response({
+                "Namespace": namespace,
+                "Deployments": deployment_status,
+                "Pods": pod_status,
+                "Replica Sets": replicaset_status,
+                "Stateful Sets": statefulset_status
+            }, status=200)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+
+class DaemonSetListAPIView(APIView):
+    """
+    API to list all DaemonSets in Kubernetes.
+    Returns Name, Namespace, Images, Labels, Pod Count, and Creation Timestamp.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Load Kubernetes config (works for both inside cluster and kubeconfig)
+            try:
+                config.load_incluster_config()  # When running inside a cluster
+            except config.ConfigException:
+                config.load_kube_config(config_file=KUBECONFIG_PATH)  # When running outside (local development)
+
+            v1_apps = client.AppsV1Api()
+
+            # Fetch all DaemonSets
+            daemonsets = v1_apps.list_daemon_set_for_all_namespaces().items
+            daemonset_list = []
+
+            for ds in daemonsets:
+                daemonset_data = {
+                    "name": ds.metadata.name,
+                    "namespace": ds.metadata.namespace,
+                    "images": [container.image for container in ds.spec.template.spec.containers],
+                    "labels": ds.metadata.labels,
+                    "pods": ds.status.number_available,  # Number of available pods in DaemonSet
+                    "created": ds.metadata.creation_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                }
+                daemonset_list.append(daemonset_data)
+
+            return Response(daemonset_list, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+#------------------------------------------------------------------------------------------------------------
+#                                           Nginx Service
+#-------------------------------------------------------------------------------------------------------------------
+
+class DeployNginxPodAPIView(APIView):
+    """
+    API to deploy an Nginx pod securely.
+    """
+    permission_classes = [IsAuthenticated]  # Require authentication
+
+    def post(self, request):
+        """Deploy an Nginx pod securely"""
+        logger.info("🔹 POST request received to deploy Nginx Pod.")
+
+        # Extract user inputs
+        pod_name = request.data.get("pod_name", "nginx-pod")  # Default pod name
+        namespace = request.data.get("namespace", "default")  # Default namespace
+
+        # Validate pod_name (only allow alphanumeric and hyphens)
+        if not pod_name.isalnum() and "-" not in pod_name:
+            return Response({"error": "Invalid pod name. Use only letters, numbers, or hyphens."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Define Pod spec securely
+        pod_manifest = client.V1Pod(
+            metadata=client.V1ObjectMeta(name=pod_name),
+            spec=client.V1PodSpec(
+                containers=[
+                    client.V1Container(
+                        name="nginx",
+                        image="nginx:latest",
+                        ports=[client.V1ContainerPort(container_port=80)],
+                        security_context=client.V1SecurityContext(
+                            read_only_root_filesystem=True,  # Restrict filesystem writes
+                            allow_privilege_escalation=False  # Prevent privilege escalation
+                        ),
+                    )
+                ]
+            ),
+        )
+
+        try:
+            # Deploy the pod
+            v1.create_namespaced_pod(namespace=namespace, body=pod_manifest)
+            logger.info(f"✅ Pod '{pod_name}' deployed successfully in namespace '{namespace}'.")
+            return Response({"message": f"Pod '{pod_name}' deployed successfully!"}, status=status.HTTP_201_CREATED)
+
+        except client.ApiException as e:
+            logger.error(f"❌ Kubernetes API error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+#------------------------------------------------------------------------------------------------------------
+#                                           Nginx HAA Service
+#-------------------------------------------------------------------------------------------------------------------
+
+
+
+class DeployNginxHAAPIView(APIView):
+    """
+    API to deploy an Nginx High-Availability Deployment + NodePort Service.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        logger.info("🔹 POST request received to deploy Nginx HA Deployment.")
+
+        namespace = request.data.get("namespace", "default")
+        replicas = int(request.data.get("replicas", 2))
+        deployment_name = request.data.get("deployment_name", "nginx-ha")
+        service_name = deployment_name + "-svc"
+
+        # Validate name
+        if not deployment_name.replace("-", "").isalnum():
+            return Response({"error": "Invalid deployment name."}, status=400)
+
+        apps_v1 = client.AppsV1Api()
+        v1 = client.CoreV1Api()
+
+        # ---------------------------
+        # 1️⃣ Create Deployment
+        # ---------------------------
+        deployment = client.V1Deployment(
+            metadata=client.V1ObjectMeta(name=deployment_name, labels={"app": deployment_name}),
+            spec=client.V1DeploymentSpec(
+                replicas=replicas,
+                selector=client.V1LabelSelector(match_labels={"app": deployment_name}),
+                template=client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(labels={"app": deployment_name}),
+                    spec=client.V1PodSpec(
+                        containers=[
+                            client.V1Container(
+                                name="nginx",
+                                image="nginx:latest",
+                                ports=[client.V1ContainerPort(container_port=80)],
+                            )
+                        ]
+                    ),
+                ),
+            ),
+        )
+
+        try:
+            apps_v1.create_namespaced_deployment(namespace, deployment)
+            logger.info(f"✅ Deployment '{deployment_name}' created.")
+        except client.exceptions.ApiException as e:
+            if e.status == 409:
+                return Response({"error": "Deployment already exists."}, status=409)
+            return Response({"error": str(e)}, status=500)
+
+        # ---------------------------
+        # 2️⃣ Create NodePort Service
+        # ---------------------------
+        service_manifest = client.V1Service(
+            metadata=client.V1ObjectMeta(name=service_name),
+            spec=client.V1ServiceSpec(
+                type="NodePort",
+                selector={"app": deployment_name},
+                ports=[
+                    client.V1ServicePort(
+                        port=80,
+                        target_port=80,
+                        node_port=None  # Auto assign NodePort
+                    )
+                ],
+            ),
+        )
+
+        try:
+            v1.create_namespaced_service(namespace, service_manifest)
+            logger.info(f"✅ Service '{service_name}' created.")
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Service error: {str(e)}"}, status=500)
+
+        # ---------------------------
+        # 3️⃣ Fetch NodePort
+        # ---------------------------
+        sleep(2)  # Wait for service creation
+        node_port = get_service_nodeport(service_name, namespace)
+
+        # Debug print
+        print(f"🔵 NodePort assigned by Kubernetes: {node_port}")
+        logger.info(f"🔵 NodePort assigned by Kubernetes: {node_port}")
+
+        # ---------------------------
+        # 4️⃣ Fetch Node IP
+        # ---------------------------
+        node_ip = get_first_node_ip()
+
+        return Response(
+            {
+                "message": "Nginx HA deployed successfully!",
+                "deployment": deployment_name,
+                "service": service_name,
+                "node_port": node_port,
+                "node_ip": node_ip,
+                "access_url": f"http://{node_ip}:{node_port}" if node_ip and node_port else None
+            },
+            status=201
+        )
+
+
+
+#------------------------------------------------------------------------------------------------------------
+#                                           Mongodb Service
+#-------------------------------------------------------------------------------------------------------------------
+
+
+
+class DeployMongoDBAPIView(APIView):
+    def post(self, request):
+        data = request.data
+        required_fields = ["replica", "app_name", "root_password", "username", "password", "database", "node_port"]
+
+        for field in required_fields:
+            if field not in data:
+                return Response({"error": f"'{field}' is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        app_name = data["app_name"]
+        namespace = "default"
+        labels = {"app": app_name}
+
+        try:
+            apps_v1, core_v1 = get_k8s_client3()
+
+            # Deployment
+            container = client.V1Container(
+                name=app_name,
+                image="mongo:latest",
+                ports=[client.V1ContainerPort(container_port=27017)],
+                env=[
+                    client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]),
+                    client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=data["root_password"]),
+                    client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=data["database"]),
+                ]
+            )
+
+            template = client.V1PodTemplateSpec(
+                metadata=client.V1ObjectMeta(labels=labels),
+                spec=client.V1PodSpec(containers=[container])
+            )
+
+            spec = client.V1DeploymentSpec(
+                replicas=int(data["replica"]),
+                selector=client.V1LabelSelector(match_labels=labels),
+                template=template
+            )
+
+            deployment = client.V1Deployment(
+                api_version="apps/v1",
+                kind="Deployment",
+                metadata=client.V1ObjectMeta(name=app_name),
+                spec=spec
+            )
+
+            apps_v1.create_namespaced_deployment(namespace=namespace, body=deployment)
+
+            # Service
+            service = client.V1Service(
+                metadata=client.V1ObjectMeta(name=app_name),
+                spec=client.V1ServiceSpec(
+                    type="NodePort",
+                    selector=labels,
+                    ports=[
+                        client.V1ServicePort(
+                            port=27017,
+                            target_port=27017,
+                            node_port=int(data["node_port"])
+                        )
+                    ]
+                )
+            )
+
+            core_v1.create_namespaced_service(namespace=namespace, body=service)
+
+            return Response({"message": f"MongoDB '{app_name}' deployed successfully."}, status=status.HTTP_201_CREATED)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}", "details": e.body}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+#------------------------------------------------------------------------------------------------------------
+#                                       Deploy Pods
+#-------------------------------------------------------------------------------------------------------------------
+
+
+logger = logging.getLogger(__name__)
+
+class DeployPodOnKnode2APIView(APIView):
+    def post(self, request):
+        logger.info("🔹 Received request to deploy a pod on knode2.")
+        print(request.data)
+        appln_name = request.data.get("appln_name")
+        appln_type = request.data.get("appln_type")
+
+        if not appln_name or not appln_type:
+            return Response(
+                {"error": "Both 'appln_name' and 'appln_type' are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Check if application type is supported
+        if appln_type not in APPLICATION_IMAGES:
+            return Response(
+                {"error": f"Application type '{appln_type}' is not supported."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Fetch application details from dictionary
+        app_config = APPLICATION_IMAGES[appln_type]
+        image_name = app_config["image"]
+        port = app_config.get("port", None)  # Default to None if not found
+        env_vars = app_config.get("env", {})  # Default to empty dict if no env vars
+
+        # Deploy directly to knode2
+        node_name = "knode2"
+        success = self.create_pod(appln_name, image_name, port, env_vars, node_name)
+
+        if success:
+            return Response(
+                {"message": f"✅ Pod '{appln_name}-pod' successfully deployed on {node_name}."},
+                status=status.HTTP_201_CREATED,
+            )
+
+        return Response(
+            {"error": f"❌ Pod '{appln_name}-pod' failed to deploy on {node_name}."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+    def create_pod(self, appln_name, image_name, port, env_vars, node_name):
+        """Create and launch a Kubernetes pod on knode2."""
+        pod_manifest = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {"name": f"{appln_name}-pod"},
+            "spec": {
+                "nodeSelector": {"kubernetes.io/hostname": node_name},  # Force scheduling on knode2
+                "containers": [
+                    {
+                        "name": appln_name,
+                        "image": image_name,
+                        "ports": [{"containerPort": port}] if port else [],
+                        "env": [{"name": k, "value": v} for k, v in env_vars.items()]
+                    }
+                ]
+            }
+        }
+
+        try:
+            v1.create_namespaced_pod(namespace="default", body=pod_manifest)
+            logger.info(f"✅ {appln_name}-pod created successfully on {node_name}!")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error creating pod on {node_name}: {str(e)}")
+            return False
+
+
+apps_v1 = client.AppsV1Api()  # Apps API client for Deployments, ReplicaSets, etc.
+
+
+
+#------------------------------------------------------------------------------------------------------------
+#                                       Delete Pods
+#-------------------------------------------------------------------------------------------------------------------
+
+
+class DeletePodAPIView(APIView):
+    """
+    API to delete a Kubernetes pod.
+    """
+    permission_classes = [IsAuthenticated]  # Require authentication
+
+    def delete(self, request):
+        """Delete a specified pod in a given namespace."""
+        logger.info("🔹 DELETE request received to delete a pod.")
+
+        # Extract user inputs
+        pod_name = request.data.get("pod_name")
+        namespace = request.data.get("namespace", "default")  # Default namespace is 'default'
+
+        # Validate input
+        if not pod_name:
+            return Response({"error": "pod_name is required."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Delete the pod
+            v1.delete_namespaced_pod(name=pod_name, namespace=namespace)
+            logger.info(f"✅ Pod '{pod_name}' deleted successfully from namespace '{namespace}'.")
+            return Response({"message": f"Pod '{pod_name}' deleted successfully!"},
+                            status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            if e.status == 404:
+                logger.error(f"❌ Pod '{pod_name}' not found in namespace '{namespace}'.")
+                return Response({"error": f"Pod '{pod_name}' not found in namespace '{namespace}'."},
+                                status=status.HTTP_404_NOT_FOUND)
+            else:
+                logger.error(f"❌ Kubernetes API error: {e}")
+                return Response({"error": str(e)},
+                                status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+
+class ListKubernetesEventsAPIView(APIView):
+    """
+    API to list Kubernetes events.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Retrieve and return Kubernetes events with secure practices."""
+        logger.info("🔹 GET request received to list Kubernetes events.")
+
+        # Get namespace from query parameters (optional)
+        namespace = request.query_params.get("namespace", None)
+        print("namespace", namespace)
+
+        try:
+            # Fetch events
+            if namespace:
+                events = v1.list_namespaced_event(namespace).items
+            else:
+                events = v1.list_event_for_all_namespaces().items
+
+            if not events:
+                return Response({"message": "No events found."}, status=status.HTTP_200_OK)
+
+            # Format helper
+            def format_timestamp(ts):
+                return ts.strftime('%Y-%m-%d %H:%M:%S') if isinstance(ts, datetime) else "Unknown"
+
+            # Process events
+            event_list = []
+            for event in events:
+                event_data = {
+                    "name": event.metadata.name,
+                    "reason": event.reason or "N/A",
+                    "message": event.message,
+                    "source": event.source.component if event.source else "Unknown",
+                    "object": f"{event.involved_object.kind}/{event.involved_object.name}",
+                    "count": event.count,
+                    "first_seen": format_timestamp(event.first_timestamp),
+                    "last_seen": format_timestamp(event.last_timestamp),
+                }
+                event_list.append(event_data)
+
+            logger.info(f"✅ Retrieved {len(event_list)} Kubernetes events.")
+            return Response({"events": event_list}, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            logger.error(f"❌ Kubernetes API error: {e}")
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+#-------------------------------------------------------------------------------------------
+#                       Namespaces
+#-------------------------------------------------------------------------------------------
+
+logger = logging.getLogger(__name__)
+
+class ListNamespacesAPIView(APIView):
+    def get(self, request):
+        try:
+            # Use the shared get_k8s_client function
+            v1 = get_k8s_client()
+            namespaces = v1.list_namespace()
+            namespace_names = [ns.metadata.name for ns in namespaces.items]
+
+            logger.debug(f"Namespaces retrieved: {namespace_names}")
+
+            return Response({
+                "status": "success",
+                "namespaces": namespace_names
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception("Error retrieving namespaces")
+            return Response({
+                "status": "error",
+                "message": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+#------------------------------------------------------------------------------------------------
+#                                       stateful sets
+#--------------------------------------------------------------------------------------------------
+
+
+
+class ListStatefulSetsAPIView(APIView):
+    """
+    API to list all StatefulSets in the cluster (or specific namespace).
+    Query param:
+      - ?namespace=<name> (default: all namespaces)
+    """
+
+    def get(self, request):
+        try:
+            # Load kubeconfig
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            config_path = os.path.join(BASE_DIR, "admin.conf")
+            config.load_kube_config(config_file=config_path)
+
+            namespace = request.query_params.get("namespace")
+
+            apps_v1 = client.AppsV1Api()
+
+            if namespace and namespace.lower() != "all":
+                sts_list = apps_v1.list_namespaced_stateful_set(namespace=namespace).items
+            else:
+                sts_list = apps_v1.list_stateful_set_for_all_namespaces().items
+
+            response = []
+
+            for sts in sts_list:
+                name = sts.metadata.name
+                ns = sts.metadata.namespace
+                labels = sts.metadata.labels
+                created = humanize_age(sts.metadata.creation_timestamp)
+                replicas = sts.status.replicas or 0
+                ready = sts.status.ready_replicas or 0
+                images = [c.image for c in sts.spec.template.spec.containers]
+
+                response.append({
+                    "name": name,
+                    "namespace": ns,
+                    "images": images,
+                    "labels": labels,
+                    "pods": f"{ready}/{replicas}",
+                    "created": created
+                })
+
+            return Response({"stateful_sets": response}, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class StatefulSetDetailAPIView(APIView):
+    def get(self, request):
+        name = request.query_params.get('name')
+        namespace = request.query_params.get('namespace', 'default')
+
+        if not name:
+            return Response({"error": "StatefulSet name is required."}, status=400)
+
+        try:
+            core_v1, apps_v1, metrics_client = get_k8s_client1()
+            sts = apps_v1.read_namespaced_stateful_set(name=name, namespace=namespace)
+
+            metadata = sts.metadata
+            spec = sts.spec
+            status_data = sts.status
+
+            # Pods status
+            running = status_data.ready_replicas or 0
+            desired = spec.replicas or 0
+
+            # Collect pod details
+            pods = core_v1.list_namespaced_pod(namespace=namespace, label_selector=",".join([f"{k}={v}" for k, v in spec.selector.match_labels.items()]))
+            pod_info = []
+            for pod in pods.items:
+                pod_metrics = None
+                try:
+                    pod_metrics = metrics_client.get_namespaced_custom_object(
+                        group="metrics.k8s.io",
+                        version="v1beta1",
+                        namespace=namespace,
+                        plural="pods",
+                        name=pod.metadata.name
+                    )
+                except Exception:
+                    pass
+
+                total_cpu = sum([
+                    float(c["usage"]["cpu"].rstrip("n")) / 1e9 for c in pod_metrics.get("containers", [])
+                ]) if pod_metrics else 0
+
+                total_mem = sum([
+                    int(c["usage"]["memory"].rstrip("Ki")) * 1024 for c in pod_metrics.get("containers", [])
+                    if "memory" in c["usage"]
+                ]) if pod_metrics else 0
+
+                pod_info.append({
+                    "name": pod.metadata.name,
+                    "namespace": pod.metadata.namespace,
+                    "images": [c.image for c in pod.spec.containers],
+                    "labels": pod.metadata.labels,
+                    "node": pod.spec.node_name,
+                    "status": pod.status.phase,
+                    "restarts": sum([cs.restart_count for cs in pod.status.container_statuses or []]),
+                    "cpu_usage": round(total_cpu * 1000, 2),  # in millicores
+                    "memory_usage": total_mem,
+                    "created": humanize_age(pod.metadata.creation_timestamp)
+                })
+
+            # Events
+            events = core_v1.list_namespaced_event(namespace=namespace)
+            related_events = [e.message for e in events.items if e.involved_object.name == name]
+            if not related_events:
+                related_events = ["No resources found."]
+
+            data = {
+                "metadata": {
+                    "name": metadata.name,
+                    "namespace": metadata.namespace,
+                    "created": metadata.creation_timestamp.strftime("%b %d, %Y"),
+                    "age": humanize_age(metadata.creation_timestamp),
+                    "uid": metadata.uid,
+                    "annotations": metadata.annotations
+                },
+                "resource_info": {
+                    "images": [c.image for c in spec.template.spec.containers]
+                },
+                "pods_status": {
+                    "running": running,
+                    "desired": desired
+                },
+                "pods": pod_info,
+                "events": related_events
+            }
+
+            return Response(data, status=status.HTTP_200_OK)
+
+        except client.exceptions.ApiException as e:
+            return Response({"error": f"Kubernetes API error: {e.reason}"}, status=e.status)
+        except Exception as e:
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+
+
+class CreateReplicaSetAPIView(APIView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.v1 = v1  # CoreV1Api instance
+        self.apps_v1 = apps_v1  # AppsV1Api instance
+
+    def post(self, request):
+        """Create a ReplicaSet from an existing pod."""
+        print("\n📌 Received request to create a ReplicaSet...")
+
+        pod_name = request.data.get("pod_name")
+        namespace = request.data.get("namespace")
+        replicas = request.data.get("replicas", 1)
+
+        if not pod_name or not namespace:
+            print("❌ Missing required fields: 'pod_name' and 'namespace'")
+            return Response(
+                {"error": "Both 'pod_name' and 'namespace' are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            replicas = int(replicas)
+            if replicas < 1:
+                print("❌ Replica count must be greater than 0!")
+                return Response(
+                    {"error": "Replica count must be greater than 0"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except ValueError:
+            print("❌ Invalid replica count!")
+            return Response(
+                {"error": "Invalid replica count. Must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Get the existing pod details
+            pod = self.v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+        except Exception as e:
+            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
+            return Response(
+                {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Ensure pod has labels
+        pod_labels = pod.metadata.labels or {"app": pod_name}
+
+        # Clean the pod spec (remove service account & unwanted volume mounts)
+        pod_spec = self.clean_pod_spec(pod.spec)
+
+        # Define ReplicaSet
+        rs_manifest = {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {"name": f"{pod_name}-rs"},
+            "spec": {
+                "replicas": replicas,
+                "selector": {"matchLabels": pod_labels},
+                "template": {
+                    "metadata": {"labels": pod_labels},
+                    "spec": pod_spec,
+                },
+            },
+        }
+
+        try:
+            # Create the ReplicaSet using self.apps_v1
+            self.apps_v1.create_namespaced_replica_set(namespace=namespace, body=rs_manifest)
+            print(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
+            return Response(
+                {"message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"},
+                status=status.HTTP_201_CREATED,
+            )
+        except Exception as e:
+            print(f"❌ Error creating ReplicaSet: {str(e)}")
+            return Response(
+                {"error": "Failed to create ReplicaSet"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def get(self, request):
+        """List all available pods in all namespaces."""
+        print("\n📌 Fetching available pods...")
+
+        try:
+            pods = v1.list_pod_for_all_namespaces(watch=False)
+            pod_list = [
+                {
+                    "name": pod.metadata.name,
+                    "namespace": pod.metadata.namespace,
+                    "labels": pod.metadata.labels or {},
+                }
+                for pod in pods.items
+            ]
+        except Exception as e:
+            print(f"❌ Error fetching pods: {str(e)}")
+            return Response({"error": "Failed to fetch pods"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        if not pod_list:
+            print("⚠️ No pods found in the cluster!")
+            return Response({"message": "No pods found in the cluster"}, status=status.HTTP_404_NOT_FOUND)
+
+        print(f"✅ Found {len(pod_list)} pods.")
+        return Response({"pods": pod_list}, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """Create a ReplicaSet from an existing pod."""
+        print("\n📌 Received request to create a ReplicaSet...")
+
+        pod_name = request.data.get("pod_name")
+        namespace = request.data.get("namespace")
+        replicas = request.data.get("replicas", 1)
+
+        if not pod_name or not namespace:
+            print("❌ Missing required fields: 'pod_name' and 'namespace'")
+            return Response(
+                {"error": "Both 'pod_name' and 'namespace' are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            replicas = int(replicas)
+            if replicas < 1:
+                print("❌ Replica count must be greater than 0!")
+                return Response(
+                    {"error": "Replica count must be greater than 0"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except ValueError:
+            print("❌ Invalid replica count!")
+            return Response(
+                {"error": "Invalid replica count. Must be an integer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            # Get the existing pod details
+            pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+        except Exception as e:
+            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
+            return Response(
+                {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # Ensure pod has labels
+        pod_labels = pod.metadata.labels or {"app": pod_name}
+
+        # Clean the pod spec (remove service account & unwanted volume mounts)
+        pod_spec = self.clean_pod_spec(pod.spec)
+
+        # Define ReplicaSet
+        rs_manifest = {
+            "apiVersion": "apps/v1",
+            "kind": "ReplicaSet",
+            "metadata": {"name": f"{pod_name}-rs"},
+            "spec": {
+                "replicas": replicas,
+                "selector": {"matchLabels": pod_labels},
+                "template": {
+                    "metadata": {"labels": pod_labels},
+                    "spec": pod_spec,
+                },
+            },
+        }
+
+        try:
+            # Create the ReplicaSet
+            apps_v1.create_namespaced_replica_set(namespace=namespace, body=rs_manifest)
+            print(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
+            return Response(
+                {"message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"},
+                status=status.HTTP_201_CREATED,
+            )
+        except Exception as e:
+            print(f"❌ Error creating ReplicaSet: {str(e)}")
+            return Response(
+                {"error": "Failed to create ReplicaSet"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def clean_pod_spec(self, pod_spec):
+        """Remove unwanted fields like 'serviceAccount' and 'kube-api-access' volume mounts."""
+        print("🔹 Cleaning pod spec...")
+
+        for container in pod_spec.containers:
+            if container.volume_mounts:
+                container.volume_mounts = [
+                    v for v in container.volume_mounts if not v.name.startswith("kube-api-access")
+                ]
+
+        if pod_spec.service_account_name:
+            pod_spec.service_account_name = None
+
+        return pod_spec
+    
+  
+  
+      
+class WorkloadStatsAPIView(APIView):
+    """
+    API to fetch workload statistics from Kubernetes.
+    Returns the count of DaemonSets, Pods, Deployments, and ReplicaSets.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Load Kubernetes configuration (works for both inside a cluster and kubeconfig)
+            try:
+                config.load_incluster_config()  # When running inside a cluster
+            except config.ConfigException:
+                config.load_kube_config(config_file=KUBECONFIG_PATH)
+
+            v1_apps = client.AppsV1Api()
+            v1_core = client.CoreV1Api()
+
+            # Get counts
+            daemonsets_count = sum(
+                1 for _ in v1_apps.list_daemon_set_for_all_namespaces().items
+            )
+            pods_count = sum(
+                1 for _ in v1_core.list_pod_for_all_namespaces().items
+            )
+            deployments_count = sum(
+                1 for _ in v1_apps.list_deployment_for_all_namespaces().items
+            )
+            replicasets_count = sum(
+                1 for _ in v1_apps.list_replica_set_for_all_namespaces().items
+            )
+
+            return Response(
+                {
+                    "daemonsets": daemonsets_count,
+                    "pods": pods_count,
+                    "deployments": deployments_count,
+                    "replicasets": replicasets_count,
+                },
+                status=status.HTTP_200_OK,
+            )
 
         except Exception as e:
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from kubernetes import client
+from concurrent.futures import ThreadPoolExecutor
+
+class K8sOverviewAPIView(APIView):
+    permission_classes = [IsAuthenticated]  # Or [] if you want open
+
+    def get(self, request):
+        namespace = request.query_params.get("namespace", "all")
+
+        v1 = client.CoreV1Api()
+        apps_v1 = client.AppsV1Api()
+
+        # -----------------------------
+        # Functions to fetch resources
+        # -----------------------------
+        def fetch_deployments():
+            return (apps_v1.list_deployment_for_all_namespaces().items
+                    if namespace.lower() == "all"
+                    else apps_v1.list_namespaced_deployment(namespace).items)
+
+        def fetch_pods():
+            return (v1.list_pod_for_all_namespaces().items
+                    if namespace.lower() == "all"
+                    else v1.list_namespaced_pod(namespace).items)
+
+        def fetch_nodes():
+            return v1.list_node().items
+
+        def fetch_services():
+            return (v1.list_service_for_all_namespaces().items
+                    if namespace.lower() == "all"
+                    else v1.list_namespaced_service(namespace).items)
+
+        # -----------------------------
+        # Parallel fetch for speed
+        # -----------------------------
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            deployments, pods, nodes, services = executor.map(
+                lambda fn: fn(), [fetch_deployments, fetch_pods, fetch_nodes, fetch_services]
+            )
+
+        # -----------------------------
+        # Format data
+        # -----------------------------
+        deployment_list = [
+            {
+                "name": d.metadata.name,
+                "namespace": d.metadata.namespace,
+                "replicas": d.spec.replicas,
+                "available_replicas": d.status.available_replicas or 0,
+                "labels": d.metadata.labels or {}
+            } for d in deployments
+        ]
+
+        pod_list = [
+            {
+                "name": p.metadata.name,
+                "namespace": p.metadata.namespace,
+                "status": p.status.phase,
+                "node": p.spec.node_name,
+                "restarts": sum(cs.restart_count for cs in (p.status.container_statuses or []))
+            } for p in pods
+        ]
+
+        node_list = [
+            {
+                "name": n.metadata.name,
+                "labels": n.metadata.labels or {},
+                "ready": next((c.status for c in n.status.conditions if c.type=="Ready"), "Unknown")
+            } for n in nodes
+        ]
+
+        service_list = [
+            {
+                "name": s.metadata.name,
+                "namespace": s.metadata.namespace,
+                "type": s.spec.type,
+                "cluster_ip": s.spec.cluster_ip
+            } for s in services
+        ]
+
+        # -----------------------------
+        # Return combined JSON
+        # -----------------------------
+        return Response({
+            "deployments": deployment_list,
+            "pods": pod_list,
+            "nodes": node_list,
+            "services": service_list
+        }, status=status.HTTP_200_OK)

@@ -233,6 +233,7 @@ urlpatterns = [
     path("api/helpdesk/custom/ticket/<int:ticket_id>/", admin_views.ticket_detail, name="helpdesk_custom_ticket_detail"),
     path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
 
+
     # Catch-all fallback to index.html
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
 ]

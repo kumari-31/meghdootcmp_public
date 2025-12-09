@@ -23,4 +23,10 @@ urlpatterns = [
     # helpdesk web UI
     path("helpdesk/", include(("helpdesk.urls", "helpdesk"), namespace="helpdesk")),
     path("", include("unifiedapiapp.urls")),  # Include app's URLs
+    # path('helpdesk/', include(('helpdesk.urls', 'helpdesk'), namespace='helpdesk')),
+    path('api/helpdesk/', include(('unifiedapiapp.helpdesk_custom.urls', 'helpdesk_custom'), namespace='helpdesk_custom')),
+    
+    # path('api/helpdesk/', include('unifiedapiapp.helpdesk_custom.urls', namespace='helpdesk_custom')),
+    path('', include('unifiedapiapp.urls')),
+
 ]

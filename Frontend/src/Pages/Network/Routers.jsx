@@ -3,6 +3,8 @@ import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
+import { useTheme } from "@mui/material/styles";
+
 import {
   Table,
   TableBody,
@@ -31,32 +33,45 @@ import { tableCellClasses } from '@mui/material/TableCell';
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: '#253848',
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
-    textAlign: 'center',
-    color: '#000',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '200px',
+    textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
-  '&:nth-of-type(odd)': {
-    backgroundColor: theme.palette.grey[300],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
+  "&:nth-of-type(odd)": {
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
-  '&:last-child td, &:last-child th': {
+
+  "&:last-child td, &:last-child th": {
     border: 0,
   },
 }));
+
 
 const Routers = () => {
   const [routers, setRouters] = useState([]);
@@ -68,6 +83,7 @@ const Routers = () => {
   const [selectedRouters, setSelectedRouters] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
+  const theme = useTheme(); 
   const [newRouter, setNewRouter] = useState({
     name: '',
     admin_state_up: true,
@@ -304,7 +320,7 @@ const Routers = () => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 400,
-    bgcolor: 'background.paper',
+    bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
     borderRadius: '8px',
@@ -323,7 +339,13 @@ const Routers = () => {
             variant="outlined"
           />
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="contained" style={{ backgroundColor: 'green', color: 'white' }} onClick={() => setShowCreateForm(true)}>
+            <Button variant="contained"  sx={{
+              backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+              color: "#fff",
+              "&:hover": {
+                backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+              }
+            }}  onClick={() => setShowCreateForm(true)}>
               Create Router <RiBallPenLine />
             </Button>
             <Button variant="contained" color="error" onClick={() => handleDeleteRouter(routers['Router ID'])}>
