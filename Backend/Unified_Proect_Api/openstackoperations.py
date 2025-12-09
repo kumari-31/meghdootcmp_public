@@ -1,18 +1,19 @@
-from openstack import connection
-import time
-from dotenv import load_dotenv
-import subprocess, os
-from django.core.exceptions import ValidationError
 import json
-from openstack.exceptions import ResourceNotFound, HttpException
+import os
+import subprocess
+import time
+
 import requests
-from dotenv import load_dotenv
-from unifiedapiapp.models import VMInfo
+from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
-from unifiedapiapp.models import VMInfo, VmRequest
-from rest_framework.response import Response
+from dotenv import load_dotenv
+from openstack import connection
+from openstack.exceptions import HttpException, ResourceNotFound
 from rest_framework import status
+from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from unifiedapiapp.models import VMInfo, VmRequest
 
 load_dotenv()
 
@@ -153,6 +154,7 @@ def create_vm1(
 #                     project_domain_name=os.getenv('PROJECT_DOMAIN_NAME')
 #                 )
 
+
 def extract_volume_error(volume):
     fault = getattr(volume, "fault", None)
     if fault and fault.get("message"):
@@ -207,18 +209,19 @@ def create_bootable_volume(
 
         # Handle error state
         if volume.status == "error":
-                error_message = extract_volume_error(volume)
-                print(f"Volume {created_volume_id} entered ERROR state: {error_message}")
+            error_message = extract_volume_error(volume)
+            print(f"Volume {created_volume_id} entered ERROR state: {error_message}")
             # Update VM request with error
-                VmRequest.objects.filter(id=vm_req_id).update(
-                creation_status="Failed",
-                creation_error_message=error_message
-                )
-                return None, None, error_message
+            VmRequest.objects.filter(id=vm_req_id).update(
+                creation_status="Failed", creation_error_message=error_message
+            )
+            return None, None, error_message
 
         # Volume ready, create VM
         if volume.status == "available":
-            print(f"Bootable volume '{volume_name}' created successfully with ID: {created_volume_id}")
+            print(
+                f"Bootable volume '{volume_name}' created successfully with ID: {created_volume_id}"
+            )
             vm_instance = create_vm1(
                 conn,
                 vm_name,
@@ -236,7 +239,9 @@ def create_bootable_volume(
                 vm_req_obj.save()
             else:
                 vm_req_obj.creation_status = "Failed"
-                vm_req_obj.creation_error_message = vm_instance.get("error", "Unknown VM error")
+                vm_req_obj.creation_error_message = vm_instance.get(
+                    "error", "Unknown VM error"
+                )
                 vm_req_obj.save()
                 return None, None, vm_instance.get("error", "VM creation failed")
 
@@ -248,14 +253,13 @@ def create_bootable_volume(
 
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         print(f"Error creating bootable volume: {e}")
         VmRequest.objects.filter(id=vm_req_id).update(
-            creation_status="Failed",
-            creation_error_message=str(e)
+            creation_status="Failed", creation_error_message=str(e)
         )
         return None, None, str(e)
-
 
 
 def create_data_volume(size, volume_name, data_volume_type):

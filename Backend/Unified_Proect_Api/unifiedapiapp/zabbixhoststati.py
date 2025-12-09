@@ -1,25 +1,25 @@
-import requests
 import json
+
+import requests
 
 # Zabbix credentials and URL
 ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
 ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
 
+
 # Authenticate and get token
 def zabbix_login():
     payload = {
         "jsonrpc": "2.0",
         "method": "user.login",
-        "params": {
-            "user": ZABBIX_USER,
-            "password": ZABBIX_PASSWORD
-        },
+        "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
         "id": 1,
-        "auth": None
+        "auth": None,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     return response.json().get("result")
+
 
 # Get all host availability status
 def get_host_availability(auth_token):
@@ -30,10 +30,11 @@ def get_host_availability(auth_token):
             "output": ["hostid", "name", "available"],
         },
         "auth": auth_token,
-        "id": 2
+        "id": 2,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     return response.json().get("result", [])
+
 
 # Main logic
 def main():
@@ -48,11 +49,7 @@ def main():
         return
 
     # Count statuses
-    availability_map = {
-        "1": "Available",
-        "2": "Not available",
-        "0": "Unknown"
-    }
+    availability_map = {"1": "Available", "2": "Not available", "0": "Unknown"}
     status_count = {"Available": 0, "Not available": 0, "Unknown": 0}
 
     for host in hosts:
@@ -65,6 +62,7 @@ def main():
     print(f"Not Available: {status_count['Not available']}")
     print(f"Unknown: {status_count['Unknown']}")
     print(f"Total: {total}")
+
 
 if __name__ == "__main__":
     main()

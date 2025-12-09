@@ -1,55 +1,53 @@
-import requests
 import json
+
+import requests
 
 # Zabbix API credentials
 ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
 ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
 
+
 # Function to authenticate with Zabbix API
 def zabbix_login():
     payload = {
         "jsonrpc": "2.0",
         "method": "user.login",
-        "params": {
-            "user": ZABBIX_USER,
-            "password": ZABBIX_PASSWORD
-        },
+        "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
         "id": 1,
-        "auth": None
+        "auth": None,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     return response.json().get("result")
+
 
 # Function to get the host group ID
 def get_hostgroup_id(auth_token, group_name="Linux servers"):
     payload = {
         "jsonrpc": "2.0",
         "method": "hostgroup.get",
-        "params": {
-            "filter": {"name": group_name}
-        },
+        "params": {"filter": {"name": group_name}},
         "auth": auth_token,
-        "id": 2
+        "id": 2,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     groups = response.json().get("result", [])
     return groups[0]["groupid"] if groups else None
+
 
 # Function to get the template ID
 def get_template_id(auth_token, template_name="Template OS Linux"):
     payload = {
         "jsonrpc": "2.0",
         "method": "template.get",
-        "params": {
-            "filter": {"host": template_name}
-        },
+        "params": {"filter": {"host": template_name}},
         "auth": auth_token,
-        "id": 3
+        "id": 3,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     templates = response.json().get("result", [])
     return templates[0]["templateid"] if templates else None
+
 
 # Function to add a new host (VM)
 def add_host(auth_token, vm_name, vm_ip):
@@ -65,22 +63,25 @@ def add_host(auth_token, vm_name, vm_ip):
         "method": "host.create",
         "params": {
             "host": vm_name,
-            "interfaces": [{
-                "type": 1,  # Agent interface
-                "main": 1,
-                "useip": 1,
-                "ip": vm_ip,
-                "dns": "",
-                "port": "10050"
-            }],
+            "interfaces": [
+                {
+                    "type": 1,  # Agent interface
+                    "main": 1,
+                    "useip": 1,
+                    "ip": vm_ip,
+                    "dns": "",
+                    "port": "10050",
+                }
+            ],
             "groups": [{"groupid": hostgroup_id}],
-            "templates": [{"templateid": template_id}]
+            "templates": [{"templateid": template_id}],
         },
         "auth": auth_token,
-        "id": 4
+        "id": 4,
     }
     response = requests.post(ZABBIX_URL, json=payload)
     return response.json()
+
 
 # Main script execution
 if __name__ == "__main__":

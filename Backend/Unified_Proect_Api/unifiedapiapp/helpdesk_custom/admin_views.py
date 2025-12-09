@@ -1,17 +1,20 @@
 # unifiedapiapp/helpdesk_custom/admin_views.py
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.urls import reverse
-from django.core.paginator import Paginator
-from unifiedapiapp.models import Ticket  # adjust import path if different
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.paginator import Paginator
 from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
+
+from unifiedapiapp.models import Ticket  # adjust import path if different
+
 
 def is_helpdesk_admin(user):
     # Change this if you prefer permission-based checks.
     # Use is_staff or a custom permission/group.
     return user.is_authenticated and (user.is_superuser or user.is_staff)
+
 
 @login_required
 @user_passes_test(is_helpdesk_admin, login_url="/", redirect_field_name=None)
@@ -31,9 +34,9 @@ def admin_dashboard(request):
         qs = qs.filter(status__iexact=status_filter)
     if q:
         qs = qs.filter(
-            Q(title__icontains=q) |
-            Q(description__icontains=q) |
-            Q(submitter_email__icontains=q)
+            Q(title__icontains=q)
+            | Q(description__icontains=q)
+            | Q(submitter_email__icontains=q)
         )
 
     # pagination

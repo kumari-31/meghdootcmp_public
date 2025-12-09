@@ -71,6 +71,7 @@ const Networks = lazy(() => import("./Pages/Network/Networks"));
 const RBACpolicies = lazy(() => import("./Pages/Network/RBACpolicies"));
 const Routers = lazy(() => import("./Pages/Network/Routers"));
 const ApprovedvmRequest = lazy(() => import("./Pages/Admin/ApprovedvmRequest"));
+const VMDeleteApproval = lazy(() => import("./Pages/Admin/VMDeleteApproval"));
 const Roles = lazy(() => import("./Pages/Administration/Roles"));
 const ReplicaSets = lazy(() => import("./Kubernets/ReplicaSets"));
 const HealthMonitoring = lazy(() =>
@@ -428,6 +429,14 @@ const App = () => {
               element={
                 <ProtectedRoute allowedRoles={["ADMIN"]}>
                   <ApprovedvmRequest />
+                </ProtectedRoute>
+              }
+            />
+             <Route
+              path="openstack/admin/VMDeleteApproval"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <VMDeleteApproval />
                 </ProtectedRoute>
               }
             />

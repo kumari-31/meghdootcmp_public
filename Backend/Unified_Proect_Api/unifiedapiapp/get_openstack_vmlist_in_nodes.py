@@ -1,10 +1,10 @@
-import openstack
 import os
+
+import openstack
 from dotenv import load_dotenv
 from openstack import connection
 
 load_dotenv()  # This will load the environment variables from a .env file
-
 
 
 # AUTH_URL = os.getenv("AUTH_URL")
@@ -16,8 +16,6 @@ load_dotenv()  # This will load the environment variables from a .env file
 # SERVER_URL = os.getenv("SERVER_URL")
 
 
-
-
 AUTH_URL = "http://10.184.43.17:5000/v3/"
 PROJECT_NAME = "admin"
 USERNAME = "admin"
@@ -25,6 +23,7 @@ PASSWORD = "Meghd@@t123"
 USER_DOMAIN_NAME = "Default"
 PROJECT_DOMAIN_NAME = "Default"
 SERVER_URL = "http://10.184.43.17:5000/v3/"
+
 
 def get_openstack_connection():
     """Establish a connection to OpenStack."""
@@ -46,24 +45,28 @@ def get_openstack_connection():
     #     project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
     # )
 
+
 def list_nodes_and_vms():
     conn = get_openstack_connection()
-    
+
     # Get list of compute nodes
     compute_services = conn.compute.services()
-    nodes = [service.host for service in compute_services if service.binary == "nova-compute"]
-    
+    nodes = [
+        service.host for service in compute_services if service.binary == "nova-compute"
+    ]
+
     node_vm_mapping = {}
-    
+
     for node in nodes:
         # Get all VMs
         vms = conn.compute.servers()
-        
+
         # Filter VMs running on this specific node
         node_vms = [vm.name for vm in vms if vm.hypervisor_hostname == node]
         node_vm_mapping[node] = node_vms
-    
+
     return node_vm_mapping
+
 
 if __name__ == "__main__":
     result = list_nodes_and_vms()

@@ -1,13 +1,16 @@
 # createvmdash
 
+from datetime import datetime
 from pyexpat.errors import messages
+
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from .models import CdacProject, Registration, VMInfo, Metric, Employee, VmRequest
-from openstackoperations import *
-from rest_framework.response import Response
 from rest_framework import status
-from datetime import datetime
+from rest_framework.response import Response
+
+from openstackoperations import *
+
+from .models import CdacProject, Employee, Metric, Registration, VMInfo, VmRequest
 
 
 def user_registeration_dashboard(request):
@@ -350,9 +353,11 @@ def vm_approve_request(id):
                     if created_bootable is None:
                         VmRequest.objects.filter(id=id).update(
                             creation_status="Failed",
-                            creation_error_message=error_message
+                            creation_error_message=error_message,
                         )
-                        print(f"VM creation failed for {current_vm_name}: {error_message}")
+                        print(
+                            f"VM creation failed for {current_vm_name}: {error_message}"
+                        )
                         # Stop further processing for this request
                         return {"status": False, "message": error_message}
 

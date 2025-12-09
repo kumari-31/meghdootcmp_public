@@ -165,8 +165,8 @@ const Navbar = () => {
               roles: ["ADMIN"],
             },
             {
-              name: "Approved Request",
-              path: "/app/openstack/admin/approvedvmrequest",
+              name: "VM DeleteApproval",
+              path: "/app/openstack/admin/vmdeleteapproval",
               roles: ["ADMIN"],
             },
             {

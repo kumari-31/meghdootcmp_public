@@ -1,18 +1,20 @@
-from kubernetes import client, config
 import os
+
+from kubernetes import client, config
+
 
 def deploy_nginx_pod(pod_name, port):
     # Get the directory where kubenetes.py is located
     current_dir = os.path.dirname(os.path.abspath(__file__))
     # Construct absolute path to admin.conf
     admin_conf_path = os.path.join(current_dir, "admin.conf")
-    
+
     try:
         # Load kubeconfig with absolute path
         config.load_kube_config(config_file=admin_conf_path)
         v1 = client.CoreV1Api()
         apps_v1 = client.AppsV1Api()
-        
+
         # Define pod spec
         pod = client.V1Pod(
             metadata=client.V1ObjectMeta(name=pod_name, labels={"app": "nginx"}),
@@ -21,10 +23,10 @@ def deploy_nginx_pod(pod_name, port):
                     client.V1Container(
                         name="nginx",
                         image="nginx:latest",
-                        ports=[client.V1ContainerPort(container_port=port)]
+                        ports=[client.V1ContainerPort(container_port=port)],
                     )
                 ]
-            )
+            ),
         )
 
         # Create pod in "default" namespace
@@ -42,6 +44,7 @@ def deploy_nginx_pod(pod_name, port):
     except Exception as e:
         print(f"Error loading kubeconfig or creating pod: {e}")
         return False
+
 
 # if __name__ == "__main__":
 #     pod_name = input("Enter the pod name: ")

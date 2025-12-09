@@ -8,6 +8,7 @@ project_name = "admin"
 user_domain_name = "Default"
 project_domain_name = "Default"
 
+
 # Get the authentication token
 def get_token():
     headers = {"Content-Type": "application/json"}
@@ -36,6 +37,7 @@ def get_token():
     response.raise_for_status()  # Raise an error if the request failed
     return response.headers["X-Subject-Token"]
 
+
 # Get the image details
 def get_image_details(image_id):
     glance_url = f"http://10.184.43.17/api/glance/images/{image_id}"
@@ -45,6 +47,7 @@ def get_image_details(image_id):
     response = requests.get(glance_url, headers=headers)
     response.raise_for_status()  # Raise an error if the request failed
     return response.json()
+
 
 # Image ID
 image_id = "54ffe87f-89dd-48e1-b5c7-1c307cf6bedc"

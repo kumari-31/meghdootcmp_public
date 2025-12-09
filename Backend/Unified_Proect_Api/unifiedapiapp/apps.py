@@ -2,5 +2,5 @@ from django.apps import AppConfig
 
 
 class UnifiedapiappConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'unifiedapiapp'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "unifiedapiapp"

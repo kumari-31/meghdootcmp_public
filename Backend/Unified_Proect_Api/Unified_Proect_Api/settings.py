@@ -1,7 +1,8 @@
-from dotenv import load_dotenv
-from pathlib import Path
 import os
+from pathlib import Path
+
 from corsheaders.defaults import default_headers
+from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
 
@@ -13,7 +14,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45'
+SECRET_KEY = "django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -25,64 +26,62 @@ X_FRAME_OPTIONS = "ALLOWALL"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 
-
-
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'django.contrib.humanize',
-    'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
-    'rest_framework.authtoken',
-    'corsheaders',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "django.contrib.humanize",
+    "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
+    "rest_framework.authtoken",
+    "corsheaders",
     "django_extensions",
-    "django.contrib.sites",      # Required for pinax-teams
-    "account",                   # Required by pinax-invitations
+    "django.contrib.sites",  # Required for pinax-teams
+    "account",  # Required by pinax-invitations
     "pinax.invitations",
-    'pinax.teams', 
+    "pinax.teams",
     "bootstrap4",
     # django-helpdesk
-    'helpdesk',
-    'unifiedapiapp'
+    "helpdesk",
+    "unifiedapiapp",
 ]
 
 SITE_ID = 1
 
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'unifiedapiapp.authentication.CookieJWTAuthentication',  # ✅ Custom cookie JWT
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "unifiedapiapp.authentication.CookieJWTAuthentication",  # ✅ Custom cookie JWT
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
     ],
 }
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ["*"]
 
 # CORS_ALLOW_ALL_ORIGINS = True  # Or set to False and specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
 
- # django-helpdesk
+# django-helpdesk
 HELPDESK_ENABLE_PER_QUEUE_TEAMS = False
 HELPDESK_KB_ENABLED = False
 HELPDESK_ENABLE_HISTORY = True
@@ -90,7 +89,7 @@ HELPDESK_ENABLE_HISTORY = True
 # Optional: email notifications (already set your SMTP)
 HELPDESK_EMAIL_FROM_ADDRESS = "rakshanavg20@gmail.com"
 HELPDESK_EMAIL_TEMPLATE_DIR = os.path.join(BASE_DIR, "helpdesk/email_templates")
-HELPDESK_AUTHENTICATION = 'Unified_Proect_Api.cookie_jwt_auth.CookieJWTAuthentication'
+HELPDESK_AUTHENTICATION = "Unified_Proect_Api.cookie_jwt_auth.CookieJWTAuthentication"
 HELPDESK_ANONYMOUS_ACCESS = False
 HELPDESK_DEFAULT_SETTINGS = {
     "default_staff_status": True,
@@ -98,25 +97,25 @@ HELPDESK_DEFAULT_SETTINGS = {
 }
 
 
-ROOT_URLCONF = 'Unified_Proect_Api.urls'
+ROOT_URLCONF = "Unified_Proect_Api.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'Unified_Proect_Api.wsgi.application'
+WSGI_APPLICATION = "Unified_Proect_Api.wsgi.application"
 
 from datetime import timedelta
 
@@ -129,13 +128,13 @@ from datetime import timedelta
 # }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=25),       # short-lived access token
-    'REFRESH_TOKEN_LIFETIME': timedelta(minutes=30),          # longer refresh token
-    'ROTATE_REFRESH_TOKENS': True,                        # rotate refresh tokens
-    'BLACKLIST_AFTER_ROTATION': True,                     # blacklist old refresh tokens
-    'UPDATE_LAST_LOGIN': True,                             # optional
-    'SIGNING_KEY': SECRET_KEY,
-    'ALGORITHM': 'HS256',
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=25),  # short-lived access token
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30),  # longer refresh token
+    "ROTATE_REFRESH_TOKENS": True,  # rotate refresh tokens
+    "BLACKLIST_AFTER_ROTATION": True,  # blacklist old refresh tokens
+    "UPDATE_LAST_LOGIN": True,  # optional
+    "SIGNING_KEY": SECRET_KEY,
+    "ALGORITHM": "HS256",
 }
 
 # Allow cookies to persist
@@ -143,16 +142,15 @@ SESSION_COOKIE_SECURE = False  # True only if using HTTPS
 CSRF_COOKIE_SECURE = False
 
 
-
 CORS_ALLOW_HEADERS = list(default_headers) + [
-    'content-type',
+    "content-type",
 ]
 CORS_ALLOW_METHODS = ["DELETE", "GET", "OPTIONS", "PATCH", "POST", "PUT"]
 
 # Cookie config for tokens
 REFRESH_COOKIE_NAME = "MDAUTH"
 REFRESH_COOKIE_HTTPONLY = True
-REFRESH_COOKIE_SECURE = False     # must be True when SameSite=None
+REFRESH_COOKIE_SECURE = False  # must be True when SameSite=None
 REFRESH_COOKIE_SAMESITE = "Lax"  # or "None" if cross-site cookies are needed
 REFRESH_COOKIE_PATH = "/"
 REFRESH_COOKIE_AGE = 30 * 60  # 20 minutes
@@ -176,13 +174,13 @@ ACCESS_COOKIE_AGE = 25 * 60  # 15 minutes
 
 # settings.py
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.environ.get('DB_NAME'),
-        'USER': os.environ.get('DB_USER'),
-        'PASSWORD': os.environ.get('DB_PASSWORD'),
-        'HOST': os.environ.get('DB_HOST','localhost'),
-        'PORT': os.environ.get('DB_PORT','5432'),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.environ.get("DB_NAME"),
+        "USER": os.environ.get("DB_USER"),
+        "PASSWORD": os.environ.get("DB_PASSWORD"),
+        "HOST": os.environ.get("DB_HOST", "localhost"),
+        "PORT": os.environ.get("DB_PORT", "5432"),
     }
 }
 
@@ -192,16 +190,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -211,9 +209,9 @@ OTP_TEST_MODE = True
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -223,24 +221,28 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = "static/"
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),  # This should point to where your React build assets are
+    os.path.join(
+        BASE_DIR, "static"
+    ),  # This should point to where your React build assets are
 ]
 
 # Media files configuration
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
+MEDIA_URL = "/media/"
+MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-OPENSTACK_MEMBER_ROLE = "member"  # Replace "member" with the actual role in your OpenStack setup
+OPENSTACK_MEMBER_ROLE = (
+    "member"  # Replace "member" with the actual role in your OpenStack setup
+)
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
@@ -252,17 +254,23 @@ EMAIL_PORT = 465
 EMAIL_HOST_USER = "tejascdac97@gmail.com"
 # EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
 EMAIL_HOST_PASSWORD = "aqdx gfas pghz snqi "
+DEFAULT_FROM_EMAIL = "tejascdac97@gmail.com"
+SERVER_EMAIL = "tejascdac97@gmail.com"
+# EMAIL_HOST = "smtp.cdac.in"
+# EMAIL_USE_TLS = True
+# EMAIL_USE_SSL = False
+# EMAIL_PORT = 587
+# EMAIL_HOST_USER = "cloud-chn@cdac.in"
+# EMAIL_HOST_PASSWORD = "MeghdooT"
 
 
-DEFAULT_FROM_EMAIL = 'tejascdac97@gmail.com'
-SERVER_EMAIL = 'tejascdac97@gmail.com'
+DEFAULT_FROM_EMAIL = "cloud-chn@cdac.in"
+SERVER_EMAIL = "cloud-chn@cdac.in"
 
 
 ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
 ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
-
-
 
 
 # """
@@ -294,10 +302,10 @@ ZABBIX_PASSWORD = "zabbix"
 # # --------------------------------------------------------------------
 # CORS_ALLOW_CREDENTIALS = True
 # CORS_ALLOWED_ORIGINS = [
-   
+
 #     "http://localhost:3000",
 #     "http://10.184.40.211:3000",
-#     "http://10.184.39.33:8002",  # Add your production origin if necessary 
+#     "http://10.184.39.33:8002",  # Add your production origin if necessary
 # ]
 # # CORS_ALLOW_ALL_ORIGINS = True
 
@@ -468,5 +476,3 @@ ZABBIX_PASSWORD = "zabbix"
 # # 🔧 DEFAULTS
 # # --------------------------------------------------------------------
 # DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-

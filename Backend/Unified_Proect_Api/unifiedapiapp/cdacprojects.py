@@ -1,4 +1,4 @@
-from .models import Project # Replace 'your_app' with your app's name
+from .models import Project  # Replace 'your_app' with your app's name
 
 # List of projects to add
 project_names = ["BOSS Linux", "Indian Army OS", "Indian Navy OS"]
