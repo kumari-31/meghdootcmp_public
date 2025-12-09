@@ -234,6 +234,9 @@ urlpatterns = [
     path('api/kube-volume-details/', PersistentVolumeDetailAPIView.as_view(), name='volume-details'),
     
     
+    path("api/k8s/overview/", K8sOverviewAPIView.as_view(), name="k8s-overview"),
+
+    
     path("api/ceph/health/", CephClusterHealthView.as_view(), name="ceph_health"),
     path("api/ceph/osd/", CephOSDInfoView.as_view(), name="ceph_osd"),
     path("api/ceph/cluster/", CephClusterInfoView.as_view(), name="ceph_cluster"),

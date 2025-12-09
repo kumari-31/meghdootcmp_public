@@ -22,38 +22,53 @@ import {
   MenuItem,
   TablePagination,
 } from '@mui/material';
+import { useTheme } from "@mui/material/styles";
+
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
 
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: '#253848',
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
-    textAlign: 'center',
-    color: '#000',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '200px',
+    textAlign: "center",
+    color: theme.palette.text.primary, // auto adjusts
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
+
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
-  '&:nth-of-type(odd)': {
-    backgroundColor: theme.palette.grey[300],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
+  "&:nth-of-type(odd)": {
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
-  '&:last-child td, &:last-child th': {
+
+  "&:last-child td, &:last-child th": {
     border: 0,
   },
 }));
+
 
 const Volumes = () => {
   const [volumes, setVolumes] = useState([]);
@@ -66,6 +81,8 @@ const Volumes = () => {
   const [selectedVolumes, setSelectedVolumes] = useState([]);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [volumeToUpdate, setVolumeToUpdate] = useState(null);
+
+  const theme = useTheme(); 
   const [newVolume, setNewVolume] = useState({
     name: '', // Changed from volume_name to name
     description: '',
@@ -364,7 +381,7 @@ const Volumes = () => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     width: 400,
-    bgcolor: 'background.paper',
+    bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
     borderRadius: '8px',
@@ -383,7 +400,14 @@ const Volumes = () => {
             variant="outlined"
           />
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="contained" style={{ backgroundColor: 'green', color: 'white' }} onClick={() => setShowCreateForm(true)}>
+            <Button variant="contained"  onClick={() => setShowCreateForm(true)}
+               sx={{
+                backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+                color: "#fff",
+                "&:hover": {
+                  backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+                }
+              }} > 
               Create Volume <RiBallPenLine />
             </Button>
             <Button variant="contained" color="error" onClick={handleDeleteSelectedVolumes}>
@@ -551,19 +575,20 @@ const Volumes = () => {
         </Box>
       </Modal>
 
-      <TableContainer component={Paper}
-      sx={{
-        width: "fit-content",
-        minWidth: "75%",
-        maxWidth: "100%",
-        margin: "0 auto",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        border: "none !important",
-        boxShadow: "none !important",
-        backgroundColor: "transparent !important"
-      }}
+      <TableContainer
+        component={Paper}
+        sx={(theme) => ({
+          width: "fit-content",
+          minWidth: "75%",
+          maxWidth: "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+
+          backgroundColor: theme.palette.background.paper,
+          boxShadow: theme.shadows[3],
+        })}
       >
         <Table 
         sx={{

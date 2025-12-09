@@ -1,0 +1,22 @@
+import statement is in the line before 858
+
+for kubernates  for making all api work fast 
+
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")
+try:
+    config.load_incluster_config()
+except config.ConfigException:
+    config.load_kube_config(config_file=KUBECONFIG_PATH)
+
+v1 = client.CoreV1Api()
+apps_v1 = client.AppsV1Api()
+metrics_client = client.CustomObjectsApi()
+
+
+added in the line number 927
+
+(parse_cpu, parse_memory, humanize_age, get_pod_metrics, get_k8s_clients, get_k8s_client4)
+
+lines number/858 to 927 /

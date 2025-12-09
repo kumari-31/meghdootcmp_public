@@ -40,14 +40,14 @@ import SortIcon from "@mui/icons-material/Sort";
 import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import apiClient from "../Axios";
 
-const CACHE_TTL = 60000; // 30 sec
+// const CACHE_TTL = 60000; // 30 sec
 
-const setCache = (key, data, ttl = 60000) => { // ttl in ms (30 sec)
-  const item = {
-    data,
-    expiry: Date.now() + ttl,
-  };
-  localStorage.setItem(key, JSON.stringify(item));
+// Cache utilities
+const setCache = (key, data, ttl = 60000) => {
+  localStorage.setItem(
+    key,
+    JSON.stringify({ data, expiry: Date.now() + ttl })
+  );
 };
 
 const getCache = (key) => {
@@ -309,11 +309,11 @@ useEffect(() => {
         deploymentsResult,
         allReplicaSetsResult,
       ] = await Promise.all([
-        safePromise(apiClient.get(`/k8s/services/`)),
-        safePromise(apiClient.get(`/k8s/pods/`)),
-        safePromise(apiClient.get(`/k8s/nodes/`)),
-        safePromise(apiClient.get(`/k8s/deployments/`)),
-        safePromise(apiClient.get(`/k8s/replicasets/`)),
+        safePromise(apiClient.get(`/k8s/services/?namespace=${ns}`)),
+        safePromise(apiClient.get(`/k8s/pods/?namespace=${ns}`)),
+        safePromise(apiClient.get(`/k8s/nodes/`)), // nodes have no namespaces
+        safePromise(apiClient.get(`/k8s/deployments/?namespace=${ns}`)),
+        safePromise(apiClient.get(`/k8s/replicasets/?namespace=${ns}`)),
       ]);
 
       const fetchedServices =
