@@ -352,9 +352,7 @@ const Flavors = () => {
   return (
     <div style={flavorsContainerStyle}>
       <div style={headerContainerFlavorsStyle}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Flavor Management
-        </Typography>
+        <h1> Flavors Management</h1>
         <div style={buttonContainerStyle}>
           <TextField
             label="Search flavors..."
@@ -553,10 +551,9 @@ const headerContainerFlavorsStyle = {
   alignItems: 'center',
   marginBottom: '20px',
 };
-const buttonContainerStyle = {
-  display: 'flex',
-  gap: '16px',
-  alignItems: 'center',
-};
+const buttonContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
+
+const searchContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
+const volumesTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
 
 export default Flavors;

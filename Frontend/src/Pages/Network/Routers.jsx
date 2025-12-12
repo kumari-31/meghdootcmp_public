@@ -92,6 +92,12 @@ const Routers = () => {
     project_id: '',
     project_name: '', // Added project_name to newRouter
   });
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    external_network_name: "",
+    project_id: "",
+  });
+  
 
   const [routerToUpdate, setRouterToUpdate] = useState(null);
   const [networks, setNetworks] = useState([]);
@@ -162,7 +168,60 @@ const Routers = () => {
     );
   }
 
+  const validateRouterForm = () => {
+    let errors = {};
+  
+    // NAME REQUIRED
+    if (!newRouter.name.trim()) {
+      errors.name = "Router name is required.";
+    } 
+    // MIN LENGTH
+    else if (newRouter.name.length < 3) {
+      errors.name = "Router name must be at least 3 characters.";
+    } 
+    // ALPHABET ONLY (NO NUMBERS / NO SPECIAL CHARACTERS)
+    else if (!/^[A-Za-z_\s]+$/.test(newRouter.name)) {
+      errors.name = "Router name can contain only alphabets and underscore (_).";
+    }
+  
+    // NETWORK REQUIRED
+    if (!newRouter.external_network_name) {
+      errors.external_network_name = "Select an external network.";
+    }
+  
+    // PROJECT REQUIRED
+    if (!newRouter.project_id) {
+      errors.project_id = "Select a project.";
+    }
+  
+    setFormErrors(errors);
+  
+    return Object.keys(errors).length === 0;
+  };
+  
 
+  const validateUpdateForm = () => {
+    let errors = {};
+  
+    // NAME REQUIRED
+    if (!routerToUpdate?.name?.trim()) {
+      errors.name = "Router name is required.";
+    } 
+    // MIN LENGTH
+    else if (routerToUpdate.name.length < 3) {
+      errors.name = "Router name must be at least 3 characters.";
+    } 
+    // ALPHABETS ONLY
+   
+    else if (!/^[A-Za-z_\s]+$/.test(routerToUpdate.name)) {
+      errors.name = "Router name must contain only alphabets.";
+    }
+  
+    setFormErrors(errors);
+  
+    return Object.keys(errors).length === 0;
+  };
+  
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setPage(0);
@@ -206,19 +265,54 @@ const Routers = () => {
 
   const handleUpdateRouterInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setRouterToUpdate((prevState) => ({
-      ...prevState,
-      [name]: type === 'checkbox' ? checked : value,
+  
+    setRouterToUpdate((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
     }));
+  
+    // Live validation for router name
+    if (name === "name") {
+      let error = "";
+      if (!value.trim()) {
+        error = "Router name is required.";
+      } else if (value.length < 3) {
+        error = "Router name must be at least 3 characters.";
+      } else if (!/^[A-Za-z_\s]+$/.test(value)) {
+        error = "Router name can contain only alphabets and underscore (_).";
+      }
+  
+      setFormErrors((prev) => ({ ...prev, name: error }));
+    }
   };
+  
+
+  const handleNewRouterNameChange = (e) => {
+    const { value } = e.target;
+    
+    setNewRouter((prev) => ({ ...prev, name: value }));
+  
+    // Live validation
+    let error = "";
+    if (!value.trim()) {
+      error = "Router name is required.";
+    } else if (value.length < 3) {
+      error = "Router name must be at least 3 characters.";
+    } else if (!/^[A-Za-z_\s]+$/.test(value)) {
+      error = "Router name can contain only alphabets and underscore (_).";
+    }
+  
+    setFormErrors((prev) => ({ ...prev, name: error }));
+  };
+  
 
   const handleCreateRouter = async (e) => {
     e.preventDefault();
 
-    if (!newRouter.name || !newRouter.external_network_name || !newRouter.project_id) {
-      alert('Please fill in all required fields');
+    if (!validateRouterForm()) {
       return;
     }
+    
 
     const existingRouter = routers.find((router) => router.name === newRouter.name);
     if (existingRouter) {
@@ -260,11 +354,8 @@ const Routers = () => {
 
   const handleUpdateRouter = async (e) => {
     e.preventDefault();
-    if (!routerToUpdate || !routerToUpdate['Router ID']) {
-      alert('Please provide a valid router ID.');
-      return;
-    }
-
+    if (!validateUpdateForm()) return;
+    
     const payload = {
       name: routerToUpdate.name,
       admin_state_up: routerToUpdate.admin_state_up,
@@ -362,8 +453,17 @@ const Routers = () => {
           </Typography>
           <form onSubmit={handleCreateRouter}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Router Name" name="name" onChange={(e) => setNewRouter({ ...newRouter, name: e.target.value })} value={newRouter.name} required />
-            </FormControl>
+            <TextField
+                label="Router Name"
+                name="name"
+                value={newRouter.name}
+                onChange={handleNewRouterNameChange}
+                error={!!formErrors.name}
+                helperText={formErrors.name}   // this shows error text correctly
+                required
+              />
+
+              </FormControl>
             <FormControl fullWidth margin="normal">
               <FormControlLabel control={<Checkbox checked={newRouter.admin_state_up} onChange={(e) => setNewRouter({ ...newRouter, admin_state_up: e.target.checked })} />} label="Admin State Up" />
             </FormControl>
@@ -371,16 +471,39 @@ const Routers = () => {
               <FormControlLabel control={<Checkbox checked={newRouter.enable_snat} onChange={(e) => setNewRouter({ ...newRouter, enable_snat: e.target.checked })} />} label="Enable SNAT" />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <InputLabel id="external_network_name-label">External Network</InputLabel>
-              <Select labelId="external_network_name-label" id="external_network_name" value={newRouter.external_network_name} onChange={(e) => setNewRouter({ ...newRouter, external_network_name: e.target.value })} label="External Network" required>
-                <MenuItem value="">Select Network</MenuItem>
-                {networks.map((network) => (
-                  <MenuItem key={network.id} value={network.name}>
-                    {network.name}
+              <InputLabel id="external_network_name-label">
+                External Network
+              </InputLabel>
+
+              <Select
+                labelId="external_network_name-label"
+                id="external_network_name"
+                value={newRouter.external_network_name}
+                onChange={(e) =>
+                  setNewRouter({ ...newRouter, external_network_name: e.target.value })
+                }
+                error={!!formErrors.external_network_name}
+                label="External Network"
+                required
+              >
+              <MenuItem value="">Select Network</MenuItem>
+
+              {networks
+                .filter((network) => network.external === true)
+                .map((network) => (
+                  <MenuItem key={network.id} value={network.id}>
+                    {network.network_name}
                   </MenuItem>
                 ))}
               </Select>
+
+              {formErrors.external_network_name && (
+                <Typography variant="caption" color="error">
+                  {formErrors.external_network_name}
+                </Typography>
+              )}
             </FormControl>
+
             {/* Project Dropdown */}
             <FormControl fullWidth margin="normal">
               <InputLabel id="project_name-label">Project</InputLabel>
@@ -396,6 +519,7 @@ const Routers = () => {
                     project_name: e.target.value,
                   });
                 }}
+                error={!!formErrors.project_id}
                 label="Project"
                 required
               >
@@ -406,7 +530,14 @@ const Routers = () => {
                   </MenuItem>
                 ))}
               </Select>
+
+              {formErrors.project_id && (
+                <Typography variant="caption" color="error">
+                  {formErrors.project_id}
+                </Typography>
+              )}
             </FormControl>
+
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
                 Create
@@ -426,8 +557,16 @@ const Routers = () => {
           </Typography>
           <form onSubmit={handleUpdateRouter}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Router Name" name="name" onChange={handleUpdateRouterInputChange} value={routerToUpdate?.name || ''} required />
-            </FormControl>
+            <TextField
+              label="Router Name"
+              name="name"
+              value={routerToUpdate?.name || ""}
+              onChange={handleUpdateRouterInputChange}
+              error={!!formErrors.name}
+              helperText={formErrors.name}
+              required
+            />
+              </FormControl>
             <FormControl fullWidth margin="normal">
               <FormControlLabel control={<Checkbox checked={routerToUpdate?.admin_state_up || false} onChange={handleUpdateRouterInputChange} name="admin_state_up" />} label="Admin State Up" />
             </FormControl>
@@ -543,7 +682,7 @@ const Routers = () => {
                     <Box display="flex" justifyContent="center" gap={1}>
                       <Button
                         variant="outlined"
-                        color="#253848"
+                        
                         onClick={() => {
                           setRouterToUpdate(router);
                           setShowUpdateForm(true);

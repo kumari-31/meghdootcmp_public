@@ -95,6 +95,11 @@ const Groups = () => {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmMessage, setConfirmMessage] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({
+    name: "",
+    description: ""
+  });
+  
 
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
@@ -129,6 +134,12 @@ const Groups = () => {
     }
     handleConfirmModalClose();
   };
+
+  const groupNameRegex = /^[A-Za-z0-9_-]+$/;
+
+  const descriptionRegex = /^[A-Za-z0-9 _.,-]*$/;
+
+
 
   const fetchGroups = async () => {
     setError(null);
@@ -227,20 +238,63 @@ const Groups = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setNewGroup((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+  
+    let error = "";
+  
+    if (name === "name") {
+      if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+        error = "Only letters, numbers, underscore (_), hyphen (-) allowed. No spaces.";
+      }
+      setFieldErrors((prev) => ({ ...prev, name: error }));
+      if (!error) {
+        setNewGroup((prev) => ({ ...prev, name: value }));
+      }
+      return;
+    }
+  
+    if (name === "description") {
+      if (!/^[A-Za-z0-9 _.,-]*$/.test(value)) {
+        error = "Invalid characters in description.";
+      }
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+      if (!error) {
+        setNewGroup((prev) => ({ ...prev, description: value }));
+      }
+      return;
+    }
   };
+  
+
 
   const handleUpdateInputChange = (e) => {
     const { name, value } = e.target;
-    setGroupToUpdate((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+  
+    let error = "";
+  
+    if (name === "name") {
+      if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+        error = "Only letters, numbers, underscore (_), hyphen (-) allowed. No spaces.";
+      }
+      setFieldErrors((prev) => ({ ...prev, name: error }));
+      if (!error) {
+        setGroupToUpdate((prev) => ({ ...prev, name: value }));
+      }
+      return;
+    }
+  
+    if (name === "description") {
+      if (!/^[A-Za-z0-9 _.,-]*$/.test(value)) {
+        error = "Invalid characters in description.";
+      }
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+      if (!error) {
+        setGroupToUpdate((prev) => ({ ...prev, description: value }));
+      }
+      return;
+    }
   };
-
+  
+  
   const handleNewMemberChange = (e) => {
     setNewMember({ user: e.target.value });
   };
@@ -261,6 +315,17 @@ const Groups = () => {
   const handleCreateGroup = async (e) => {
     e.preventDefault();
 
+
+    if (!groupNameRegex.test(newGroup.name)) {
+      showSnackbar("Group name can contain only letters, numbers, underscore (_) and hyphen (-). No spaces.", "error");
+      return;
+    }
+  
+    if (!descriptionRegex.test(newGroup.description)) {
+      showSnackbar("Description contains invalid characters.", "error");
+      return;
+    }
+  
     const existingGroup = groups.find((group) => group.name.trim() === newGroup.name.trim());
 
     if (existingGroup) {
@@ -297,6 +362,16 @@ const Groups = () => {
   const handleUpdateGroup = async (e) => {
     e.preventDefault();
 
+
+      if (!groupNameRegex.test(groupToUpdate.name)) {
+        showSnackbar("Group name may contain only alphabets, numbers, underscore (_) and hyphen (-). No spaces.", "error");
+        return;
+      }
+
+      if (!descriptionRegex.test(groupToUpdate.description)) {
+        showSnackbar("Invalid characters in description.", "error");
+        return;
+      }
     if (!groupToUpdate) {
       showSnackbar('No group selected for update.', 'error');
       return;
@@ -422,10 +497,13 @@ const Groups = () => {
           <h2>Create New Group</h2>
           <form onSubmit={handleCreateGroup}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Name" name="name" placeholder="Name" onChange={handleInputChange} value={newGroup.name} required />
+              <TextField label="Name" name="name" placeholder="Name" onChange={handleInputChange} value={newGroup.name} required error={Boolean(fieldErrors.name)}
+            helperText={fieldErrors.name}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" placeholder="Description" onChange={handleInputChange} value={newGroup.description} required />
+              <TextField label="Description" name="description" placeholder="Description" onChange={handleInputChange} value={newGroup.description} required 
+              error={Boolean(fieldErrors.description)}
+              helperText={fieldErrors.description} />
             </FormControl>
             <FormControl fullWidth margin="normal">
               <Select value={newMember.user} onChange={handleNewMemberChange} displayEmpty>
@@ -457,10 +535,12 @@ const Groups = () => {
           <h2>Update Group</h2>
           <form onSubmit={handleUpdateGroup}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Group Name" name="name" onChange={handleUpdateInputChange} value={groupToUpdate?.name} required />
+              <TextField label="Group Name" name="name" onChange={handleUpdateInputChange} value={groupToUpdate?.name} required  error={Boolean(fieldErrors.name)}
+                helperText={fieldErrors.name} />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" onChange={handleUpdateInputChange} value={groupToUpdate?.description} required />
+              <TextField label="Description" name="description" onChange={handleUpdateInputChange} value={groupToUpdate?.description} required error={Boolean(fieldErrors.description)}
+              helperText={fieldErrors.description} />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
@@ -557,7 +637,7 @@ const Groups = () => {
                 <StyledTableCell>{group.description}</StyledTableCell>
                 <StyledTableCell>
                   <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" color="#253848" onClick={() => { setGroupToUpdate(group); setShowUpdateForm(true); }}>
+                    <Button variant="outlined"  onClick={() => { setGroupToUpdate(group); setShowUpdateForm(true); }}>
                       Update
                     </Button>
                     <Button variant="outlined" color="error" onClick={() => handleDeleteGroup(group.id)}>

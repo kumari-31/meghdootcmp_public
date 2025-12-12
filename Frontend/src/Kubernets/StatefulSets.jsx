@@ -20,15 +20,20 @@ import {
   MenuItem,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { styled, useTheme } from "@mui/material/styles"; // <--- Import useTheme
+import { styled, useTheme } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import apiClient from "../Axios";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from "react-router-dom";
+import "../Pages/style.css"; // For cloud loader
 
-// Styled Table Components
+
+// ------------------ Styled Table ------------------
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -37,25 +42,29 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: theme.palette.text.secondary, // Use theme for consistency
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  // Use theme colors for row backgrounds for consistency with light/dark mode
-  backgroundColor: theme.palette.mode === 'light' ? theme.palette.grey[100] : theme.palette.background.paper,
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.mode === 'light' ? theme.palette.grey[300] : theme.palette.background.default,
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
-  "&:last-child td, &:last-child th": {
-    border: 0,
-  },
-  '&:hover': { // Add hover effect for the entire row
-    backgroundColor: theme.palette.action.hover,
-    transition: 'background-color 0.2s ease-in-out',
-  },
+  "&:last-child td, &:last-child th": { border: 0 },
 }));
 
+// ------------------ StatefulSets Component ------------------
 const StatefulSets = () => {
   const [allStatefulSets, setAllStatefulSets] = useState([]);
   const [statefulSets, setStatefulSets] = useState([]);
@@ -63,175 +72,161 @@ const StatefulSets = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-
+   const [error, setError] = useState(null);
   const [namespacesForDropdown, setNamespacesForDropdown] = useState(["all"]);
   const [selectedNamespace, setSelectedNamespace] = useState("all");
 
   const navigate = useNavigate();
-  const theme = useTheme(); // <--- Initialize useTheme
+  const theme = useTheme();
 
+  // Fetch StatefulSets
   useEffect(() => {
-    const fetchStatefulSetsData = async () => {
+    const fetchStatefulSets = async () => {
       setLoading(true);
       try {
         const response = await apiClient.get("/k8s/statefulsets/");
-        const fetchedStatefulSets = response.data.stateful_sets || [];
-        setAllStatefulSets(fetchedStatefulSets);
+        const data = response.data.stateful_sets || [];
+        setAllStatefulSets(data);
 
-        const allNamespaces = fetchedStatefulSets.map(ss => ss.namespace).filter(Boolean);
-        const uniqueNamespaces = ["all", ...new Set(allNamespaces)].sort();
-        setNamespacesForDropdown(uniqueNamespaces);
-
-        if (!uniqueNamespaces.includes(selectedNamespace)) {
-          setSelectedNamespace(uniqueNamespaces[0] || "all");
-        }
-
-      } catch (error) {
-        console.error("Error fetching StatefulSets or namespaces:", error);
+        const namespaces = [
+          "all",
+          ...new Set(data.map((ss) => ss.namespace).filter(Boolean)),
+        ];
+        setNamespacesForDropdown(namespaces);
+      } catch (err) {
+        console.error("Error fetching StatefulSets:", err);
         setAllStatefulSets([]);
         setNamespacesForDropdown(["all"]);
-        setSelectedNamespace("all");
       } finally {
         setLoading(false);
       }
     };
-
-    fetchStatefulSetsData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchStatefulSets();
   }, []);
 
+  // Filter StatefulSets
   useEffect(() => {
-    let currentFilteredStatefulSets = allStatefulSets;
+    let filtered = allStatefulSets;
 
     if (selectedNamespace !== "all") {
-      currentFilteredStatefulSets = currentFilteredStatefulSets.filter(
-        (ss) => ss.namespace === selectedNamespace
-      );
+      filtered = filtered.filter((ss) => ss.namespace === selectedNamespace);
     }
 
-    if (searchQuery) {
-      const lowerCaseSearchQuery = searchQuery.toLowerCase();
-      currentFilteredStatefulSets = currentFilteredStatefulSets.filter((ss) =>
-        Object.values(ss).some(
-          (value) =>
-            (typeof value === "string" && value.toLowerCase().includes(lowerCaseSearchQuery)) ||
-            (typeof value === "number" && value.toString().toLowerCase().includes(lowerCaseSearchQuery)) ||
-            (Array.isArray(value) && value.some(item =>
-                typeof item === 'string' && item.toLowerCase().includes(lowerCaseSearchQuery)
-            )) ||
-            (typeof value === "object" && value !== null && !Array.isArray(value) &&
-             JSON.stringify(value).toLowerCase().includes(lowerCaseSearchQuery))
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((ss) =>
+        Object.values(ss).some((val) =>
+          JSON.stringify(val).toLowerCase().includes(q)
         )
       );
     }
 
-    setStatefulSets(currentFilteredStatefulSets);
+    setStatefulSets(filtered);
     setPage(0);
   }, [allStatefulSets, selectedNamespace, searchQuery]);
 
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(+e.target.value);
     setPage(0);
   };
-
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value);
-  };
-
-  const handleChangeNamespace = (event) => {
-    setSelectedNamespace(event.target.value);
-  };
-
-  // Function to handle click on StatefulSet name
-  const handleStatefulSetNameClick = (name, namespace) => {
+  const handleSearchChange = (e) => setSearchQuery(e.target.value);
+  const handleChangeNamespace = (e) => setSelectedNamespace(e.target.value);
+  const handleStatefulSetClick = (name, namespace) =>
     navigate(`/app/kubernetes/statefulset-details/${name}?namespace=${namespace}`);
-  };
 
   const numberOfColumns = 6; // Name, Namespace, Images, Labels, Pods, Created
 
+  // ---------------- Loading Cloud ----------------
+  if (loading) {
+    return (
+      <div className="cloud-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+          <path
+            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-back"
+          />
+          <path
+            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-front"
+          />
+        </svg>
+        <div className="loading-message">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Stack alignItems="center" justifyContent="center" sx={{ height: "80vh", color: "error.main" }}>
+        <Typography variant="h6">{error}</Typography>
+      </Stack>
+    );
+  }
+
   return (
-    <Paper
-      sx={{
-        width: "90%",
-        margin: "20px auto",
-        padding: "20px",
-        borderRadius: "10px",
-        boxShadow: 3,
-        bgcolor: theme.palette.background.paper, // Use theme for consistency
-        color: theme.palette.text.primary, // Use theme for consistency
-      }}
-    >
-      <Typography
-        variant="h5"
-        sx={{ marginBottom: 2, textAlign: "left", fontWeight: "bold", color: theme.palette.text.primary }}
+    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+      {/* Header + Search + Namespace */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
       >
-        Kubernetes Stateful Sets
-      </Typography>
+        <h1>Stateful Sets</h1>
+        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+          <FormControl sx={{ minWidth: 180 }}>
+            <InputLabel>Namespace</InputLabel>
+            <Select
+              value={selectedNamespace}
+              label="Namespace"
+              onChange={handleChangeNamespace}
+            >
+              {namespacesForDropdown.map((ns) => (
+                <MenuItem value={ns} key={ns}>
+                  {ns === "all" ? "All Namespaces" : ns}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
 
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        mb: 2,
-        justifyContent: 'flex-end',
-      }}>
-        <FormControl sx={{ minWidth: 180, flexShrink: 0 }}>
-          <InputLabel id="statefulset-namespace-select-label" sx={{ color: theme.palette.text.secondary }}>Namespace</InputLabel>
-          <Select
-            labelId="statefulset-namespace-select-label"
-            id="statefulset-namespace-select"
-            value={selectedNamespace}
-            label="Namespace"
-            onChange={handleChangeNamespace}
-            sx={{
-              color: theme.palette.text.secondary,
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
-              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main },
+          <TextField
+            label="Search StatefulSets..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            variant="outlined"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
             }}
-          >
-            {namespacesForDropdown.map((ns) => (
-              <MenuItem key={ns} value={ns} sx={{ color: theme.palette.text.secondary }}>
-                {ns === "all" ? "All Namespaces" : ns}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          />
+        </div>
+      </div>
 
-        <TextField
-          label="Search"
-          variant="outlined"
-          margin="dense"
+      {/* Table */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          width: "fit-content",
+          minWidth: "75%",
+          margin: "0 auto",
+          backgroundColor: "transparent",
+          boxShadow: "none",
+        }}
+      >
+        <Table
           sx={{
-            width: '250px',
-            '& .MuiOutlinedInput-root': {
-              color: theme.palette.text.secondary,
-              '& fieldset': { borderColor: theme.palette.divider },
-              '&:hover fieldset': { borderColor: theme.palette.primary.main },
-              '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-            },
-            '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
-            '& .MuiInputLabel-root.Mui-focused': { color: theme.palette.primary.main },
+            width: "100%",
+            minWidth: 650,
+            border: "none",
+            "& td, & th": { border: "none !important" },
           }}
-          value={searchQuery}
-          onChange={handleSearchChange}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
-      <TableContainer sx={{ maxHeight: 600, borderRadius: '8px', overflow: 'auto' }}>
-        <Table stickyHeader aria-label="stateful sets table">
+        >
           <TableHead>
             <TableRow>
               <StyledTableCell>Name</StyledTableCell>
@@ -245,11 +240,7 @@ const StatefulSets = () => {
           <TableBody>
             {loading ? (
               <StyledTableRow>
-                <StyledTableCell colSpan={numberOfColumns} align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress />
-                  </Box>
-                </StyledTableCell>
+                
               </StyledTableRow>
             ) : statefulSets.length === 0 ? (
               <StyledTableRow>
@@ -260,61 +251,49 @@ const StatefulSets = () => {
             ) : (
               statefulSets
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((ss, index) => (
-                  <StyledTableRow key={ss.name || index}>
+                .map((ss, i) => (
+                  <StyledTableRow key={ss.name || i}>
                     <StyledTableCell>
-                      {/* --- MODIFIED SECTION --- */}
                       <Typography
-                        component="span" // Use span to keep it inline within the cell
+                        component="span"
                         sx={{
-                          cursor: 'pointer',
-                          color: theme.palette.primary.main, // Blue color by default
-                          fontWeight: 'bold',
-                          '&:hover': { textDecoration: 'underline' } // Underline on hover
+                          cursor: "pointer",
+                          color: theme.palette.primary.main,
+                          fontWeight: "bold",
+                          textUnderlineOffset: "3px",
+                          "&:hover": { textDecoration: "underline" },
                         }}
-                        onClick={() => handleStatefulSetNameClick(ss.name, ss.namespace)}
+                        onClick={() => handleStatefulSetClick(ss.name, ss.namespace)}
                       >
                         {ss.name}
                       </Typography>
-                      {/* --- END MODIFIED SECTION --- */}
                     </StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{ss.namespace}</StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{ss.images ? ss.images.join(', ') : 'N/A'}</StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>
-                      {ss.labels ?
-                        Object.entries(ss.labels)
-                          .map(([key, value]) => `${key}: ${value}`)
-                          .join(', ')
-                        : 'N/A'
-                      }
+                    <StyledTableCell>{ss.namespace}</StyledTableCell>
+                    <StyledTableCell>{ss.images?.join(", ") || "N/A"}</StyledTableCell>
+                    <StyledTableCell>
+                      {ss.labels
+                        ? Object.entries(ss.labels).map(([k, v]) => `${k}: ${v}`).join(", ")
+                        : "N/A"}
                     </StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{ss.pods}</StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{ss.created}</StyledTableCell>
+                    <StyledTableCell>{ss.pods}</StyledTableCell>
+                    <StyledTableCell>{ss.created || "N/A"}</StyledTableCell>
                   </StyledTableRow>
                 ))
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={statefulSets.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
       </TableContainer>
-      <TablePagination
-        rowsPerPageOptions={[10, 25, 50]}
-        component="div"
-        count={statefulSets.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        sx={{
-          color: theme.palette.text.secondary,
-          '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-            color: theme.palette.text.secondary,
-          },
-          '& .MuiTablePagination-select, & .MuiTablePagination-actions': {
-            color: theme.palette.text.secondary,
-          },
-        }}
-      />
-    </Paper>
+    </div>
   );
 };
 

@@ -85,6 +85,11 @@ const VolumeTypes = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
   const theme = useTheme();
 
+  const [fieldErrors, setFieldErrors] = useState({
+    name: "",
+    description: ""
+  });
+  
 
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
@@ -97,6 +102,8 @@ const VolumeTypes = () => {
     setSnackbarOpen(false);
   };
 
+  const nameRegex = /^[A-Za-z_-]+$/; // only letters, underscore, hyphen, no spaces or numbers
+  const maxDescriptionLength = 200;
   // Fetch volume types
   const fetchVolumeTypes = async () => {
     setError(null);
@@ -184,17 +191,70 @@ const VolumeTypes = () => {
   // Input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setNewVolumeType((prev) => ({ ...prev, [name]: value }));
+    let error = "";
+  
+    // Name validation
+    if (name === "name") {
+      if (!/^[A-Za-z_-]*$/.test(value)) {
+        error = "Only alphabets, underscore (_) and hyphen (-) allowed. No numbers or spaces.";
+      }
+      setFieldErrors((prev) => ({ ...prev, name: error }));
+      if (!error) setNewVolumeType((prev) => ({ ...prev, name: value }));
+      return;
+    }
+  
+    // Description validation
+    if (name === "description") {
+      if (value.length > maxDescriptionLength) {
+        error = `Description cannot exceed ${maxDescriptionLength} characters.`;
+      }
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+      if (!error) setNewVolumeType((prev) => ({ ...prev, description: value }));
+      return;
+    }
   };
-
+  
   const handleUpdateInputChange = (e) => {
     const { name, value } = e.target;
-    setVolumeToUpdate((prev) => ({ ...prev, [name]: value }));
+    let error = "";
+  
+    if (name === "name") {
+      if (!/^[A-Za-z_-]*$/.test(value)) {
+        error = "Only alphabets, underscore (_) and hyphen (-) allowed. No numbers or spaces.";
+      }
+      setFieldErrors((prev) => ({ ...prev, name: error }));
+      if (!error) setVolumeToUpdate((prev) => ({ ...prev, name: value }));
+      return;
+    }
+  
+    if (name === "description") {
+      if (value.length > maxDescriptionLength) {
+        error = `Description cannot exceed ${maxDescriptionLength} characters.`;
+      }
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+      if (!error) setVolumeToUpdate((prev) => ({ ...prev, description: value }));
+      return;
+    }
   };
+  
 
   const handleCreateVolumeType = async (e) => {
     e.preventDefault();
   
+      // Check name
+  if (!newVolumeType.name || !nameRegex.test(newVolumeType.name)) {
+    showSnackbar(
+      "Name may only contain alphabets, underscore (_) and hyphen (-). No spaces or numbers.",
+      "error"
+    );
+    return;
+  }
+
+  // Check description length
+  if (newVolumeType.description && newVolumeType.description.length > maxDescriptionLength) {
+    showSnackbar(`Description cannot exceed ${maxDescriptionLength} characters.`, "error");
+    return;
+  }
     try {
       const response = await apiClient.post('/create-volume-type/', newVolumeType);
   
@@ -228,6 +288,19 @@ const VolumeTypes = () => {
   const handleUpdateVolumeType = async (e) => {
     e.preventDefault();
     if (!volumeToUpdate) return;
+     // Validate
+  if (!volumeToUpdate.name || !nameRegex.test(volumeToUpdate.name)) {
+    showSnackbar(
+      "Name may only contain alphabets, underscore (_) and hyphen (-). No spaces or numbers.",
+      "error"
+    );
+    return;
+  }
+
+  if (volumeToUpdate.description && volumeToUpdate.description.length > maxDescriptionLength) {
+    showSnackbar(`Description cannot exceed ${maxDescriptionLength} characters.`, "error");
+    return;
+  }
     try {
       const response = await apiClient.put(`/update-volume-type/${volumeToUpdate.id}/`, volumeToUpdate);
       if (response.status === 200) {
@@ -320,14 +393,30 @@ const VolumeTypes = () => {
 
       {/* Create Modal */}
       <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
-        <Box sx={(theme) => modalStyle(theme)}>
+        <Box  sx={modalStyle}>
           <h2>Create Volume Type</h2>
           <form onSubmit={handleCreateVolumeType}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Name" name="name" value={newVolumeType.name} onChange={handleInputChange} required />
+            <TextField
+            label="Name"
+            name="name"
+            value={newVolumeType.name}
+            onChange={handleInputChange}
+            error={Boolean(fieldErrors.name)}
+            helperText={fieldErrors.name}
+          />
+
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" value={newVolumeType.description} onChange={handleInputChange} />
+            <TextField
+              label="Description"
+              name="description"
+              value={newVolumeType.description}
+              onChange={handleInputChange}
+              error={Boolean(fieldErrors.description)}
+              helperText={fieldErrors.description}
+            />
+
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Create</Button>
@@ -339,15 +428,30 @@ const VolumeTypes = () => {
 
       {/* Update Modal */}
       <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
-      <Box sx={(theme) => modalStyle(theme)}>
+      <Box  sx={modalStyle}>
 
           <h2>Update Volume Type</h2>
           <form onSubmit={handleUpdateVolumeType}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Name" name="name" value={volumeToUpdate?.name || ''} onChange={handleUpdateInputChange} required />
+            <TextField
+              label="Name"
+              name="name"
+              value={volumeToUpdate?.name || ""}
+              onChange={handleUpdateInputChange}
+              error={Boolean(fieldErrors.name)}
+              helperText={fieldErrors.name}
+            />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" value={volumeToUpdate?.description || ''} onChange={handleUpdateInputChange} />
+            <TextField
+                label="Description"
+                name="description"
+                value={volumeToUpdate?.description || ""}
+                onChange={handleUpdateInputChange}
+                error={Boolean(fieldErrors.description)}
+                helperText={fieldErrors.description}
+              />
+
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Update</Button>

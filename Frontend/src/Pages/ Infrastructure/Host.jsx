@@ -94,12 +94,40 @@ const HostAggregates = () => {
     // ✅ NEW STATES
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
-
+    const [errors, setErrors] = useState({
+      name: "",
+      availability_zone: "",
+    });
+    
   const showSnackbar = (msg, sev) => {
     setSnackbarMessage(msg);
     setSnackbarSeverity(sev);
     setSnackbarOpen(true);
   };
+  const validateField = (name, value) => {
+    let error = "";
+  
+    if (name === "name") {
+      if (!value.trim()) {
+        error = "Name is required";
+      } else if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+        error = "Only letters, numbers, _ and - allowed";
+      } else if (value.length > 50) {
+        error = "Name cannot exceed 50 characters";
+      }
+    }
+  
+    if (name === "availability_zone") {
+      if (!value.trim()) {
+        error = "Availability Zone is required";
+      } else if (value.length > 50) {
+        error = "Availability Zone cannot exceed 50 characters";
+      }
+    }
+  
+    setErrors((prev) => ({ ...prev, [name]: error }));
+  };
+  
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
 
@@ -156,6 +184,31 @@ const HostAggregates = () => {
   }
 
 
+  const validateAggregate = (agg) => {
+    let newErrors = { name: "", availability_zone: "" };
+  
+    // Name validation
+    if (!agg.name || !agg.name.trim()) {
+      newErrors.name = "Name is required";
+    } else if (!/^[A-Za-z0-9_-]+$/.test(agg.name)) {
+      newErrors.name = "Name can only contain letters, numbers, _ or -";
+    } else if (agg.name.length > 50) {
+      newErrors.name = "Name cannot exceed 50 characters";
+    }
+  
+    // Availability zone validation
+    if (!agg.availability_zone || !agg.availability_zone.trim()) {
+      newErrors.availability_zone = "Availability Zone is required";
+    } else if (agg.availability_zone.length > 50) {
+      newErrors.availability_zone = "Availability Zone cannot exceed 50 characters";
+    }
+  
+    setErrors(newErrors);
+  
+    // Return true if no errors
+    return !newErrors.name && !newErrors.availability_zone;
+  };
+  
   const handleSearch = (e) => {
     const value = e.target.value.toLowerCase();
     setSearch(value);
@@ -170,6 +223,10 @@ const HostAggregates = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
   
+
+    if (!validateAggregate(newAgg)) {
+      return; // Stop if validation fails
+    }
     // 🔍 Check if name already exists (case-insensitive)
     const existingAgg = aggregates.find(
       (ag) => ag.name.toLowerCase().trim() === newAgg.name.toLowerCase().trim()
@@ -208,6 +265,12 @@ const HostAggregates = () => {
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (!aggToUpdate) return;
+
+      if (!validateAggregate(aggToUpdate)) {
+        return; // Stop if validation fails
+      }
+
     try {
       await apiClient.put(`infrastructure/host-aggregates/${aggToUpdate.id}/`, aggToUpdate);
       showSnackbar("Updated successfully", "success");
@@ -305,11 +368,26 @@ const HostAggregates = () => {
              <Box sx={modalStyle}>
                <h3>Create Host Aggregate</h3>
                <form onSubmit={handleCreate}>
-                 <TextField fullWidth label="Name" required value={newAgg.name}
-                   onChange={(e) => setNewAgg({ ...newAgg, name: e.target.value })} />
+                 <TextField 
+                 fullWidth label="Name" required value={newAgg.name}
+                 onChange={(e) => {
+                  const value = e.target.value;
+                  validateField("name", value);
+                  setNewAgg({ ...newAgg, name: value });
+                }}
+                
+                   error={!!errors.name}
+                    helperText={errors.name}/>
      
                  <TextField fullWidth label="Availability Zone" required      sx={{ mt: 2 }} value={newAgg.availability_zone}
-                   onChange={(e) => setNewAgg({ ...newAgg, availability_zone: e.target.value })} />
+                   onChange={(e) => {
+                    const value = e.target.value;
+                    validateField("availability_zone", value);
+                    setNewAgg({ ...newAgg, availability_zone: value });
+                  }}
+                  
+                   error={!!errors.availability_zone}
+                  helperText={errors.availability_zone} />
      
                  {/* <TextField fullWidth label="Metadata (JSON)" sx={{ mt: 2 }} placeholder='{"env":"prod"}'
                    onChange={(e) =>
@@ -327,11 +405,23 @@ const HostAggregates = () => {
                <h3>Update Host Aggregate</h3>
                <form onSubmit={handleUpdate}>
                  <TextField fullWidth label="Name" value={aggToUpdate?.name || ""}
-                   onChange={(e) => setAggToUpdate({ ...aggToUpdate, name: e.target.value })} />
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      validateField("name", value);
+                      setAggToUpdate({ ...aggToUpdate, name: value });
+                    }}
+                   error={!!errors.name}
+                   helperText={errors.name}/>
      
                  <TextField fullWidth label="Availability Zone"   disabled sx={{ mt: 2 }}
                    value={aggToUpdate?.availability_zone || ""}
-                   onChange={(e) => setAggToUpdate({ ...aggToUpdate, availability_zone: e.target.value })} />
+                   onChange={(e) => {
+                    const value = e.target.value;
+                    validateField("availability_zone", value);
+                    setAggToUpdate({ ...aggToUpdate, availability_zone: value });
+                  }}
+                  
+                   helperText={errors.availability_zone}/>
      
                  <TextField fullWidth label="Metadata (JSON)"  disabled sx={{ mt: 2 }}
                    defaultValue={JSON.stringify(aggToUpdate?.metadata || {})}

@@ -108,6 +108,14 @@ const Users = () => {
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
     const theme = useTheme();
 
+    const [fieldErrors, setFieldErrors] = useState({
+      username: "",
+      email: "",
+      description: "",
+      role: "",
+      project: "",
+    });
+    
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
@@ -247,23 +255,123 @@ const Users = () => {
   };
 
   const handleUserInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setNewUser((prevState) => ({
-      ...prevState,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    const { name, value } = e.target;
+    let error = "";
+  
+    // USERNAME: alphabets, numbers, _, -, NO SPACE
+    if (name === "username") {
+      if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+        error = "Only letters, numbers, underscore (_), hyphen (-). No spaces.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, username: error }));
+  
+      if (!error) {
+        setNewUser((prev) => ({ ...prev, username: value }));
+      }
+      return;
+    }
+  
+    // EMAIL VALIDATION
+    if (name === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        error = "Invalid email format.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, email: error }));
+      setNewUser((prev) => ({ ...prev, email: value }));
+      return;
+    }
+  
+    // DESCRIPTION
+    if (name === "description") {
+      if (!/^[A-Za-z0-9 _.,-]*$/.test(value)) {
+        error = "Invalid characters in description.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+      if (!error) {
+        setNewUser((prev) => ({ ...prev, description: value }));
+      }
+      return;
+    }
+  
+    // DEFAULT UPDATE FOR OTHER FIELDS
+    setNewUser((prev) => ({ ...prev, [name]: value }));
   };
+  
 
   const handleUpdateUserInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setUserToUpdate((prevState) => ({
-      ...prevState,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
+    let error = "";
+  
+    // USERNAME VALIDATION
+    if (name === "username") {
+      if (!/^[A-Za-z0-9_-]*$/.test(value)) {
+        error = "Only letters, numbers, underscore (_), hyphen (-). No spaces.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, username: error }));
+  
+      if (!error) {
+        setUserToUpdate((prev) => ({ ...prev, username: value }));
+      }
+      return;
+    }
+  
+    // EMAIL VALIDATION
+    if (name === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (value && !emailRegex.test(value)) {
+        error = "Invalid email format.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, email: error }));
+      setUserToUpdate((prev) => ({ ...prev, email: value }));
+      return;
+    }
+  
+    // DESCRIPTION VALIDATION
+    if (name === "description") {
+      if (!/^[A-Za-z0-9 _.,-]*$/.test(value)) {
+        error = "Invalid characters in description.";
+      }
+  
+      setFieldErrors((prev) => ({ ...prev, description: error }));
+  
+      if (!error) {
+        setUserToUpdate((prev) => ({ ...prev, description: value }));
+      }
+      return;
+    }
+  
+    // CHECKBOX (enabled)
+    if (type === "checkbox") {
+      setUserToUpdate((prev) => ({ ...prev, enabled: checked }));
+      return;
+    }
+  
+    // DEFAULT UPDATE
+    setUserToUpdate((prev) => ({ ...prev, [name]: value }));
   };
+  
+
+  const usernameRegex = /^[A-Za-z_-]+$/;  // only alphabets, underscore, hyphen
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*?&#^()_+=\-[\]{};:'",.<>\/\\|]).{8,}$/;
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    // Username format validation
+    if (!usernameRegex.test(newUser.username)) {
+      showSnackbar(
+        "Username may only contain alphabets, underscore (_) and hyphen (-). No spaces or numbers.",
+        "error"
+      );
+      return;
+    }
+
     if (!Array.isArray(users)) {
       console.error('Users data is not an array. Cannot perform check.');
       showSnackbar('An error occurred. Please try again later.', 'error');
@@ -274,6 +382,27 @@ const Users = () => {
 
     if (existingUser) {
       showSnackbar('A user with the same username already exists.', 'error');
+      return;
+    }
+    
+      // Email validation
+    if (!emailRegex.test(newUser.email)) {
+      showSnackbar("Please enter a valid email address.", "error");
+      return;
+    }
+
+    // Password validation
+    if (!passwordRegex.test(newUser.password)) {
+      showSnackbar(
+        "Password must be 8+ chars and include letters, numbers, and a special character.",
+        "error"
+      );
+      return;
+    }
+
+    // Confirm password match
+    if (newUser.password !== newUser.confirm_password) {
+      showSnackbar("Passwords do not match.", "error");
       return;
     }
 
@@ -327,8 +456,24 @@ const Users = () => {
       showSnackbar('Please select a user to update.', 'warning');
       return;
     }
+
+     // Username validation (if editable)
+    if (userToUpdate.username && !usernameRegex.test(userToUpdate.username)) {
+      showSnackbar(
+        "Username may only contain alphabets, underscore (_) and hyphen (-). No spaces or numbers.",
+        "error"
+      );
+      return;
+    }
+
+    // Email validation
+    if (!emailRegex.test(userToUpdate.email)) {
+      showSnackbar("Please enter a valid email address.", "error");
+      return;
+    }
+
     const payload = {
-      name: userToUpdate.name,
+      username: userToUpdate.username,
       email: userToUpdate.email,
       enabled: userToUpdate.enabled || false,
       description: userToUpdate.description,
@@ -474,13 +619,16 @@ const Users = () => {
               <TextField label="Domain Name" name="domain_name" value={newUser.domain_name} disabled />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="User Name" name="username" value={newUser.username} onChange={handleUserInputChange} required />
+              <TextField label="User Name" name="username" value={newUser.username} onChange={handleUserInputChange} required error={!!fieldErrors.username}
+                helperText={fieldErrors.username} />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" value={newUser.description} onChange={handleUserInputChange} />
+              <TextField label="Description" name="description" value={newUser.description} onChange={handleUserInputChange} error={!!fieldErrors.description}
+              helperText={fieldErrors.description}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Email" name="email" value={newUser.email} onChange={handleUserInputChange} required />
+              <TextField label="Email" name="email" value={newUser.email} onChange={handleUserInputChange} required error={!!fieldErrors.email}
+              helperText={fieldErrors.email}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
               <TextField label="Password" name="password" type="password" value={newUser.password} onChange={handleUserInputChange} required />
@@ -551,13 +699,16 @@ const Users = () => {
           </Typography>
           <form onSubmit={handleUpdateUser}>
             <FormControl fullWidth margin="normal">
-              <TextField label="User Name" name="name" value={userToUpdate?.name} onChange={handleUpdateUserInputChange} required />
+              <TextField label="User Name" name="username" value={userToUpdate?.username} onChange={handleUpdateUserInputChange} required  error={!!fieldErrors.username}
+          helperText={fieldErrors.username}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Email" name="email" value={userToUpdate?.email} onChange={handleUpdateUserInputChange} required />
+              <TextField label="Email" name="email" value={userToUpdate?.email} onChange={handleUpdateUserInputChange} required  error={!!fieldErrors.email}
+          helperText={fieldErrors.email}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" value={userToUpdate?.description} onChange={handleUpdateUserInputChange} />
+              <TextField label="Description" name="description" value={userToUpdate?.description} onChange={handleUpdateUserInputChange} error={!!fieldErrors.description}
+          helperText={fieldErrors.description}/>
             </FormControl>
             <FormControl fullWidth margin="normal">
               <InputLabel id="update-role-label">Role</InputLabel>
@@ -704,7 +855,7 @@ const Users = () => {
                   </StyledTableCell>
                   <StyledTableCell>
                     <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined" color="#253848" onClick={() => handleOpenUpdateModal(user)}>
+                      <Button variant="outlined"  onClick={() => handleOpenUpdateModal(user)}>
                         Update
                       </Button>
                       <Button variant="outlined" color="error" onClick={() => handleDeleteUser(user.id)}>
@@ -765,30 +916,6 @@ const headerContainerVolumesStyle = {
   marginBottom: '20px',
 };
 const searchContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
-const volumesTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
-const modalStyle = {
-  position: 'absolute',
-  top: '50%',
-  left: '50%',
-  transform: 'translate(-50%, -50%)',
-  width: 400,
-  bgcolor: 'background.paper',
-  boxShadow: 24,
-  p: 4,
-  borderRadius: '8px',
-};
 
-const getAlertIcon = (severity) => {
-  switch (severity) {
-    case 'success':
-      return <CheckCircleOutline sx={{ mr: 1 }} />;
-    case 'error':
-      return <ErrorOutline sx={{ mr: 1 }} />;
-    case 'warning':
-      return <InfoOutlined sx={{ mr: 1 }} />;
-    default:
-      return <InfoOutlined sx={{ mr: 1 }} />;
-  }
-};
 
 export default Users;

@@ -95,6 +95,7 @@ const Projects = () => {
   const [groups, setGroups] = useState([]); // List of available groups
   const [users, setUsers] = useState([]); // List of available users
 
+  
   // States for new project creation form, including new optional fields
   const [newProject, setNewProject] = useState({
     Domain_id: 'default',
@@ -203,6 +204,9 @@ const handleSearchChange = (e) => {
   setPage(0); // Reset page to first on search
 };
 
+const projectNameRegex = /^[A-Za-z_-]+$/;
+const descriptionRegex = /^[A-Za-z0-9\s._-]+$/;
+
 // Filters projects based on the search term
 const filteredProjects = projects.filter((project) =>
   Object.values(project).some((value) =>
@@ -246,21 +250,27 @@ const handleSelectProject = (projectId) => {
 
 // Handles input changes for the new project form fields
 const handleInputChange = (e) => {
-  const { name, value, type, checked } = e.target;
-  setNewProject((prevState) => ({
-    ...prevState,
-    [name]: type === 'checkbox' ? checked : value,
+  const { name, value } = e.target;
+
+  // Don't block typing, just update state
+  setNewProject((prev) => ({
+    ...prev,
+    [name]: value,
   }));
 };
 
-// Handles input changes for the update project form fields
+
 const handleUpdateInputChange = (e) => {
-  const { name, value, type, checked } = e.target;
-  setProjectToUpdate((prevState) => ({
-    ...prevState,
-    [name]: type === 'checkbox' ? checked : value,
+  const { name, value } = e.target;
+
+  // Don't block typing, just update state
+  setProjectToUpdate((prev) => ({
+    ...prev,
+    [name]: value,
   }));
 };
+
+
 
 // Adds a selected user with their role to the new project's user_roles list
 const handleAddUserRole = () => {
@@ -305,6 +315,18 @@ const handleGroupSelectChange = (event) => {
   const handleCreateProject = async (e) => {
     e.preventDefault();
 
+    if (!projectNameRegex.test(newProject.name)) {
+      setShowAlertModal(true);
+      setAlertMessage("Project name can contain only alphabets, underscore (_) and hyphen (-). No spaces or numbers.");
+      return;
+    }
+    
+    if (!descriptionRegex.test(newProject.description)) {
+      setShowAlertModal(true);
+      setAlertMessage("Description contains invalid characters.");
+      return;
+    }
+    
     // Check for duplicate project name
     const existingProject = projects.find((project) => project.name === newProject.name);
     if (existingProject) {
@@ -359,6 +381,18 @@ const handleGroupSelectChange = (event) => {
   const handleUpdateProject = async (e) => {
     e.preventDefault();
 
+    if (!projectNameRegex.test(projectToUpdate.name)) {
+      setShowAlertModal(true);
+      setAlertMessage("Project name can contain only alphabets, underscore (_) and hyphen (-). No spaces or numbers.");
+      return;
+    }
+    
+    if (!descriptionRegex.test(projectToUpdate.description)) {
+      setShowAlertModal(true);
+      setAlertMessage("Description contains invalid characters.");
+      return;
+    }
+    
     if (!projectToUpdate) {
       setShowAlertModal(true);
       setAlertMessage('No project selected for update.');
@@ -531,10 +565,22 @@ const handleGroupSelectChange = (event) => {
               <TextField label="Domain Name" name="Domain_name" value={newProject.Domain_name} disabled />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Name" name="name" onChange={handleInputChange} value={newProject.name} required />
+              <TextField label="Name" name="name" onChange={handleInputChange} value={newProject.name} required
+              error={!projectNameRegex.test(newProject.name) && newProject.name !== ""}
+              helperText={
+                !projectNameRegex.test(newProject.name) && newProject.name !== ""
+                  ? "Only A–Z, a–z, underscore (_) and hyphen (-). No spaces, no numbers."
+                  : ""
+              } />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" onChange={handleInputChange} value={newProject.description} required />
+              <TextField label="Description" name="description" onChange={handleInputChange} value={newProject.description} required 
+               error={!descriptionRegex.test(newProject.description) && newProject.description !== ""}
+               helperText={
+                 !descriptionRegex.test(newProject.description) && newProject.description !== ""
+                   ? "Only letters, numbers, space, dot, underscore, hyphen allowed."
+                   : ""
+               }/>
             </FormControl>
             <FormControl fullWidth margin="normal">
               <InputLabel id="enabled-label">Enabled</InputLabel>
@@ -635,10 +681,33 @@ const handleGroupSelectChange = (event) => {
           </Typography>
           <form onSubmit={handleUpdateProject}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Project Name" name="name" onChange={handleUpdateInputChange} value={projectToUpdate?.name} required />
+              <TextField label="Project Name" name="name" onChange={handleUpdateInputChange} value={projectToUpdate?.name} required error={
+                projectToUpdate &&
+                !projectNameRegex.test(projectToUpdate.name) &&
+                projectToUpdate.name !== ""
+              }
+              helperText={
+                projectToUpdate &&
+                !projectNameRegex.test(projectToUpdate.name) &&
+                projectToUpdate.name !== ""
+                  ? "Only A–Z, a–z, underscore (_) and hyphen (-). No spaces, no numbers."
+                  : ""
+              }/>
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <TextField label="Description" name="description" onChange={handleUpdateInputChange} value={projectToUpdate?.description} required />
+              <TextField label="Description" name="description" onChange={handleUpdateInputChange} value={projectToUpdate?.description} required 
+               error={
+                projectToUpdate &&
+                !descriptionRegex.test(projectToUpdate.description) &&
+                projectToUpdate.description !== ""
+              }
+              helperText={
+                projectToUpdate &&
+                !descriptionRegex.test(projectToUpdate.description) &&
+                projectToUpdate.description !== ""
+                  ? "Only letters, numbers, space, dot, underscore, hyphen allowed."
+                  : ""
+              }/>
             </FormControl>
             <FormControl fullWidth margin="normal">
               <InputLabel id="update-enabled-label">Enabled</InputLabel>
@@ -744,7 +813,7 @@ const handleGroupSelectChange = (event) => {
                 </StyledTableCell>
                 <StyledTableCell>
                   <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" color="#253848" onClick={() => { setProjectToUpdate(project); setShowUpdateForm(true); }}>
+                    <Button variant="outlined"  onClick={() => { setProjectToUpdate(project); setShowUpdateForm(true); }}>
                       Update
                     </Button>
                     <Button variant="outlined" color="error" onClick={() => handleDeleteProject(project.id)}>

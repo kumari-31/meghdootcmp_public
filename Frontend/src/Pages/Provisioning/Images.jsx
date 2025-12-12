@@ -9,6 +9,7 @@ import {
   FaDownload,
   FaTrashAlt,
 } from "react-icons/fa";
+import { useTheme } from "@mui/material/styles";
 import { CiCirclePlus } from "react-icons/ci";
 import "../style.css";
 import "./Images.css";
@@ -50,23 +51,24 @@ const getImageByName = (name) => {
 
 const getStatusIcon = (status) => {
   return status === "active" ? (
-    <FaPlayCircle className="status-icon active" />
+    <FaPlayCircle className="status-icon active"  style={{ color: "#4ade80" }} />
   ) : (
-    <FaStopCircle className="status-icon inactive" />
+    <FaStopCircle className="status-icon inactive" style={{ color: "#f87171" }} />
   );
 };
 
 const getVisibilityIcon = (visibility) => {
   if (visibility === "public")
-    return <FaGlobe className="visibility-icon public" />;
+    return <FaGlobe style={{ color: "#60a5fa" }} />;
   if (visibility === "private")
-    return <FaLock className="visibility-icon private" />;
+    return <FaLock style={{ color: "#fbbf24" }} />;
   if (visibility === "shared")
-    return <FaShareAlt className="visibility-icon shared" />;
+    return <FaShareAlt style={{ color: "#a78bfa" }} />;
   return null;
 };
 
 const Images = () => {
+  const theme = useTheme();
   const [imageData, setImageData] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -87,18 +89,15 @@ const Images = () => {
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
+  // Snackbar Handler
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
     setSnackbarSeverity(severity);
     setSnackbarOpen(true);
   };
 
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === "clickaway") {
-      return;
-    }
-    setSnackbarOpen(false);
-  };
+  const handleSnackbarClose = () => setSnackbarOpen(false);
+
 
   const fetchData = useCallback(async () => {
     setError(null);
@@ -287,23 +286,77 @@ const Images = () => {
   }
 
   return (
-    <div className="App-image">
-      <header className="App-header">
-        <h1>Images Dashboard</h1>
+    <div
+        className="App-image"
+        style={{
+          backgroundColor:
+            theme.palette.mode === "dark"
+              ? "#0d1117"      // dark bg
+              : "#ffffff",     // light bg (matches card’s light feel)
+
+          color:
+            theme.palette.mode === "dark"
+              ? "#c9d1d9"      // dark text
+              : "#1e293b",     // light text (neutral dark blue-gray)
+        }}
+      >
+
+
+      <header className="App-header" style={{ borderColor: "#222" }}>
+      <h1
+        style={{
+          color: theme.palette.mode === "dark" ? "#f0f6fc" : "#1e293b"
+        }}
+      >
+        Images Dashboard
+      </h1>
+
       </header>
 
       <div className="card-container">
         {imageData.map((image, index) => (
-          <div className="card" key={index}>
+          <div className="card" key={index}
+          style={{
+            background:
+              theme.palette.mode === "dark"
+                ? "linear-gradient(135deg,rgb(31, 33, 36) 0%, #0d1117 100%)"
+                : "linear-gradient(135deg, #ffffff 0%,rgb(228, 231, 236) 100%)",
+        
+            border:
+              theme.palette.mode === "dark"
+                ? "1px solid #30363d"
+                : "1px solid #e5e7eb",
+        
+            color:
+              theme.palette.mode === "dark"
+                ? "#c9d1d9"
+                : "#1f2937",
+          }}
+          >
             <div className="card-left">
               <img
                 src={getImageByName(image.name)}
                 alt={image.name}
                 className="circular-image"
               />
+              
               <div className="download-button">
                 <button
-                  className="btn small-btn"
+                  className="btn small-btn" style={{
+                    background:
+                      theme.palette.mode === "dark"
+                        ? "#21262d"
+                        : "#f3f4f6",
+                    border:
+                      theme.palette.mode === "dark"
+                        ? "1px solid #30363d"
+                        : "1px solid #d1d5db",
+                    color:
+                      theme.palette.mode === "dark"
+                        ? "#58a6ff"
+                        : "#2563eb",
+                  }}
+                  
                   onClick={() => image?.id && image?.name && handleDownload(image.id, image.name)}
                   >
                   <span>
@@ -314,7 +367,16 @@ const Images = () => {
               </div>
             </div>
             <div className="card-middle">
-              <h4 className="image-title">{image.name}</h4>
+            <h4
+              className="image-title"
+              style={{
+                color:
+                  theme.palette.mode === "dark"
+                    ? "#ffffff"
+                    : "#111827",
+              }}
+            >
+            </h4>
               <div className="info">
                 <p>
                   <strong>Status:</strong>
@@ -332,6 +394,7 @@ const Images = () => {
                   <strong>Size:</strong> {image.size}
                 </p>
               </div>
+              
             </div>
             <div className="card-right">
             <div className="card-actions one">
@@ -346,26 +409,39 @@ const Images = () => {
                 </button> */}
               </div>
               <div className="card-actions two">
-                <button
-                  className="btn small-btn"
-                  onClick={() => handleCreateVolumeDialogOpen(image)}
-                >
-                  <span>
-                    <CiCirclePlus />
-                  </span>
-                  Create Volume
-                </button>
+              <button
+                className="btn small-btn"
+                style={{
+                  background:
+                    theme.palette.mode === "dark" ? "#21262d" : "#ffffff",
+                  border:
+                    theme.palette.mode === "dark" ? "1px solid #30363d" : "1px solid #d1d5db",
+                  color:
+                    theme.palette.mode === "dark" ? "#10b981" : "#059669",
+                }}
+                onClick={() => handleCreateVolumeDialogOpen(image)}
+              >
+                <span><CiCirclePlus /></span>
+                Create Volume
+              </button>
               </div>
               <div className="card-actions three">
-                <button
+              <button
                   className="btn small-btn"
+                  style={{
+                    background:
+                      theme.palette.mode === "dark" ? "#21262d" : "#ffffff",
+                    border:
+                      theme.palette.mode === "dark" ? "1px solid #30363d" : "1px solid #fecaca",
+                    color:
+                      theme.palette.mode === "dark" ? "#f87171" : "#dc2626",
+                  }}
                   onClick={() => handleDelete(image.id)}
                 >
-                  <span>
-                    <FaTrashAlt />
-                  </span>
+                  <span><FaTrashAlt /></span>
                   Delete
                 </button>
+
               </div>
             </div>
           </div>

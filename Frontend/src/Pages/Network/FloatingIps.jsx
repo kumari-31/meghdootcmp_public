@@ -82,6 +82,8 @@ const FloatingIps = () => {
   const [selectedFloatingIps, setSelectedFloatingIps] = useState([]);
   const [projects, setProjects] = useState([]);
   const [networks, setNetworks] = useState([]);
+  const [formErrors, setFormErrors] = useState({});
+
   const theme = useTheme(); 
   const [associateData, setAssociateData] = useState({
     network_pool: 'External Network 10.184.53.0/24',
@@ -243,53 +245,64 @@ const FloatingIps = () => {
     }
   };
 
+  const validateAssociateForm = () => {
+    const errors = {};
+  
+    if (!associateData.project_name) {
+      errors.project_name = 'Project is required';
+    }
+  
+    if (!associateData.network_name) {
+      errors.network_name = 'Network is required';
+    }
+  
+    if (associateData.floating_ip) {
+      const ipRegex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+      if (!ipRegex.test(associateData.floating_ip)) {
+        errors.floating_ip = 'Invalid IP address';
+      }
+    }
+  
+    if (associateData.description && associateData.description.length > 255) {
+      errors.description = 'Description must be under 255 characters';
+    }
+  
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleFloatingIpActions = async (e) => {
     e.preventDefault();
-
+  
+    if (!validateAssociateForm()) {
+      return; // Stop submission if validation fails
+    }
+  
     try {
       let floatingIp = associateData.floating_ip;
-
+  
       if (!floatingIp) {
         const createPayload = {
-          network_id: associateData.network_id, // Use network_id from state
+          network_id: associateData.network_id,
         };
-
+  
         const createResponse = await apiClient.post('/floating-ips/', createPayload);
-
+  
         if (createResponse.status === 201 || createResponse.status === 200) {
-          floatingIp = createResponse.data.floating_ip_address; // Corrected to get address
+          floatingIp = createResponse.data.floating_ip_address;
           alert('Floating IP created successfully: ' + floatingIp);
           fetchFloatingIps();
         } else {
-          console.error('Error creating Floating IP:', createResponse);
           alert('Error creating Floating IP.');
           return;
         }
       }
-
-      // const associatePayload = {
-      //   network_pool: associateData.network_pool,
-      //   project_name: associateData.project_name,
-      //   floating_ip: floatingIp,
-      //   description: associateData.description || 'Assigning floating IP',
-      // };
-
-      // const associateResponse = await apiClient.post('floating-ips/associate/', associatePayload);
-
-      // if (associateResponse.status === 201 || associateResponse.status === 200) {
-      //   alert('Floating IP associated successfully!');
-      //   setShowAssociateForm(false);
-      //   fetchFloatingIps();
-      // } else {
-      //   console.error('Error associating Floating IP:', associateResponse);
-      //   alert('Error associating Floating IP.');
-      // }
+  
+      // Proceed with associate logic...
     } catch (error) {
       console.error('Error:', error);
       alert('An error occurred. Please try again.');
-    }
-    finally {
-      // Reset the form data to its initial state
+    } finally {
       setAssociateData({
         network_pool: 'External Network 10.184.53.0/24',
         project_name: '',
@@ -298,11 +311,10 @@ const FloatingIps = () => {
         network_id: '',
         network_name: '',
       });
-      setShowAssociateForm(false); // Close the modal
+      setShowAssociateForm(false);
     }
   };
-
-
+  
   const handleReleaseFloatingIp = async (floatingIpAddress) => {
     try {
       const response = await apiClient.post('/floating-ips/release/', {
@@ -330,8 +342,10 @@ const FloatingIps = () => {
 
   const handleNetworkSelectChange = (e) => {
     const selectedNetworkName = e.target.value;
-    const selectedNetwork = networks.find((network) => network.name === selectedNetworkName);
-
+    const selectedNetwork = networks.find(
+      (network) => network.network_name === selectedNetworkName && network.external
+    );
+  
     if (selectedNetwork) {
       setAssociateData((prevData) => ({
         ...prevData,
@@ -346,6 +360,7 @@ const FloatingIps = () => {
       }));
     }
   };
+  
 
   const modalStyle = {
     position: 'absolute',
@@ -402,7 +417,16 @@ const FloatingIps = () => {
             </FormControl>
             <FormControl fullWidth margin="normal">
               <InputLabel id="project_name-label">Project Name</InputLabel>
-              <Select labelId="project_name-label" id="project_name" name="project_name" value={associateData.project_name} onChange={handleAssociateInputChange} label="Project Name" required>
+              <Select
+                labelId="project_name-label"
+                id="project_name"
+                name="project_name"
+                value={associateData.project_name}
+                onChange={handleAssociateInputChange}
+                label="Project Name"
+                required
+                error={!!formErrors.project_name} // highlight error
+              >
                 <MenuItem value="">Select Project</MenuItem>
                 {projects.map((project) => (
                   <MenuItem key={project.id} value={project.name}>
@@ -410,7 +434,13 @@ const FloatingIps = () => {
                   </MenuItem>
                 ))}
               </Select>
+              {formErrors.project_name && (
+                <Typography variant="caption" color="error">
+                  {formErrors.project_name}
+                </Typography>
+              )}
             </FormControl>
+
             <FormControl fullWidth margin="normal">
               <TextField label="Floating IP Address (optional)" name="floating_ip" value={associateData.floating_ip} onChange={handleAssociateInputChange} />
             </FormControl>
@@ -429,11 +459,16 @@ const FloatingIps = () => {
                 required
               >
                 <MenuItem value="">Select Network</MenuItem>
-                {networks.map((network) => (
-                  <MenuItem key={network.id} value={network.name}>
-                    {network.name}
+                
+                {networks
+                .filter((network) => network.external)
+                .map((network) => (
+                  <MenuItem key={network.id} value={network.network_name}>
+                    {network.network_name}
                   </MenuItem>
-                ))}
+              ))}
+
+
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
@@ -536,7 +571,7 @@ const FloatingIps = () => {
                   </StyledTableCell>
                   <StyledTableCell>
                     <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined" color="#253848" onClick={() => handleReleaseFloatingIp(floatingIp.floating_ip_address)}>
+                      <Button variant="outlined"  onClick={() => handleReleaseFloatingIp(floatingIp.floating_ip_address)}>
                         Release
                       </Button>
                       <Button variant="outlined" color="error" onClick={() => handleDeleteFloatingIps(floatingIp.id)}>

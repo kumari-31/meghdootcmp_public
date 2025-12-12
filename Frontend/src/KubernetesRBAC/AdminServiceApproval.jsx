@@ -16,6 +16,8 @@ import {
   DialogContent,
   DialogActions,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
@@ -23,9 +25,13 @@ import ErrorIcon from "@mui/icons-material/Error";
 import { useEffect, useState } from "react";
 import apiClient from "../Axios";
 
+// Styled Table Components (same as Roles page)
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -34,19 +40,33 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: "#000",
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
+
   "&:last-child td, &:last-child th": {
     border: 0,
   },
 }));
+
+
 
 const AdminServiceApproval = () => {
   const [requests, setRequests] = useState([]);
@@ -54,6 +74,7 @@ const AdminServiceApproval = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const theme = useTheme();
   const [counts, setCounts] = useState({
     pending: 0,
     accepted: 0,
@@ -197,12 +218,16 @@ const AdminServiceApproval = () => {
       <Stack
         direction="row"
         spacing={3}
-        sx={{ width: "90%", mx: "auto", mt: 4 }}
+        justifyContent="center"
+        sx={{ mt: 4, mb: 3 }}
       >
         {/* Pending */}
         <Paper
-          elevation={3}
-          sx={{ p: 2, minWidth: 250, backgroundColor: "#e3f2fd" }}
+          sx={{ p: 2, minWidth: 220, backgroundColor:
+            theme.palette.mode === "dark"
+              ? "#1e293b"   // dark slate
+              : "#e3f2fd",
+          color: theme.palette.mode === "dark" ? "#f1f5f9" : "inherit", }}
         >
           <Typography variant="subtitle1">Total Pending Request</Typography>
           <Typography variant="h3" color="primary">
@@ -210,13 +235,15 @@ const AdminServiceApproval = () => {
           </Typography>
         </Paper>
 
+
         {/* Accepted */}
         <Paper
-          elevation={3}
           sx={{
             p: 2,
-            minWidth: 250,
-            backgroundColor: "#e8f5e9",
+            minWidth: 220,
+            backgroundColor: theme.palette.mode === "dark" ? "#1f3323" : "#e8f5e9",
+            color: theme.palette.mode === "dark" ? "#d1fae5" : "inherit",
+
             cursor: "pointer",
           }}
           onClick={() =>
@@ -233,13 +260,15 @@ const AdminServiceApproval = () => {
           </Typography>
         </Paper>
 
+
         {/* Rejected */}
         <Paper
-          elevation={3}
-          sx={{
+           sx={{
             p: 2,
-            minWidth: 250,
-            backgroundColor: "#ffebee",
+            minWidth: 220,
+            backgroundColor: theme.palette.mode === "dark" ? "#3b1f22" : "#ffebee",
+            color: theme.palette.mode === "dark" ? "#fecaca" : "inherit",
+
             cursor: "pointer",
           }}
           onClick={() =>
@@ -255,16 +284,37 @@ const AdminServiceApproval = () => {
             {counts.rejected}
           </Typography>
         </Paper>
+
       </Stack>
 
       {/* Table */}
-      <Paper sx={{ width: "90%", mx: "auto", mt: 4, p: 2 }}>
+      <Paper sx={{
+          width: "fit-content",
+          minWidth: "75%",
+          maxWidth: "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          border: "none !important",
+          boxShadow: "none !important",
+          backgroundColor: "transparent !important"
+        }}>
         <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
           Pending Service Requests for Approval
         </Typography>
 
         <TableContainer component={Paper} sx={{ maxHeight: 380 }}>
-          <Table stickyHeader>
+          <Table 
+          sx={{
+            width: "100%",
+            minWidth: 650,
+            tableLayout: "auto",
+            border: "none !important",
+            "& td, & th": { border: "none !important" },
+            "& .MuiTableCell-root": { borderBottom: "none !important" },
+            "& .MuiTableRow-root": { border: "none !important" },
+          }}>
             <TableHead>
               <TableRow>
                 <StyledTableCell>Sr. No.</StyledTableCell>
