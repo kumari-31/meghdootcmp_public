@@ -70,6 +70,14 @@ from .serializers import (CombinedDataSerializer, CombinedFormSerializer,
                           VmRequestSerializer)
 from .table_imp import *
 
+from openstackoperations import (
+    get_conn,
+    get_guac_token,
+    delete_connection,
+    delete_guac_user
+)
+
+
 # Load environment variables
 load_dotenv()
 
@@ -8500,6 +8508,7 @@ class VMDeleteRequestAPIView(APIView):
         return Response({"message": "Delete request sent to admin."}, status=200)
 
 
+
 class VMDeleteAdminApprovalAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -8518,7 +8527,17 @@ class VMDeleteAdminApprovalAPIView(APIView):
             return Response({"message": "VM Info Not Found"}, status=404)
 
         if approve:
-            # Prepare dynamic log data (exclude ID fields)
+
+            connection_id = vm_info.connection_id
+            guac_username = vm_info.username
+            authToken = get_guac_token()
+            print("AUTH TOKEN IN DELETE FLOW:", authToken)
+
+            if not authToken:
+                 return Response({"message": "Failed to get Guacamole token"}, status=500)
+
+            
+             # Prepare dynamic log data (exclude ID fields)
             log_data = {}
 
             # Copy from VmRequest
@@ -8542,22 +8561,58 @@ class VMDeleteAdminApprovalAPIView(APIView):
             # Save logs
             DeletedVMLog.objects.create(**log_data)
 
-            # Delete from OpenStack
+            # -----------------------------------
+            #    1️⃣ DELETE GUACAMOLE CONNECTION
+            # -----------------------------------
+            if connection_id:
+                delete_conn_resp = delete_connection(connection_id, authToken)
+
+                if delete_conn_resp.status_code in [200, 204]:
+                    print(f"Guacamole Connection Deleted: {connection_id}")
+                else:
+                    print("Guacamole connection deletion failed:",
+                      getattr(delete_conn_resp, "text", delete_conn_resp))
+                    
+            # -----------------------------------
+            # 2️⃣ DELETE GUACAMOLE USER IF NO OTHER VM USES IT
+            # -----------------------------------
+            other_vms_using_user = VMInfo.objects.filter(username=guac_username).exclude(vm_name=vm_name).exists()
+
+            if not other_vms_using_user:
+                delete_user_resp = delete_guac_user(guac_username, authToken)
+
+                if delete_user_resp.status_code in [200, 204]:
+                    print(f"Guacamole User Deleted: {guac_username}")
+                else:
+                    print("Guacamole user deletion failed:",
+                        getattr(delete_user_resp, "text", delete_user_resp))
+            else:
+                print("User NOT deleted — still used by another VM")
+
+
+            # -----------------------------------
+            # 3️⃣ DELETE VM FROM OPENSTACK
+            # -----------------------------------
             try:
                 conn = get_conn()
-                conn.compute.delete_server(vm_info.vm_id)
+                if vm_info.vm_id:
+                    conn.compute.delete_server(vm_info.vm_id, ignore_missing=True)
+                print("OpenStack VM Deleted:", vm_info.vm_id)
             except Exception as e:
-                print("Error deleting VM:", e)
+                print("Error deleting VM from OpenStack:", e)
 
+            # -----------------------------------
+            # 4️⃣ DELETE DB RECORDS
+            # -----------------------------------
             vm_info.delete()
             vm_request.delete()
 
             return Response({"message": "VM Deleted Successfully!"}, status=200)
 
-        else:
-            vm_request.delete_request_status = "Rejected"
-            vm_request.save()
-            return Response({"message": "Delete Request Rejected"}, status=200)
+        # If deletion rejected
+        vm_request.delete_request_status = "Rejected"
+        vm_request.save()
+        return Response({"message": "Delete Request Rejected"}, status=200)
 
 
 class VMPendingDeleteRequestsAPIView(APIView):
@@ -12551,105 +12606,105 @@ class HypervisorDataAPIView(APIView):
 
 # ------------------------2 June 2025--------------------------
 
-load_dotenv()
+# load_dotenv()
 
-guacamole_base_url = os.getenv("GUACAMOLE_BASE_URL")
-guacamole_uname = os.getenv("GUACAMOLE_UNAME")
-guacamole_pwd = os.getenv("GUACAMOLE_PWD")
-# Load environment variables from .env file
-
-
-def get_token():
-    url = f"{guacamole_base_url}/tokens"
-
-    payload = f"username={guacamole_uname}&password={guacamole_pwd}"
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-    response = requests.request("POST", url, headers=headers, data=payload)
-
-    return response
+# guacamole_base_url = os.getenv("GUACAMOLE_BASE_URL")
+# guacamole_uname = os.getenv("GUACAMOLE_UNAME")
+# guacamole_pwd = os.getenv("GUACAMOLE_PWD")
+# # Load environment variables from .env file
 
 
-class GuacamoleUpdatePasswordAPIView(APIView):
-    """
-    API to update an existing user's password in Guacamole.
-    """
+# def get_token():
+#     url = f"{guacamole_base_url}/tokens"
 
-    def post(self, request):
-        username = request.data.get("username")
-        new_password = request.data.get("new_password")
+#     payload = f"username={guacamole_uname}&password={guacamole_pwd}"
+#     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
-        if not username or not new_password:
-            return Response(
-                {"error": "Username and new password are required."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+#     response = requests.request("POST", url, headers=headers, data=payload)
 
-        try:
-            # First get a fresh token
-            token_response = get_token()
-            if token_response.status_code != 200:
-                return Response(
-                    {"error": "Failed to authenticate with Guacamole"},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
+#     return response
 
-            auth_token = token_response.json().get("authToken")
-            if not auth_token:
-                return Response(
-                    {"error": "No auth token received from Guacamole"},
-                    status=status.HTTP_401_UNAUTHORIZED,
-                )
 
-            # Now update the password with the token
-            url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token={auth_token}"
+# class GuacamoleUpdatePasswordAPIView(APIView):
+#     """
+#     API to update an existing user's password in Guacamole.
+#     """
 
-            payload = {
-                "username": username,
-                "password": new_password,
-                "attributes": {
-                    "disabled": "",
-                    "expired": "",
-                    "access-window-start": "",
-                    "access-window-end": "",
-                    "valid-from": "",
-                    "valid-until": "",
-                    "timezone": None,
-                    "guac-full-name": None,
-                    "guac-organization": None,
-                    "guac-organizational-role": None,
-                },
-            }
+#     def post(self, request):
+#         username = request.data.get("username")
+#         new_password = request.data.get("new_password")
 
-            headers = {"Content-Type": "application/json"}
+#         if not username or not new_password:
+#             return Response(
+#                 {"error": "Username and new password are required."},
+#                 status=status.HTTP_400_BAD_REQUEST,
+#             )
 
-            response = requests.put(url, headers=headers, json=payload)
+#         try:
+#             # First get a fresh token
+#             token_response = get_token()
+#             if token_response.status_code != 200:
+#                 return Response(
+#                     {"error": "Failed to authenticate with Guacamole"},
+#                     status=status.HTTP_401_UNAUTHORIZED,
+#                 )
 
-            if (
-                response.status_code == 204
-            ):  # Guacamole returns 204 on successful update
-                return Response(
-                    {"message": "Password updated successfully."},
-                    status=status.HTTP_200_OK,
-                )
-            else:
-                return Response(
-                    {
-                        "error": "Failed to update password.",
-                        "details": response.text,
-                        "status_code": response.status_code,
-                    },
-                    status=response.status_code,
-                )
+#             auth_token = token_response.json().get("authToken")
+#             if not auth_token:
+#                 return Response(
+#                     {"error": "No auth token received from Guacamole"},
+#                     status=status.HTTP_401_UNAUTHORIZED,
+#                 )
 
-        except Exception as e:
-            return Response(
-                {
-                    "error": "An error occurred while updating the password.",
-                    "details": str(e),
-                },
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+#             # Now update the password with the token
+#             url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token={auth_token}"
+
+#             payload = {
+#                 "username": username,
+#                 "password": new_password,
+#                 "attributes": {
+#                     "disabled": "",
+#                     "expired": "",
+#                     "access-window-start": "",
+#                     "access-window-end": "",
+#                     "valid-from": "",
+#                     "valid-until": "",
+#                     "timezone": None,
+#                     "guac-full-name": None,
+#                     "guac-organization": None,
+#                     "guac-organizational-role": None,
+#                 },
+#             }
+
+#             headers = {"Content-Type": "application/json"}
+
+#             response = requests.put(url, headers=headers, json=payload)
+
+#             if (
+#                 response.status_code == 204
+#             ):  # Guacamole returns 204 on successful update
+#                 return Response(
+#                     {"message": "Password updated successfully."},
+#                     status=status.HTTP_200_OK,
+#                 )
+#             else:
+#                 return Response(
+#                     {
+#                         "error": "Failed to update password.",
+#                         "details": response.text,
+#                         "status_code": response.status_code,
+#                     },
+#                     status=response.status_code,
+#                 )
+
+#         except Exception as e:
+#             return Response(
+#                 {
+#                     "error": "An error occurred while updating the password.",
+#                     "details": str(e),
+#                 },
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            # )
 
 
 # class ServiceRequestAPIView(APIView):

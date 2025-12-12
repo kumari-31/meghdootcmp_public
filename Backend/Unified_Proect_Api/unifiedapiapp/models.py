@@ -104,6 +104,7 @@ class VMInfo(models.Model):
     host_name = models.CharField(max_length=255, blank=True, null=True)
     instance_name = models.CharField(max_length=255, blank=True, null=True)
     vnc_display = models.IntegerField(blank=True, null=True)
+    connection_id = models.CharField(max_length=100, null=True, blank=True)
     username = models.CharField(max_length=255, blank=True, null=True)
     ip = models.CharField(max_length=255, blank=True, null=True, default="")
     vm_access_from_date = models.CharField(max_length=255, blank=True, null=True)

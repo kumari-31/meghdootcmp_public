@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import time
+import token
 
 import requests
 from django.core.exceptions import ValidationError
@@ -35,6 +36,9 @@ conn = connection.Connection(
     user_domain_name=os.getenv("USER_DOMAIN_NAME"),
     project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
 )
+
+def get_conn():
+    return conn
 
 
 def detach_volume(conn, server_id, volume_id):
@@ -143,18 +147,6 @@ def create_vm1(
         return {"server_id": None, "status": False, "error": str(e)}
 
 
-# Establish a connection to the OpenStack service
-# conn = connection.Connection(
-#                     auth_url=os.getenv('AUTH_URL'),
-#                     # project_name=os.getenv('PROJECT_NAME'),
-#                     project_name="Cloud",
-#                     username="admin",
-#                     password=os.getenv('PASSWORD'),
-#                     user_domain_name=os.getenv('USER_DOMAIN_NAME'),
-#                     project_domain_name=os.getenv('PROJECT_DOMAIN_NAME')
-#                 )
-
-
 def extract_volume_error(volume):
     fault = getattr(volume, "fault", None)
     if fault and fault.get("message"):
@@ -244,8 +236,19 @@ def create_bootable_volume(
                 )
                 vm_req_obj.save()
                 return None, None, vm_instance.get("error", "VM creation failed")
+                        # ⭐⭐⭐ NEW CODE — Get Neutron port ID (connection_id)
+            server_id = vm_instance["server_id"]
+            ports = list(conn.network.ports(device_id=server_id))  # Convert generator to list
+            connection_id = ports[0].id if ports else None
+            print(f"Connection (Port) ID for VM '{vm_name}': {connection_id}")
 
-            return created_volume_id, vm_instance["server_id"], ""
+            # Update request success
+            vm_req_obj.creation_status = "Created"
+            vm_req_obj.creation_error_message = None
+            vm_req_obj.save()
+
+            # Return connection_id now
+            return created_volume_id, server_id, None, ""
 
         # Unexpected status
         print(f"Volume {created_volume_id} is in unexpected status: {volume.status}")
@@ -259,7 +262,7 @@ def create_bootable_volume(
         VmRequest.objects.filter(id=vm_req_id).update(
             creation_status="Failed", creation_error_message=str(e)
         )
-        return None, None, str(e)
+        return None, None, None, str(e)
 
 
 def create_data_volume(size, volume_name, data_volume_type):
@@ -396,15 +399,15 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
         # ----------------------------
         # 2️⃣ GET GUACAMOLE AUTH TOKEN
         # -------------------------------
-        token = get_token()
+        authToken = get_guac_token()
 
-        if token.status_code != 200:
-            print("token------>", token)
-            print("Failed to get token")
+        if not authToken:
+            print("Failed to get Guacamole token")
             return {"status": False, "message": "Failed to get token"}
 
-        authToken = token.json().get("authToken")
         print("AUTHtoken===========>", authToken)
+
+        guac_connections = {}
 
         for line, vmtime in zip(lines, vms):
             fields = line.split(",")
@@ -433,6 +436,8 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
             con_identifier = conn.json().get("identifier")
             print("Connection ID:", con_identifier)
 
+            guac_connections[vm_name] = con_identifier
+
             # -------------------------------
             # 5️⃣ CREATE GUACAMOLE USER
             # -------------------------------
@@ -459,6 +464,8 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
             else:
                 print("User mapping failed:", getattr(map_resp, "text", map_resp))
 
+
+            instance_name = parsed_instance_name
             # -------------------------------
             # 7️⃣ SAVE VM DETAILS IN DATABASE
             # -------------------------------
@@ -477,10 +484,13 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
                     "volume_id": vmtime.get("volume_id"),
                     "data_volume_id": vmtime.get("data_volume_id"),
                     "vm_id": vmtime.get("vm_id"),
+                    "connection_id": con_identifier,
                 },
             )
 
             print(">>> Saved VMInfo:", vm_info_obj)
+
+            update_ip_by_vmname(vm_name)    
 
             # -------------------------------
             # 8️⃣ SEND EMAIL
@@ -524,6 +534,7 @@ Cloud Team
         "instance_name": instance_name,
         "vnc_display": vnc_display,
         "username": u_name,
+        "connections": guac_connections,
     }
 
 
@@ -552,44 +563,70 @@ def update_ip_by_vmname(vm_name):
         return ""
 
 
-# def update_ip_by_vmname(vm_name):
-#     vms = VMInfo.objects.filter(vm_name=vm_name)
-#     print(vms)
-#     try:
-#         print("vm in update ip", vm_name)
-#         server = conn.compute.find_server(vm_name)
-#         print("serve name in get ip r======", server)
-#         # Extract and print IP addresses
-#         ip = ""
-#         for network, addresses in server.addresses.items():
-#             for address in addresses:
-#                 print("addresss", address)
-#                 ip = address["addr"]
-#                 print(f"{address['addr']}")
-#         return ip
-#     except Exception as e:
-#         print("Error on updating IP", e)
-#         return ip
-#     return
-
-
-def get_token():
+def get_guac_token():
     url = f"{guacamole_base_url}/tokens"
     print("guacamole uname and pwd", guacamole_uname, guacamole_pwd)
     print("url in get token", url)
     # payload=f"username={guacamole_uname}&password={guacamole_pwd}"
     payload = {"username": guacamole_uname, "password": guacamole_pwd}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
+    print("HEADERS SENT:", headers)
+    print("PAYLOAD SENT:", payload)
     # response = requests.request("POST", url, headers=headers, data=payload)
     response = requests.post(url, data=payload, headers=headers)
     print("Token response code:", response.status_code)
     print("Token response body:", response.text)
+
+    if response.status_code != 200:
+        return None # Failed to get token
+    return response.json().get("authToken")
+
+# def get_guac_token():
+
+#     print("GUAC URL:", guacamole_base_url)
+#     print("GUAC USER:", guacamole_uname)
+#     print("GUAC PWD:", guacamole_pwd)
+    
+#     url = f"{guacamole_base_url}/tokens"
+#     payload = {"username": guacamole_uname, "password": guacamole_pwd}
+#     headers = {"Content-Type": "application/x-www-form-urlencoded"}
+
+#     try:
+#         response = requests.post(url, data=payload, headers=headers)
+#         print("Token response code:", response.status_code)
+#         print("Token response body:", response.text)
+
+#         if response.status_code == 200:
+#             # Return only the token string
+#             return response.json().get("authToken")
+#         else:
+#             print("Failed to get Guacamole token")
+#             return None
+
+#     except Exception as e:
+#         print("Exception while getting Guacamole token:", e)
+#         return None
+
+
+
+
+def delete_connection(connection_id, authToken):
+    url = f"{guacamole_base_url}/session/data/mysql/connections/{connection_id}?token={authToken}"
+    headers = {"X-Guacamole-Token": authToken}  # optional
+    response = requests.delete(url, headers=headers)
     return response
 
 
-def create_connection(name, port, hostname, token):
-    url = f"{guacamole_base_url}/session/data/mysql/connections?token=" + token
+def delete_guac_user(username, authToken):
+    url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token={authToken}"
+    headers = {"X-Guacamole-Token": authToken}  # optional
+    response = requests.delete(url, headers=headers)
+    return response
+
+
+
+def create_connection(name, port, hostname, authToken):
+    url = f"{guacamole_base_url}/session/data/mysql/connections?token=" + authToken
 
     payload = json.dumps(
         {
@@ -648,16 +685,16 @@ def create_connection(name, port, hostname, token):
     return response
 
 
-def create_user(username, password, token, vmvalidity):
+def create_user(username, password, authToken, vmvalidity):
 
-    url = f"{guacamole_base_url}/session/data/mysql/users?token=" + token
-    check = requests.get(url)
+    check_url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token=" + authToken
+    check_resp = requests.get(check_url)
 
-    if check.status_code == 200:
+    if check_resp.status_code == 200:
         print(f"User '{username}' already exists in Guacamole → SKIPPING creation")
-        return check
+        return check_resp
 
-    url = f"{guacamole_base_url}/session/data/mysql/users?token={token}"
+    url = f"{guacamole_base_url}/session/data/mysql/users?token={authToken}"
 
     payload = {
         "username": username,
@@ -682,14 +719,14 @@ def create_user(username, password, token, vmvalidity):
     return response
 
 
-def map_user_conn(con_identifier, username, token):
+def map_user_conn(con_identifier, username, authToken):
     # print(type(con_identifier))
 
     url = (
         f"{guacamole_base_url}/session/data/mysql/users/"
         + username
         + "/permissions?token="
-        + token
+        + authToken
     )
 
     payload = [
@@ -708,8 +745,12 @@ def map_user_conn(con_identifier, username, token):
 
 def get_connections_list():
 
-    token = get_token()
-    url = f"{guacamole_base_url}//session/data/mysql/connections?token=" + token
+    authToken = get_guac_token()
+    if not authToken:
+        print("Failed to get Guacamole token")
+        return {}
+
+    url = f"{guacamole_base_url}//session/data/mysql/connections?token=" + authToken
     response = requests.get(url)
 
     # Check if the request was successful (status code 200)
@@ -762,8 +803,11 @@ def update_connection(connection_id, update_data):
 
 def update_guacamole_user_date_time(username, from_date, to_date, from_time, to_time):
     print("updating", username, from_date, to_date, from_time, to_time)
-    token = get_token()
-    authToken = token.json().get("authToken")
+    authToken = get_guac_token()
+    if not authToken:
+        print("Failed to get Guacamole token")
+        return
+    
     print(authToken)
     url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token=" + authToken
 
@@ -809,7 +853,10 @@ import traceback
 
 def read_csv_file(csv_file_path):
     try:
-        token = get_token()
+        authToken = get_guac_token()
+        if not authToken:
+            print("Failed to get Guacamole token")
+            return
         with open(csv_file_path, "r") as file:
             csv_reader = csv.DictReader(file)
 
@@ -824,42 +871,38 @@ def read_csv_file(csv_file_path):
                 )
                 vnc_display = f"59{row['VNC Display']}"
                 username = row["username"]
+ 
 
-                if token.status_code == 200:
-                    print(token.json()["authToken"])
-                    authToken = token.json()["authToken"]
-
-                    conn = create_connection(username, vnc_display, hostname, authToken)
-                    con_identifier = conn.json()["identifier"]
-                    if conn.status_code == 200:
-                        print("connection created")
+                conn = create_connection(username, vnc_display, hostname, authToken)
+                con_identifier = conn.json()["identifier"]
+                if conn.status_code == 200:
+                    print("connection created")
                         # print(conn.json())
                         # con_identifier = conn.json()['identifier']
 
-                    else:
-                        print(conn)
-
-                    user = create_user(username, username, authToken)
-                    if user.status_code == 200:
-                        print("user created")
+                else:
+                    print(conn)
+                user = create_user(username, username, authToken)
+                if user.status_code == 200:
+                    print("user created")
                         # print(user.json())
-                        username = user.json()["username"]
+                    username = user.json()["username"]
 
-                    else:
-                        print("status code", user)
+                else:
+                    print("status code", user)
 
-                    map_user = map_user_conn(con_identifier, username, authToken)
+                map_user = map_user_conn(con_identifier, username, authToken)
                     # print(map_user.json())
-                    con_identifier = conn.json()["identifier"]
-                    print("connection identifier", con_identifier)
-                    if map_user.status_code == 204:
-                        print("map_user done")
+                con_identifier = conn.json()["identifier"]
+                print("connection identifier", con_identifier)
+                if map_user.status_code == 204:
+                    print("map_user done")
                         # print(map_user.json())
 
-                    else:
-                        print(map_user)
                 else:
-                    print("No token")
+                    print(map_user)
+            else:
+                print("No token")
 
                 # Print the extracted values
                 print(f"{vm}, {hostname}, {vnc_display}, {username}")

@@ -1,12 +1,8 @@
-<<<<<<< HEAD
-# unifiedapiapp/helpdesk_custom/admin_views.py
-=======
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse
 from django.core.paginator import Paginator
 from helpdesk.models import Ticket
->>>>>>> 1ba2c8b264654eeb6d3b9737cc2764b156eaf983
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator

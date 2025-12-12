@@ -17,6 +17,16 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 
 from helpdesk_custom.roles import get_user_role
 from helpdesk.models import Ticket, Queue
+from .models import (
+    VMInfo, 
+    Registration, 
+    Metric, 
+    Employee, 
+    VmRequest, 
+    CdacProject, 
+    ServiceRequest
+)
+
 User = get_user_model()
 
 

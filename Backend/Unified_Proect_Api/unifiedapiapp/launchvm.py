@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from rest_framework import status
 from rest_framework.response import Response
+from django.utils import timezone
 
 from openstackoperations import *
 
@@ -317,6 +318,18 @@ def vm_approve_request(id):
                 # Process each VM name and create corresponding VMs
                 for vm_detail in all_vm_details:
                     current_vm_name = vm_detail["vm_name"]
+
+                    # Check if VM already exists in OpenStack
+                    existing_server = conn.compute.find_server(current_vm_name)
+                    if existing_server:
+                        print(f"VM '{current_vm_name}' already exists → skip creation")
+                        # Update VMInfo if exists
+                        VMInfo.objects.filter(vm_name=current_vm_name).update(
+                            vm_id=existing_server.id,
+                            ip=update_ip_by_vmname(current_vm_name)
+                        )
+                        continue
+                    
                     volume_name = current_vm_name + "_volume"
                     print(
                         "Processing VM:", current_vm_name, "with volume:", volume_name
@@ -334,31 +347,30 @@ def vm_approve_request(id):
                     print("volume_type", volume_type)
 
                     # Create bootable volume and VM
-                    created_bootable, vm_instance_id, error_message = (
-                        create_bootable_volume(
-                            auth_url,
-                            project_name,
-                            username,
-                            password,
-                            volume_name,
-                            size_gb,
-                            volume_type,
-                            image_id,
-                            current_vm_name,
-                            flavor_id,
-                            id,
-                        )
-                    )
+                    created_bootable, vm_instance_id, _ignored_conn, error_message = create_bootable_volume(
+                                auth_url,
+                                project_name,
+                                username,
+                                password,
+                                volume_name,
+                                size_gb,
+                                volume_type,
+                                image_id,
+                                current_vm_name,
+                                flavor_id,
+                                id,
+                            )
+
+                    # Store values into vm_detail
+                    vm_detail["vm_id"] = vm_instance_id
+                    vm_detail["connection_id"] = None
 
                     if created_bootable is None:
                         VmRequest.objects.filter(id=id).update(
                             creation_status="Failed",
                             creation_error_message=error_message,
                         )
-                        print(
-                            f"VM creation failed for {current_vm_name}: {error_message}"
-                        )
-                        # Stop further processing for this request
+                        print(f"VM creation failed for {current_vm_name}: {error_message}")
                         return {"status": False, "message": error_message}
 
                     created_vm_ids.append(vm_instance_id)
@@ -395,16 +407,24 @@ def vm_approve_request(id):
 
                     # Store the volume and VM details in the vm_detail dictionary
                     vm_detail["volume_id"] = created_bootable
-                    vm_detail["vm_id"] = vm_instance_id
+                    # vm_detail["vm_id"] = vm_instance_id
                     vm_detail["data_volume_id"] = volume_id
 
                 # Save all VM details
                 res = run_shell_script_to_save_vm_details(all_vm_details, False)
                 print("Response from shell script:", res)
-                print("Response status:", res["status"])
-                context = {"status": res["status"], "message": res["message"]}
+               
+                if not res["status"]:
+                    return {"status": False, "message": res["message"]}
+                
+                guac_connections = res.get("connections", {})
 
-                if res["status"]:
+                for vm_detail in all_vm_details:
+                    vm_name = vm_detail["vm_name"]
+                    vm_detail["connection_id"] = guac_connections.get(vm_name)
+                    print(f"Mapped Guac ID for {vm_name} → {vm_detail['connection_id']}")
+
+                if res.get("status", False):
                     # Update VM info for the first VM (original VM name)
                     vm_info.creation_status = "Approved"
                     vm_info.host_name = res.get("host_name", "")
@@ -425,12 +445,17 @@ def vm_approve_request(id):
                     if all_vm_details[0].get("vm_id"):
                         vm_info.vm_id = all_vm_details[0]["vm_id"]
 
+                    if all_vm_details[0].get("connection_id"):
+                        vm_info.connection_id = all_vm_details[0]["connection_id"]
+
+
                     vm_info.save()
 
                     # Create additional VMInfo records for any additional VMs
                     for i in range(1, len(all_vm_details)):
-                        additional_vm_info = VMInfo(
-                            vm_name=all_vm_details[i]["vm_name"],
+                        v = all_vm_details[i]  # ✔ correct position
+                        VMInfo.objects.create(
+                            vm_name=v["vm_name"],
                             email=vm_info.email,
                             vm_access_from_date=vm_info.vm_access_from_date,
                             vm_access_to_date=vm_info.vm_access_to_date,
@@ -441,16 +466,15 @@ def vm_approve_request(id):
                             username=res.get("username", ""),
                             instance_name=res.get("instance_name", ""),
                             vnc_display=res.get("vnc_display", ""),
-                            ip=update_ip_by_vmname(all_vm_details[i]["vm_name"]),
-                            volume_id=all_vm_details[i].get("volume_id", ""),
-                            vm_id=all_vm_details[i].get("vm_id", ""),
-                            data_volume_id=all_vm_details[i].get("data_volume_id", ""),
+                            ip=update_ip_by_vmname(v["vm_name"]),
+                            volume_id=v.get("volume_id", ""),
+                            vm_id=v.get("vm_id", ""),
+                            data_volume_id=v.get("data_volume_id", ""),
+                            connection_id=v.get("connection_id", ""),
                         )
-                        additional_vm_info.save()
 
                     return {"status": res["status"], "message": res["message"]}
-                else:
-                    return {"status": res["status"], "message": res["message"]}
+                
         else:
             # For Student designation
             print("img", flavor_id)
@@ -535,6 +559,7 @@ def vm_approve_request(id):
     except Exception as e:
         print(f"Error processing VM request: {e}")
         return {"status": False, "message": str(e)}
+
 
 
 # def vm_approve_request(id):
