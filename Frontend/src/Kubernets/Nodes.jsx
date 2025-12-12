@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -14,31 +14,35 @@ import {
   Typography,
   InputAdornment,
   Box,
-  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Stack,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { styled, useTheme } from "@mui/material/styles"; // Import useTheme
+import { styled, useTheme } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import apiClient from "../Axios";
+import "../Pages/style.css"; // For cloud loader
 
-// Helper function to format bytes to a more readable unit (e.g., GB, MB)
+// Helper to format memory bytes
 const formatBytes = (bytes, decimals = 2) => {
-  if (bytes === 0) return '0 Bytes';
-  if (bytes === null || bytes === undefined) return 'N/A';
-
+  if (!bytes) return "N/A";
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-
+  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
 };
 
-// Styled Table Components
+// ---------------- Styled Table ----------------
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -47,133 +51,149 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: theme.palette.text.secondary, // Use theme for consistency
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
   "&:last-child td, &:last-child th": {
     border: 0,
   },
-  '&:hover': {
-    backgroundColor: theme.palette.action.hover,
-    transition: 'background-color 0.2s ease-in-out',
-  },
 }));
 
+// ---------------- MAIN COMPONENT ----------------
 const Nodes = () => {
   const [nodes, setNodes] = useState([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(7);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const navigate = useNavigate(); // Initialize useNavigate
-  const theme = useTheme(); // Initialize useTheme
+  const theme = useTheme();
+  const navigate = useNavigate();
 
-  const fetchNodes = async () => {
-    setLoading(true);
-    try {
-      const response = await apiClient.get("/k8s/nodes/");
-      setNodes(response.data.nodes);
-    } catch (error) {
-      console.error("Error fetching nodes:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Fetch Nodes
   useEffect(() => {
+    const fetchNodes = async () => {
+      setLoading(true);
+      try {
+        const response = await apiClient.get("/k8s/nodes/");
+        setNodes(response.data.nodes);
+      } catch (err) {
+        console.error("Error fetching nodes:", err);
+        setError("Failed to load nodes.");
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchNodes();
   }, []);
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
-    setPage(0);
-  };
-
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value);
-  };
-
-  const handleNodeNameClick = (name) => {
-    navigate(`/app/kubernetes/nodes-details/${name}`);
-  };
-
+  // Filter nodes
   const filteredNodes = nodes.filter((node) =>
     Object.values(node).some(
-      (value) =>
-        (typeof value === "string" && value.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (typeof value === "object" && value !== null && !Array.isArray(value) &&
-         JSON.stringify(value).toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (Array.isArray(value) &&
-          value.some((item) => typeof item === "string" && item.toLowerCase().includes(searchQuery.toLowerCase()))
-        )
+      (val) =>
+        (typeof val === "string" && val.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (typeof val === "number" && val.toString().includes(searchQuery.toLowerCase())) ||
+        (Array.isArray(val) &&
+          val.some((item) => typeof item === "string" && item.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (typeof val === "object" && val !== null && JSON.stringify(val).toLowerCase().includes(searchQuery.toLowerCase()))
     )
   );
 
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(+e.target.value);
+    setPage(0);
+  };
+
+  const handleSearchChange = (e) => setSearchQuery(e.target.value);
+  const handleNodeNameClick = (name) => navigate(`/app/kubernetes/nodes-details/${name}`);
+
   const numberOfColumns = 10;
 
+  // ---------------- Loading Cloud ----------------
+  if (loading) {
+    return (
+      <div className="cloud-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+          <path
+            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-back"
+          />
+          <path
+            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-front"
+          />
+        </svg>
+        <div className="loading-message">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Stack alignItems="center" justifyContent="center" sx={{ height: "80vh", color: "error.main" }}>
+        <Typography variant="h6">{error}</Typography>
+      </Stack>
+    );
+  }
+
   return (
-    <Paper
-      sx={{
-        width: "90%",
-        margin: "20px auto",
-        padding: "20px",
-        borderRadius: "10px",
-        boxShadow: 3,
-        bgcolor: theme.palette.background.paper,
-        color: theme.palette.text.primary,
-      }}
-    >
-      <Typography
-        variant="h5"
-        sx={{ marginBottom: 2, textAlign: "left", fontWeight: "bold", color: theme.palette.text.primary }}
+    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+      {/* Header + Search */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
       >
-        Kubernetes Nodes
-      </Typography>
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        mb: 2,
-      }}>
+        <h1>Nodes</h1>
         <TextField
-          label="Search"
+          label="Search Nodes..."
           variant="outlined"
-          margin="dense"
-          sx={{
-            width: '250px',
-            '& .MuiOutlinedInput-root': {
-              color: theme.palette.text.secondary,
-              '& fieldset': { borderColor: theme.palette.divider },
-              '&:hover fieldset': { borderColor: theme.palette.primary.main },
-              '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main },
-            },
-            '& .MuiInputLabel-root': { color: theme.palette.text.secondary },
-            '& .MuiInputLabel-root.Mui-focused': { color: theme.palette.primary.main },
-          }}
           value={searchQuery}
           onChange={handleSearchChange}
           InputProps={{
             endAdornment: (
               <InputAdornment position="end">
-                <SearchIcon sx={{ color: theme.palette.text.secondary }} />
+                <SearchIcon />
               </InputAdornment>
             ),
           }}
         />
-      </Box>
-      <TableContainer sx={{ maxHeight: 600, borderRadius: '8px', overflow: 'auto' }}>
-        <Table stickyHeader aria-label="nodes table">
+      </div>
+
+      {/* Table */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          width: "fit-content",
+          minWidth: "90%",
+          margin: "0 auto",
+          backgroundColor: "transparent",
+          boxShadow: "none",
+          maxHeight: 600,
+        }}
+      >
+        <Table stickyHeader>
           <TableHead>
             <TableRow>
               <StyledTableCell>Name</StyledTableCell>
@@ -188,16 +208,9 @@ const Nodes = () => {
               <StyledTableCell>Created</StyledTableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
-            {loading ? (
-              <StyledTableRow>
-                <StyledTableCell colSpan={numberOfColumns} align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress />
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ) : filteredNodes.length === 0 ? (
+            {filteredNodes.length === 0 ? (
               <StyledTableRow>
                 <StyledTableCell colSpan={numberOfColumns} align="center">
                   No Nodes Found
@@ -206,58 +219,48 @@ const Nodes = () => {
             ) : (
               filteredNodes
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((node, index) => (
-                  <StyledTableRow key={node.name || index}>
+                .map((node, i) => (
+                  <StyledTableRow key={node.name || i}>
                     <StyledTableCell>
-                      {/* --- MODIFIED SECTION for clickable name --- */}
                       <Typography
                         component="span"
                         sx={{
-                          cursor: 'pointer',
-                          color: theme.palette.primary.main, // Blue color by default
-                          fontWeight: 'bold',
-                          '&:hover': { textDecoration: 'underline' } // Underline on hover
+                          cursor: "pointer",
+                          color: theme.palette.primary.main,
+                          fontWeight: "bold",
+                          "&:hover": { textDecoration: "underline" },
                         }}
                         onClick={() => handleNodeNameClick(node.name)}
                       >
                         {node.name}
                       </Typography>
-                      {/* --- END MODIFIED SECTION --- */}
                     </StyledTableCell>
                     <StyledTableCell>{node.ready}</StyledTableCell>
-                    <StyledTableCell>{node.cpu_requests !== undefined ? node.cpu_requests.toFixed(2) : 'N/A'}</StyledTableCell>
-                    <StyledTableCell>{node.cpu_limits !== undefined ? node.cpu_limits.toFixed(2) : 'N/A'}</StyledTableCell>
-                    <StyledTableCell>{node.cpu_capacity !== undefined ? node.cpu_capacity.toFixed(2) : 'N/A'}</StyledTableCell>
+                    <StyledTableCell>{node.cpu_requests?.toFixed(2) ?? "N/A"}</StyledTableCell>
+                    <StyledTableCell>{node.cpu_limits?.toFixed(2) ?? "N/A"}</StyledTableCell>
+                    <StyledTableCell>{node.cpu_capacity?.toFixed(2) ?? "N/A"}</StyledTableCell>
                     <StyledTableCell>{formatBytes(node.memory_requests_bytes)}</StyledTableCell>
                     <StyledTableCell>{formatBytes(node.memory_limits_bytes)}</StyledTableCell>
                     <StyledTableCell>{formatBytes(node.memory_capacity_bytes)}</StyledTableCell>
-                    <StyledTableCell>{node.pods !== undefined ? node.pods : 'N/A'}</StyledTableCell>
-                    <StyledTableCell>{node.created}</StyledTableCell>
+                    <StyledTableCell>{node.pods ?? "N/A"}</StyledTableCell>
+                    <StyledTableCell>{node.created ?? "N/A"}</StyledTableCell>
                   </StyledTableRow>
                 ))
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={filteredNodes.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
       </TableContainer>
-      <TablePagination
-        rowsPerPageOptions={[10, 25, 50]}
-        component="div"
-        count={filteredNodes.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        sx={{
-          color: theme.palette.text.secondary,
-          '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-            color: theme.palette.text.secondary,
-          },
-          '& .MuiTablePagination-select, & .MuiTablePagination-actions': {
-            color: theme.palette.text.secondary,
-          },
-        }}
-      />
-    </Paper>
+    </div>
   );
 };
 

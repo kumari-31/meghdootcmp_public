@@ -86,31 +86,45 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 
 // ---------------- Circular Gradient Stat Component ----------------
 const GradientCircularStat = ({ value, label, subLabel, gradientId }) => {
+  const theme = useTheme();
   const radius = 45;
   const stroke = 6;
   const normalizedRadius = radius - stroke * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (value / 100) * circumference;
+
+  // THEME COLORS
+  const isDark = theme.palette.mode === "dark";
+
+  const gradientStart = isDark ? "#4ade80" : "#42a5f5";  // greenish in dark, blue in light
+  const gradientEnd = isDark ? "#16a34a" : "#1e88e5";
+
+  const textColor = isDark ? "#f1f5f9" : "#333";  // white-ish in dark mode
+  const subTextColor = isDark ? "#cbd5e1" : "#64748b";
+
+  const baseCircleColor = isDark ? "#334155" : "#e0e0e0"; // bg stroke
   
 
   return (
     <Box sx={{ textAlign: "center" }}>
       <svg height={radius * 2} width={radius * 2}>
-        <defs>
+      <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#42a5f5" />
-            <stop offset="100%" stopColor="#1e88e5" />
+            <stop offset="0%" stopColor={gradientStart} />
+            <stop offset="100%" stopColor={gradientEnd} />
           </linearGradient>
         </defs>
-        <circle
-          stroke="#e0e0e0"
+       {/* Background Circle */}
+       <circle
+          stroke={baseCircleColor}
           fill="transparent"
           strokeWidth={stroke}
           r={normalizedRadius}
           cx={radius}
           cy={radius}
         />
-        <circle
+         {/* Animated Usage Circle */}
+         <circle
           stroke={`url(#${gradientId})`}
           fill="transparent"
           strokeWidth={stroke}
@@ -122,26 +136,31 @@ const GradientCircularStat = ({ value, label, subLabel, gradientId }) => {
           cy={radius}
           style={{ transition: "stroke-dashoffset 0.5s ease" }}
         />
-        <text
+          {/* Value Text */}
+          <text
           x="50%"
           y="50%"
           dy=".3em"
           textAnchor="middle"
           fontSize="16"
           fontWeight="bold"
-          fill="#333"
+          fill={textColor}
         >
           {value}%
         </text>
       </svg>
       <Typography
         variant="body2"
-        sx={{ mt: 1, color: "#0f172a", fontWeight: 600 }}
+        sx={{
+          mt: 1,
+          fontWeight: 600,
+          color: textColor
+        }}
       >
         {label}
       </Typography>
       {subLabel && (
-        <Typography variant="caption" sx={{ color: "#64748b" }}>
+         <Typography variant="caption" sx={{ color: subTextColor }}>
           {subLabel}
         </Typography>
       )}
@@ -270,12 +289,16 @@ const Hypervisors = () => {
           borderRadius: 3,
           height: "100%",
           boxShadow: 6,
-          background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
+          background: theme.palette.mode === "dark"
+             ?  "linear-gradient(145deg, #0a0a0a, #1a1a1a)"   // smooth black-on-black
+            : "linear-gradient(145deg, #f9fafb, #e9ecef)",
+          color: theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
+
         }}
       >
         <Typography
           variant="h6"
-          sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
+          sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b", }}
         >
           Hypervisor Summary ({hypervisors[0]?.hostname || "N/A"})
         </Typography>
@@ -335,12 +358,16 @@ const Hypervisors = () => {
           borderRadius: 3,
           height: "100%",
           boxShadow: 6,
-          background: "linear-gradient(145deg, #f9fafb, #e9ecef)",
+          background: theme.palette.mode === "dark"
+            ?  "linear-gradient(145deg, #0a0a0a, #1a1a1a)"   // smooth black-on-black
+            : "linear-gradient(145deg, #f9fafb, #e9ecef)",
+          color: theme.palette.mode === "dark" ? "#f1f5f9" : "#1e293b",
+
         }}
       >
         <Typography
           variant="h6"
-          sx={{ mb: 3, fontWeight: "bold", textAlign: "center", color: "#1e293b" }}
+          sx={{ mb: 3, fontWeight: "bold", textAlign: "center",color: theme.palette.mode === "dark" ? "#e2e8f0" : "#1e293b",}}
         >
           Resource Providers Summary (All Providers)
         </Typography>

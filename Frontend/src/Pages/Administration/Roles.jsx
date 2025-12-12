@@ -104,6 +104,9 @@ const Roles = () => {
     setSnackbarOpen(false);
   };
 
+  // Allow only alphabets, spaces, and underscore
+const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
+
   const fetchRoles = async () => {
     setError(null);
     try {
@@ -207,8 +210,14 @@ const Roles = () => {
   const handleCreateRole = async (e) => {
     e.preventDefault();
 
+     // Validate name
+  if (!isValidRoleName(newRole.name)) {
+    showSnackbar("Role name can contain only alphabets and underscore (_).", "error");
+    return;
+  }
     const existingRole = roles.find((role) => role.name === newRole.name);
 
+    
     if (existingRole) {
       showSnackbar('A role with the same name already exists. Please choose a different name.', 'error');
       return;
@@ -237,6 +246,11 @@ const Roles = () => {
       showSnackbar('No role selected for update.', 'error');
       return;
     }
+     // Validate name
+  if (!isValidRoleName(roleToUpdate.name)) {
+    showSnackbar("Role name can contain only alphabets and underscore (_).", "error");
+    return;
+  }
 
     try {
       const response = await apiClient.put(`/edit-roles/${roleToUpdate.id}/`, roleToUpdate);
@@ -345,6 +359,7 @@ const Roles = () => {
             onChange={handleSearchChange}
             variant="outlined"
           />
+
           <div style={{ display: 'flex', gap: '8px' }}>
             <Button variant="contained" sx={{
                 backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
@@ -367,7 +382,17 @@ const Roles = () => {
           <h2>Create New Role</h2>
           <form onSubmit={handleCreateRole}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Name" name="name" placeholder="Name" onChange={handleInputChange} value={newRole.name} required />
+              <TextField
+                  label="Name"
+                  name="name"
+                  placeholder="Name"
+                  onChange={handleInputChange}
+                  value={newRole.name}
+                  required
+                  error={newRole.name && !isValidRoleName(newRole.name)}
+                  helperText={newRole.name && !isValidRoleName(newRole.name) ? "Only alphabets and underscore allowed" : ""}
+                />
+
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
@@ -386,8 +411,17 @@ const Roles = () => {
           <h2>Update Role</h2>
           <form onSubmit={handleUpdateRole}>
             <FormControl fullWidth margin="normal">
-              <TextField label="Role Name" name="name" onChange={handleUpdateInputChange} value={roleToUpdate?.name} required />
-            </FormControl>
+            <TextField
+                label="Role Name"
+                name="name"
+                onChange={handleUpdateInputChange}
+                value={roleToUpdate?.name || ''}
+                required
+                error={roleToUpdate?.name && !isValidRoleName(roleToUpdate.name)}
+                helperText={roleToUpdate?.name && !isValidRoleName(roleToUpdate.name) ? "Only alphabets and underscore allowed" : ""}
+              />
+
+              </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
                 Update

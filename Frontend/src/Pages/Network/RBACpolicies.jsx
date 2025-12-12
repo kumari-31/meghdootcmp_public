@@ -91,6 +91,8 @@ const RBACpolicies = () => {
   const [editingPolicy, setEditingPolicy] = useState(null);
   const [projects, setProjects] = useState([]); 
   const theme = useTheme(); 
+  const [formErrors, setFormErrors] = useState({});
+
 
   // Snackbar states and handlers
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -122,6 +124,26 @@ const RBACpolicies = () => {
         return <InfoOutlined style={{ marginRight: '8px' }} />;
     }
   };
+
+  const validateCreateForm = () => {
+    const errors = {};
+  
+    if (!targetProject) {
+      errors.targetProject = "Target Project is required";
+    }
+  
+    if (!objectType) {
+      errors.objectType = "Object Type is required";
+    }
+  
+    if (objectType && !network) {
+      errors.network = "Network is required";
+    }
+  
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
 
 
   const fetchRbacPolicies = async () => {
@@ -253,6 +275,11 @@ const RBACpolicies = () => {
   
   const createRbacPolicy = async (e) => {
     e.preventDefault();
+     // 🔥 ADD HERE (validation check)
+    if (!validateCreateForm()) {
+      showSnackbar("Please fix the form errors.", "error");
+      return;
+    }
     const payload = {
       target_project_id: targetProject,
       action,
@@ -452,46 +479,77 @@ const RBACpolicies = () => {
             Create New RBAC Policy
           </Typography>
           <form onSubmit={createRbacPolicy}>
-          <FormControl fullWidth margin="normal">
-              <InputLabel id="targetProject-label">Target Project</InputLabel>
+          <FormControl fullWidth margin="normal" error={!!formErrors.targetProject}>
+            <InputLabel id="targetProject-label">Target Project</InputLabel>
+            <Select
+              labelId="targetProject-label"
+              id="targetProject"
+              value={targetProject}
+              onChange={(e) => setTargetProject(e.target.value)}
+              label="Target Project"
+              required
+            >
+              <MenuItem value="">Select Target Project</MenuItem>
+              {projects.map((proj) => (
+                <MenuItem key={proj.id} value={proj.id}>
+                  {proj.name}
+                </MenuItem>
+              ))}
+            </Select>
+            {formErrors.targetProject && (
+              <Typography variant="caption" color="error">{formErrors.targetProject}</Typography>
+            )}
+          </FormControl>
+
+
+          <FormControl fullWidth margin="normal" error={!!formErrors.objectType}>
+            <InputLabel id="objectType-label">Action And Object Type</InputLabel>
+            <Select
+              labelId="objectType-label"
+              id="objectType"
+              value={objectType}
+              onChange={(e) => setObjectType(e.target.value)}
+              label="Action And Object Type"
+              required
+            >
+              <MenuItem value="">Select Object Type</MenuItem>
+              <MenuItem value="external_network">External Network</MenuItem>
+              <MenuItem value="shared_network">Shared Network</MenuItem>
+              <MenuItem value="shared_qos_policy">Shared QoS Policy</MenuItem>
+            </Select>
+            {formErrors.objectType && (
+              <Typography variant="caption" color="error">{formErrors.objectType}</Typography>
+            )}
+          </FormControl>
+
+            {objectType && (
+              <FormControl fullWidth margin="normal" error={!!formErrors.network}>
+              <InputLabel id="network-label">Network</InputLabel>
               <Select
-                labelId="targetProject-label"
-                id="targetProject"
-                value={targetProject}
-                onChange={(e) => setTargetProject(e.target.value)}
-                label="Target Project"
+                labelId="network-label"
+                id="network"
+                value={network}
+                onChange={(e) => setNetwork(e.target.value)}
+                label="Network"
                 required
               >
-                <MenuItem value="">Select Target Project</MenuItem>
-                {projects.map((proj) => (
-                  <MenuItem key={proj.id} value={proj.id}>
-                    {proj.name}
+                <MenuItem value="">Select Network</MenuItem>
+            
+                {networks.map((net) => (
+                  <MenuItem key={net.id} value={net.id}>
+                    {net.network_name}
                   </MenuItem>
                 ))}
+            
               </Select>
+            
+              {formErrors.network && (
+                <Typography variant="caption" color="error">
+                  {formErrors.network}
+                </Typography>
+              )}
             </FormControl>
-
-            <FormControl fullWidth margin="normal">
-              <InputLabel id="objectType-label">Action And Object Type</InputLabel>
-              <Select labelId="objectType-label" id="objectType" value={objectType} onChange={(e) => setObjectType(e.target.value)} label="Action And Object Type" required>
-                <MenuItem value="">Select Object Type</MenuItem>
-                <MenuItem value="external_network">External Network</MenuItem>
-                <MenuItem value="shared_network">Shared Network</MenuItem>
-                <MenuItem value="shared_qos_policy">Shared QoS Policy</MenuItem>
-              </Select>
-            </FormControl>
-            {objectType && (
-              <FormControl fullWidth margin="normal">
-                <InputLabel id="network-label">Network</InputLabel>
-                <Select labelId="network-label" id="network" value={network} onChange={(e) => setNetwork(e.target.value)} label="Network" required>
-                  <MenuItem value="">Select Network</MenuItem>
-                  {networks.map((net) => (
-                    <MenuItem key={net.id} value={net.id}>
-                      {net.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+            
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
@@ -600,7 +658,7 @@ const RBACpolicies = () => {
                   <StyledTableCell>{policy.object_id}</StyledTableCell>
                   <StyledTableCell>
                     <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined" color="#253848" onClick={() => handleEditClick(policy)}>
+                      <Button variant="outlined"  onClick={() => handleEditClick(policy)}>
                         Update
                       </Button>
                       <Button variant="outlined" color="error" onClick={() => deleteRbacPolicy(policy.id)}>

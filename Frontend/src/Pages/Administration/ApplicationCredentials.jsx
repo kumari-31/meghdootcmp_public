@@ -94,6 +94,11 @@ const ApplicationCredentials = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
+  const [errors, setErrors] = useState({
+    name: "",
+    description: ""
+  });
+  
   // ---------- Snackbar Functions ----------
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
@@ -173,12 +178,30 @@ const ApplicationCredentials = () => {
   };
 
   const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
+  
+    let errorMsg = "";
+  
+    if (name === "name") {
+      if (!/^[A-Za-z0-9_-]{3,30}$/.test(value)) {
+        errorMsg = "Name must be 3–30 characters, only letters, numbers, - and _ allowed.";
+      }
+    }
+  
+    if (name === "description") {
+      if (value && !/^[A-Za-z0-9 .,_-]{3,100}$/.test(value)) {
+        errorMsg = "Description must be 3–100 characters (letters, numbers, spaces allowed).";
+      }
+    }
+  
+    setErrors((prev) => ({ ...prev, [name]: errorMsg }));
+  
     setNewCredential((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: value,
     }));
   };
+  
 
   const handleRoleChange = (e) => {
     const { value } = e.target;
@@ -343,8 +366,28 @@ const ApplicationCredentials = () => {
         <Box sx={modalStyle}>
           <h2>Create Application Credential</h2>
           <form onSubmit={handleCreateCredential}>
-            <TextField fullWidth label="Name" name="name" value={newCredential.name} onChange={handleInputChange} required margin="normal" />
-            <TextField fullWidth label="Description" name="description" value={newCredential.description} onChange={handleInputChange} margin="normal" />
+          <TextField
+            fullWidth
+            label="Name"
+            name="name"
+            value={newCredential.name}
+            onChange={handleInputChange}
+            required
+            margin="normal"
+            error={Boolean(errors.name)}
+            helperText={errors.name}
+          />
+
+          <TextField
+            fullWidth
+            label="Description"
+            name="description"
+            value={newCredential.description}
+            onChange={handleInputChange}
+            margin="normal"
+            error={Boolean(errors.description)}
+            helperText={errors.description}
+          />
             <TextField fullWidth label="Secret" name="secret" value={newCredential.secret} onChange={handleInputChange} margin="normal" required />
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>

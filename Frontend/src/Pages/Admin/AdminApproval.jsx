@@ -19,6 +19,8 @@ import {
   CircularProgress,
   Tooltip,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+
 import '../style.css';
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -28,9 +30,13 @@ import { tableCellClasses } from "@mui/material/TableCell";
 import { GoAlert } from "react-icons/go";
 import apiClient from "../../Axios"; // Update path if required
 
+// Styled Table Components (same as Roles page)
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -39,15 +45,27 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: "#000",
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
+
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
+
   "&:last-child td, &:last-child th": {
     border: 0,
   },
@@ -66,6 +84,8 @@ const AdminApproval = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
 
+
+   const theme = useTheme();
   const [statusFilter, setStatusFilter] = useState("");
   const [filteredRows, setFilteredRows] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -234,7 +254,11 @@ const AdminApproval = () => {
         justifyContent="center"
         sx={{ mt: 4, mb: 3 }}
       >
-        <Paper sx={{ p: 2, minWidth: 220, backgroundColor: "#e3f2fd" }}>
+        <Paper sx={{ p: 2, minWidth: 220, backgroundColor:
+      theme.palette.mode === "dark"
+        ? "#1e293b"   // dark slate
+        : "#e3f2fd",
+    color: theme.palette.mode === "dark" ? "#f1f5f9" : "inherit", }}>
           <Typography variant="subtitle1">Total Pending Requests</Typography>
           <Typography variant="h3" color="primary">
             {counts.pending}
@@ -245,7 +269,9 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: "#e8f5e9",
+            backgroundColor: theme.palette.mode === "dark" ? "#1f3323" : "#e8f5e9",
+            color: theme.palette.mode === "dark" ? "#d1fae5" : "inherit",
+
             cursor: "pointer",
           }}
           onClick={() => handleCardClick("accepted")}
@@ -260,7 +286,9 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: "#ffebee",
+            backgroundColor: theme.palette.mode === "dark" ? "#3b1f22" : "#ffebee",
+            color: theme.palette.mode === "dark" ? "#fecaca" : "inherit",
+
             cursor: "pointer",
           }}
           onClick={() => handleCardClick("rejected")}
@@ -274,7 +302,9 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: "#fff3e0", // Light Orange for failed
+            backgroundColor: theme.palette.mode === "dark" ? "#3b2d1f" : "#fff3e0",
+            color: theme.palette.mode === "dark" ? "#ffedd5" : "inherit",
+ // Light Orange for failed
             cursor: "pointer",
           }}
           onClick={() => handleCardClick("failed")}

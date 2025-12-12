@@ -82,6 +82,11 @@ const Volumes = () => {
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [volumeToUpdate, setVolumeToUpdate] = useState(null);
 
+  const [errors, setErrors] = useState({
+    name: '',
+    description: '',
+  });
+  
   const theme = useTheme(); 
   const [newVolume, setNewVolume] = useState({
     name: '', // Changed from volume_name to name
@@ -229,12 +234,40 @@ const Volumes = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+  
+    // Create a copy of errors
+    let newErrors = { ...errors };
+  
+    // Name validation
+    if (name === 'name') {
+      if (!value) {
+        newErrors.name = 'Name is required';
+      } else if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+        newErrors.name = 'Name can only contain letters, numbers, _ or -';
+      } else if (value.length > 50) {
+        newErrors.name = 'Name cannot exceed 50 characters';
+      } else {
+        newErrors.name = '';
+      }
+    }
+  
+    // Description validation
+    if (name === 'description') {
+      if (value.length > 200) {
+        newErrors.description = 'Description cannot exceed 200 characters';
+      } else {
+        newErrors.description = '';
+      }
+    }
+  
+    setErrors(newErrors);
+  
     setNewVolume((prevState) => ({
       ...prevState,
       [name]: value,
     }));
   };
-
+  
   // Only for status dropdown
   const handleUpdateStatusChange = (e) => {
     const { value } = e.target;
@@ -247,14 +280,16 @@ const Volumes = () => {
   const handleCreateVolume = async (e) => {
     e.preventDefault();
 
-    if (!newVolume.name) { // Use newVolume.name as per API payload
-      alert('Volume Name is required.');
-      return;
-    }
-    if (!newVolume.size || newVolume.size <= 0) {
-      alert('Size must be greater than 0.');
-      return;
-    }
+     // Final validation
+  if (errors.name || errors.description || !newVolume.name) {
+    alert('Please fix the errors before submitting.');
+    return;
+  }
+
+  if (!newVolume.size || newVolume.size <= 0) {
+    alert('Size must be greater than 0.');
+    return;
+  }
 
     const payload = {
       name: newVolume.name,
@@ -426,7 +461,10 @@ const Volumes = () => {
                 name="name" // Changed name to 'name'
                 placeholder="Volume Name"
                 onChange={handleInputChange}
-                value={newVolume.name} // Use newVolume.name
+                value={newVolume.name} 
+                // Use newVolume.name
+                error={!!errors.name}
+                helperText={errors.name}
                 required
               />
             </FormControl>
@@ -447,6 +485,8 @@ const Volumes = () => {
                 name="volume_source"
                 value={newVolume.volume_source}
                 onChange={handleInputChange}
+                error={!!errors.description}
+                helperText={errors.description}
               >
                 <MenuItem value="none">None</MenuItem>
                 <MenuItem value="image">Image</MenuItem>

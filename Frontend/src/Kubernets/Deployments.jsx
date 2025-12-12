@@ -13,22 +13,27 @@ import {
   Typography,
   InputAdornment,
   Box,
-  CircularProgress,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
+  Stack,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
-import { styled, useTheme } from "@mui/material/styles"; // Import useTheme
+import { styled, useTheme } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import apiClient from "../Axios";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
+import "../Pages/style.css";
 
-// Styled Table Components
+// ---------------- Styled Table ----------------
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
-    backgroundColor: "#253848",
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[900]
+        : theme.palette.grey[800],
     color: theme.palette.common.white,
     fontWeight: "bold",
     fontSize: 16,
@@ -37,201 +42,197 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.body}`]: {
     fontSize: 14,
     textAlign: "center",
-    color: theme.palette.text.secondary, // Use theme for consistency
+    color: theme.palette.text.primary,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: "200px",
   },
 }));
 
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
-  backgroundColor: theme.palette.grey[100],
+  backgroundColor:
+    theme.palette.mode === "dark"
+      ? theme.palette.grey[800]
+      : theme.palette.grey[100],
   "&:nth-of-type(odd)": {
-    backgroundColor: theme.palette.grey[300],
+    backgroundColor:
+      theme.palette.mode === "dark"
+        ? theme.palette.grey[700]
+        : theme.palette.grey[300],
   },
   "&:last-child td, &:last-child th": {
     border: 0,
   },
-  '&:hover': { // Add hover effect
-    backgroundColor: theme.palette.action.hover,
-    transition: 'background-color 0.2s ease-in-out',
-  },
 }));
 
+// ---------------- MAIN COMPONENT ----------------
 const Deployments = () => {
   const [allDeployments, setAllDeployments] = useState([]);
   const [deployments, setDeployments] = useState([]);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(7);
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
-
+  const [error, setError] = useState(null);
   const [namespacesForDropdown, setNamespacesForDropdown] = useState(["all"]);
   const [selectedNamespace, setSelectedNamespace] = useState("all");
 
-  const theme = useTheme(); // Initialize useTheme
-  const navigate = useNavigate(); // Initialize useNavigate
+  const theme = useTheme();
+  const navigate = useNavigate();
 
+  // ---------------- Fetch Deployments ----------------
   useEffect(() => {
-    const fetchDeploymentsAndPopulateNamespaces = async () => {
+    const fetchDeployments = async () => {
       setLoading(true);
       try {
         const response = await apiClient.get("/k8s/deployments/");
-        const fetchedDeployments = response.data;
-        setAllDeployments(fetchedDeployments);
+        const data = response.data;
+        setAllDeployments(data);
 
-        const allNamespaces = fetchedDeployments.map(dep => dep.namespace);
-        const uniqueNamespaces = ["all", ...new Set(allNamespaces)].sort();
-        setNamespacesForDropdown(uniqueNamespaces);
-
-        if (!uniqueNamespaces.includes(selectedNamespace)) {
-          setSelectedNamespace(uniqueNamespaces[0] || "all");
-        }
-
-      } catch (error) {
-        console.error("Error fetching deployments or namespaces:", error);
-        setAllDeployments([]);
-        setNamespacesForDropdown(["all"]);
-        setSelectedNamespace("all");
+        const namespaces = ["all", ...new Set(data.map((d) => d.namespace || "default"))];
+        setNamespacesForDropdown(namespaces);
+      } catch (err) {
+        console.error("Error fetching deployments:", err);
+        setError("Failed to load deployments.");
       } finally {
         setLoading(false);
       }
     };
-
-    fetchDeploymentsAndPopulateNamespaces();
-    // eslint-disable-next-line
+    fetchDeployments();
   }, []);
 
+  // ---------------- Filter Deployments ----------------
   useEffect(() => {
-    let currentFilteredDeployments = allDeployments;
+    let filtered = allDeployments;
 
     if (selectedNamespace !== "all") {
-      currentFilteredDeployments = currentFilteredDeployments.filter(
-        (deployment) => deployment.namespace === selectedNamespace
-      );
+      filtered = filtered.filter((d) => d.namespace === selectedNamespace);
     }
 
-    if (searchQuery) {
-      const lowerCaseSearchQuery = searchQuery.toLowerCase();
-      currentFilteredDeployments = currentFilteredDeployments.filter((deployment) =>
-        Object.values(deployment).some(
-          (value) =>
-            (typeof value === "string" && value.toLowerCase().includes(lowerCaseSearchQuery)) ||
-            (typeof value === "number" && value.toString().toLowerCase().includes(lowerCaseSearchQuery)) ||
-            (Array.isArray(value) && value.some(item => // Add array handling for labels if needed
-                typeof item === 'string' && item.toLowerCase().includes(lowerCaseSearchQuery)
-            )) ||
-            (typeof value === "object" && value !== null && !Array.isArray(value) &&
-             JSON.stringify(value).toLowerCase().includes(lowerCaseSearchQuery))
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((d) =>
+        Object.values(d).some(
+          (val) =>
+            (typeof val === "string" && val.toLowerCase().includes(q)) ||
+            (typeof val === "number" && val.toString().toLowerCase().includes(q)) ||
+            (Array.isArray(val) &&
+              val.some((item) => typeof item === "string" && item.toLowerCase().includes(q))) ||
+            (typeof val === "object" && val !== null && JSON.stringify(val).toLowerCase().includes(q))
         )
       );
     }
 
-    setDeployments(currentFilteredDeployments);
+    setDeployments(filtered);
     setPage(0);
   }, [allDeployments, selectedNamespace, searchQuery]);
 
-
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(+event.target.value);
+  const handleChangePage = (_, newPage) => setPage(newPage);
+  const handleChangeRowsPerPage = (e) => {
+    setRowsPerPage(+e.target.value);
     setPage(0);
-  };
-
-  const handleSearchChange = (event) => {
-    setSearchQuery(event.target.value);
-  };
-
-  const handleChangeNamespace = (event) => {
-    setSelectedNamespace(event.target.value);
-  };
-
-  // Handle click on Deployment name to navigate to details
-  const handleNameClick = (name, namespace) => {
-    // This path MUST start with a '/' to be absolute from the root
-    navigate(`/app/kubernetes/deployment-details/${name}?namespace=${namespace}`);
   };
 
   const numberOfColumns = 5;
 
-  return (
-    <Paper
-      sx={{
-        width: "90%",
-        margin: "20px auto",
-        padding: "20px",
-        borderRadius: "10px",
-        boxShadow: 3,
-        bgcolor: theme.palette.background.paper, // Use theme for consistency
-        color: theme.palette.text.primary, // Use theme for consistency
-      }}
-    >
-      <Typography
-        variant="h5"
-        sx={{ marginBottom: 2, textAlign: "left", fontWeight: "bold", color: theme.palette.text.primary }} // Use theme for consistency
+  // ---------------- Loading Cloud ----------------
+  if (loading) {
+    return (
+      <div className="cloud-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+          <path
+            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-back"
+          />
+          <path
+            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+            className="cloud-front"
+          />
+        </svg>
+        <div className="loading-message">Loading...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Stack
+        alignItems="center"
+        justifyContent="center"
+        sx={{ height: "80vh", color: "error.main" }}
       >
-        Kubernetes Deployments
-      </Typography>
+        <Typography variant="h6">{error}</Typography>
+      </Stack>
+    );
+  }
 
-      <Box sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        mb: 2,
-        justifyContent: 'flex-end',
-      }}>
-        <FormControl sx={{ minWidth: 180, flexShrink: 0 }}>
-          <InputLabel id="namespace-select-label" sx={{ color: theme.palette.text.secondary }}>Namespace</InputLabel> {/* Use theme */}
-          <Select
-            labelId="namespace-select-label"
-            id="namespace-select"
-            value={selectedNamespace}
-            label="Namespace"
-            onChange={handleChangeNamespace}
-            sx={{
-              color: theme.palette.text.secondary, // Use theme
-              '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider }, // Use theme
-              '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }, // Use theme
-              '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.primary.main }, // Use theme
+  return (
+    <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
+      {/* ------- Header + Search + Namespace Dropdown ------- */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "20px",
+        }}
+      >
+        <h1>Deployments</h1>
+
+        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+          <FormControl sx={{ minWidth: 180 }}>
+            <InputLabel>Namespace</InputLabel>
+            <Select
+              value={selectedNamespace}
+              label="Namespace"
+              onChange={(e) => setSelectedNamespace(e.target.value)}
+            >
+              {namespacesForDropdown.map((ns) => (
+                <MenuItem value={ns} key={ns}>
+                  {ns === "all" ? "All Namespaces" : ns}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            label="Search Deployments..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            variant="outlined"
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
             }}
-          >
-            {namespacesForDropdown.map((ns) => (
-              <MenuItem key={ns} value={ns} sx={{ color: theme.palette.text.secondary }}> {/* Use theme */}
-                {ns === "all" ? "All Namespaces" : ns}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          />
+        </div>
+      </div>
 
-        <TextField
-          label="Search"
-          variant="outlined"
-          margin="dense"
+      {/* ---------------- TABLE ---------------- */}
+      <TableContainer
+        component={Paper}
+        sx={{
+          width: "fit-content",
+          minWidth: "75%",
+          margin: "0 auto",
+          backgroundColor: "transparent",
+          boxShadow: "none",
+        }}
+      >
+        <Table
           sx={{
-            width: '250px',
-            '& .MuiOutlinedInput-root': {
-              color: theme.palette.text.secondary, // Use theme
-              '& fieldset': { borderColor: theme.palette.divider }, // Use theme
-              '&:hover fieldset': { borderColor: theme.palette.primary.main }, // Use theme
-              '&.Mui-focused fieldset': { borderColor: theme.palette.primary.main }, // Use theme
+            width: "100%",
+            minWidth: 650,
+            border: "none",
+            "& td, & th": {
+              border: "none !important",
             },
-            '& .MuiInputLabel-root': { color: theme.palette.text.secondary }, // Use theme
-            '& .MuiInputLabel-root.Mui-focused': { color: theme.palette.primary.main }, // Use theme
           }}
-          value={searchQuery}
-          onChange={handleSearchChange}
-          InputProps={{
-            endAdornment: (
-              <InputAdornment position="end">
-                <SearchIcon sx={{ color: theme.palette.text.secondary }} /> {/* Use theme */}
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
-
-      <TableContainer sx={{ maxHeight: 600, borderRadius: '8px', overflow: 'auto' }}> {/* Added borderRadius and overflow */}
-        <Table stickyHeader aria-label="deployments table">
+        >
           <TableHead>
             <TableRow>
               <StyledTableCell>Name</StyledTableCell>
@@ -241,16 +242,9 @@ const Deployments = () => {
               <StyledTableCell>Labels</StyledTableCell>
             </TableRow>
           </TableHead>
+
           <TableBody>
-            {loading ? (
-              <StyledTableRow>
-                <StyledTableCell colSpan={numberOfColumns} align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                    <CircularProgress />
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ) : deployments.length === 0 ? (
+            {deployments.length === 0 ? (
               <StyledTableRow>
                 <StyledTableCell colSpan={numberOfColumns} align="center">
                   No Deployments Found
@@ -259,58 +253,54 @@ const Deployments = () => {
             ) : (
               deployments
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((deployment, index) => (
-                  <StyledTableRow key={deployment.name + deployment.namespace + index}>
+                .map((d, i) => (
+                  <StyledTableRow key={d.name + d.namespace + i}>
                     <StyledTableCell>
                       <Typography
                         component="span"
                         sx={{
-                          cursor: 'pointer',
-                          color: theme.palette.primary.main, // Use theme for consistency
-                          fontWeight: 'bold',
-                          '&:hover': { textDecoration: 'underline' }
+                          cursor: "pointer",
+                          color: theme.palette.primary.main,
+                          fontWeight: "bold",
+                          "&:hover": { textDecoration: "underline" },
                         }}
-                        onClick={() => handleNameClick(deployment.name, deployment.namespace || 'default')}
+                        onClick={() =>
+                          navigate(
+                            `/app/kubernetes/deployment-details/${d.name}?namespace=${d.namespace}`
+                          )
+                        }
                       >
-                        {deployment.name}
+                        {d.name}
                       </Typography>
                     </StyledTableCell>
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{deployment.namespace}</StyledTableCell> {/* Use theme */}
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{deployment.replicas !== undefined ? deployment.replicas : 'N/A'}</StyledTableCell> {/* Use theme */}
-                    <StyledTableCell sx={{ color: theme.palette.text.secondary }}>{deployment.available_replicas !== undefined ? deployment.available_replicas : 'N/A'}</StyledTableCell> {/* Use theme */}
-                    <StyledTableCell sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary }}> {/* Use theme */}
-                      {deployment.labels ?
-                        Object.entries(deployment.labels)
-                          .map(([key, value]) => `${key}: ${value}`)
-                          .join(", ")
-                        : 'N/A'
-                      }
+
+                    <StyledTableCell>{d.namespace || "default"}</StyledTableCell>
+                    <StyledTableCell>{d.replicas ?? "N/A"}</StyledTableCell>
+                    <StyledTableCell>{d.available_replicas ?? "N/A"}</StyledTableCell>
+                    <StyledTableCell sx={{ fontSize: "0.75rem" }}>
+                      {d.labels
+                        ? Object.entries(d.labels)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(", ")
+                        : "N/A"}
                     </StyledTableCell>
                   </StyledTableRow>
                 ))
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          component="div"
+          count={deployments.length}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[10, 25, 50]}
+        />
       </TableContainer>
-      <TablePagination
-        rowsPerPageOptions={[10, 25, 50]}
-        component="div"
-        count={deployments.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-        sx={{
-          color: theme.palette.text.secondary, // Use theme
-          '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
-            color: theme.palette.text.secondary, // Use theme
-          },
-          '& .MuiTablePagination-select, & .MuiTablePagination-actions': {
-            color: theme.palette.text.secondary, // Use theme
-          },
-        }}
-      />
-    </Paper>
+    </div>
   );
 };
 

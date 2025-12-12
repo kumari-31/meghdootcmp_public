@@ -70,6 +70,7 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 }));
 
 
+
 const Networks = () => {
   const [networks, setNetworks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +93,13 @@ const Networks = () => {
     is_shared: false,
   });
 
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    subnet_name: "",
+    network_address: "",
+    gateway_ip: "",
+  });
+  
   const fetchNetworks = async () => {
     setError(null);
     try {
@@ -103,6 +111,8 @@ const Networks = () => {
       setLoading(false);
     }
   };
+// Validate network name: only letters, spaces, and underscore allowed
+const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
 
   useEffect(() => {
     fetchNetworks();
@@ -136,6 +146,34 @@ const Networks = () => {
     );
   }
 
+  const validateNetworkField = (name, value) => {
+    let error = "";
+  
+    if (name === "name") {
+      if (!value.trim()) {
+        error = "Network name is required.";
+      } else if (!/^[A-Za-z_\s]+$/.test(value)) {
+        error = "Network name can contain only letters and underscore (_).";
+      }
+    }
+  
+    if (name === "network_address") {
+      const regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\/([0-9]|[1-2][0-9]|3[0-2])$/;
+      if (!regex.test(value)) {
+        error = "Invalid CIDR format, e.g., 192.168.1.0/24";
+      }
+    }
+  
+    if (name === "gateway_ip") {
+      const regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+      if (!regex.test(value)) {
+        error = "Invalid IP address";
+      }
+    }
+  
+    setFormErrors((prev) => ({ ...prev, [name]: error }));
+  };
+  
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     // Filtering logic remains the same, but we'll apply it to the full dataset
@@ -181,90 +219,140 @@ const Networks = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const fieldValue = type === "checkbox" ? checked : value;
+  
     setNewNetwork((prevState) => ({
       ...prevState,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: fieldValue,
     }));
+  
+    validateNetworkField(name, fieldValue); // live validation
   };
+  
 
   const handleUpdateInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+    const fieldValue = type === "checkbox" ? checked : value;
+  
     setNetworkToUpdate((prevState) => ({
       ...prevState,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: fieldValue,
     }));
-  };
-
-  const handleCreateNetwork = async (e) => {
-    e.preventDefault();
-
-    const existingNetwork = networks.find((network) => network.name === newNetwork.name);
-
-    if (existingNetwork) {
-      alert('A network with the same name already exists. Please choose a different name.');
-      return;
+  
+    if (name !== "is_shared") {  // don't validate checkbox
+      validateNetworkField(name, fieldValue);
     }
+  };
+  
 
-    const payload = {
-      name: newNetwork.name,
-      subnet_name: newNetwork.subnet_name,
-      network_address: newNetwork.network_address,
-      gateway_ip: newNetwork.gateway_ip,
+    // Validate CIDR format (e.g., 192.168.1.0/24)
+    const isValidCIDR = (cidr) => {
+      const regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\/([0-9]|[1-2][0-9]|3[0-2])$/;
+      return regex.test(cidr);
     };
+    const handleCreateNetwork = async (e) => {
+      e.preventDefault();
 
-    try {
-      const response = await apiClient.post('/networks/create/', payload);
-      if (response.status === 201 || response.status === 200) {
-        alert('Network created successfully');
-        setShowCreateForm(false);
-        setNewNetwork({
-          name: '',
-          subnet_name: '',
-          network_address: '',
-          gateway_ip: '',
+     
+      // Check for empty fields
+      if (!newNetwork.name || !newNetwork.subnet_name || !newNetwork.network_address || !newNetwork.gateway_ip) {
+        alert("All fields are required");
+        return;
+      }
+    
+      if (!isValidNetworkName(newNetwork.name)) {
+        alert("Network name can contain only alphabets and underscore (_).");
+        return;
+      }
+      // Validate IP address
+      if (!isValidIP(newNetwork.gateway_ip)) {
+        alert("Invalid Gateway IP address");
+        return;
+      }
+    
+      // Validate CIDR
+      if (!isValidCIDR(newNetwork.network_address)) {
+        alert("Invalid Network Address (CIDR format required, e.g., 192.168.1.0/24)");
+        return;
+      }
+    
+      // Check unique network name
+      const existingNetwork = networks.find((network) => network.name === newNetwork.name);
+      if (existingNetwork) {
+        alert('A network with the same name already exists. Please choose a different name.');
+        return;
+      }
+    
+      // Proceed with API request
+      try {
+        const response = await apiClient.post('/networks/create/', {
+          name: newNetwork.name,
+          subnet_name: newNetwork.subnet_name,
+          network_address: newNetwork.network_address,
+          gateway_ip: newNetwork.gateway_ip,
         });
-        fetchNetworks();
-      } else {
-        console.error('Unexpected response:', response);
-        alert('Unexpected response from the server. Please check the inputs and try again.');
+        if (response.status === 201 || response.status === 200) {
+          alert('Network created successfully');
+          setShowCreateForm(false);
+          setNewNetwork({ name: '', subnet_name: '', network_address: '', gateway_ip: '' });
+          fetchNetworks();
+        }
+      } catch (error) {
+        console.error('Error creating network:', error);
+        alert('Error creating network. Please check the inputs and try again.');
       }
-    } catch (error) {
-      console.error('Error creating network:', error);
-      alert('Error creating network. Please check the inputs and try again.');
-    }
-  };
-
-  const handleUpdateNetwork = async (e) => {
-    e.preventDefault();
-
-    if (!networkToUpdate) {
-      alert('No network selected for update.');
-      return;
-    }
-
-    try {
-      const response = await apiClient.put(`/networks/edit/${networkToUpdate.id}/`, {
-        network_name: networkToUpdate.name,
-        is_shared: networkToUpdate.is_shared,
-        subnet_name: networkToUpdate.subnet_name,
-        gateway_ip: networkToUpdate.gateway_ip,
-        cidr: networkToUpdate.network_address,
-      });
-
-      if (response.status === 200) {
-        alert('Network updated successfully');
-        setShowUpdateForm(false);
-        setNetworkToUpdate(null);
-        fetchNetworks();
-      } else {
-        alert('Failed to update the network. Please check the inputs and try again.');
+    };
+    
+    const handleUpdateNetwork = async (e) => {
+      e.preventDefault();
+    
+      if (!networkToUpdate) {
+        alert('No network selected for update.');
+        return;
       }
-    } catch (error) {
-      console.error('Error updating network:', error);
-      alert('An error occurred while updating the network. Please try again later.');
-    }
-  };
 
+      
+    
+      if (!networkToUpdate.name || !networkToUpdate.subnet_name || !networkToUpdate.network_address || !networkToUpdate.gateway_ip) {
+        alert("All fields are required");
+        return;
+      }
+      if (!isValidNetworkName(networkToUpdate.name)) {
+        alert("Network name can contain only alphabets and underscore (_).");
+        return;
+      }
+    
+      if (!isValidIP(networkToUpdate.gateway_ip)) {
+        alert("Invalid Gateway IP address");
+        return;
+      }
+    
+      if (!isValidCIDR(networkToUpdate.network_address)) {
+        alert("Invalid Network Address (CIDR format required, e.g., 192.168.1.0/24)");
+        return;
+      }
+    
+      try {
+        const response = await apiClient.put(`/networks/edit/${networkToUpdate.id}/`, {
+          network_name: networkToUpdate.name,
+          is_shared: networkToUpdate.is_shared,
+          subnet_name: networkToUpdate.subnet_name,
+          gateway_ip: networkToUpdate.gateway_ip,
+          cidr: networkToUpdate.network_address,
+        });
+    
+        if (response.status === 200) {
+          alert('Network updated successfully');
+          setShowUpdateForm(false);
+          setNetworkToUpdate(null);
+          fetchNetworks();
+        }
+      } catch (error) {
+        console.error('Error updating network:', error);
+        alert('An error occurred while updating the network. Please try again later.');
+      }
+    };
+    
   const handleDeleteSelectedNetworks = async () => {
     if (selectedNetworks.length === 0) {
       alert('No networks selected for deletion');
@@ -362,10 +450,13 @@ const Networks = () => {
             Create New Network
           </Typography>
           <form onSubmit={handleCreateNetwork}>
-            <TextField label="Name" name="name" onChange={handleInputChange} value={newNetwork.name} fullWidth margin="normal" required />
+            <TextField label="Name" name="name" onChange={handleInputChange} value={newNetwork.name} fullWidth margin="normal" required  error={!!formErrors.name}
+  helperText={formErrors.name}/>
             <TextField label="Subnet Name" name="subnet_name" onChange={handleInputChange} value={newNetwork.subnet_name} fullWidth margin="normal" required />
-            <TextField label="Network Address" name="network_address" onChange={handleInputChange} value={newNetwork.network_address} fullWidth margin="normal" required />
-            <TextField label="Gateway IP" name="gateway_ip" onChange={handleInputChange} value={newNetwork.gateway_ip} fullWidth margin="normal" required />
+            <TextField label="Network Address" name="network_address" onChange={handleInputChange} value={newNetwork.network_address} fullWidth margin="normal" required error={!!formErrors.network_address}
+  helperText={formErrors.network_address} />
+            <TextField label="Gateway IP" name="gateway_ip" onChange={handleInputChange} value={newNetwork.gateway_ip} fullWidth margin="normal" required error={!!formErrors.gateway_ip}
+  helperText={formErrors.gateway_ip}/>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
                 Create
@@ -384,10 +475,13 @@ const Networks = () => {
             Update Network
           </Typography>
           <form onSubmit={handleUpdateNetwork}>
-            <TextField label="Name" name="name" onChange={handleUpdateInputChange} value={networkToUpdate?.name || ''} fullWidth margin="normal" required />
+            <TextField label="Name" name="name" onChange={handleUpdateInputChange} value={networkToUpdate?.name || ''} fullWidth margin="normal" required  error={!!formErrors.name}
+  helperText={formErrors.name}/>
             <TextField label="Subnet Name" name="subnet_name" onChange={handleUpdateInputChange} value={networkToUpdate?.subnet_name || ''} fullWidth margin="normal" required />
-            <TextField label="Gateway IP" name="gateway_ip" onChange={handleUpdateInputChange} value={networkToUpdate?.gateway_ip || ''} fullWidth margin="normal" required />
-            <TextField label="Network Address (CIDR)" name="network_address" onChange={handleUpdateInputChange} value={networkToUpdate?.network_address || ''} fullWidth margin="normal" required />
+            <TextField label="Gateway IP" name="gateway_ip" onChange={handleUpdateInputChange} value={networkToUpdate?.gateway_ip || ''} fullWidth margin="normal" required error={!!formErrors.gateway_ip}
+  helperText={formErrors.gateway_ip} />
+            <TextField label="Network Address (CIDR)" name="network_address" onChange={handleUpdateInputChange} value={networkToUpdate?.network_address || ''} fullWidth margin="normal" required error={!!formErrors.network_address}
+  helperText={formErrors.network_address} />
             <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
               <Typography component="label" sx={{ mr: 2 }}>
                 Shared
