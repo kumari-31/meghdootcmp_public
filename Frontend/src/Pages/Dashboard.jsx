@@ -318,6 +318,58 @@ const [showK8s, setShowK8s] = useState(false);
 
   const [date, setDate] = useState(new Date());
 
+// ----------- Add this helper here -----------
+const fetchVmRequests = async ({ date = null, page = 1, size = 500 }) => {
+  try {
+    if (date) {
+      // Fetch filtered by date
+      const res = await apiClient.get(`/vm-requests/filter-by-date/?date=${date}`);
+      const data = res.data.data || [];
+
+      // Calculate counts
+      const accepted = data.filter(r => r.admin_status === "Accepted").length;
+      const rejected = data.filter(r => r.admin_status === "Rejected" || r.fla_status === "Rejected").length;
+      const pending = data.length - accepted - rejected;
+
+      return {
+        total: data.length,
+        pending,
+        accepted,
+        rejected,
+        raw: data,
+      };
+    } else {
+      // Fetch overall
+      const res = await apiClient.get(`/vmdetails/overview/?page=${page}&size=${size}`);
+      const data = res.data;
+
+      return {
+        total: data.total_records || 0,
+        pending: data.status_counts?.pending || 0,
+        accepted: data.status_counts?.accepted || 0,
+        rejected: data.status_counts?.rejected || 0,
+        raw: data.data || [],
+      };
+    }
+  } catch (err) {
+    console.error("fetchVmRequests Error:", err);
+    return {
+      total: 0,
+      pending: 0,
+      accepted: 0,
+      rejected: 0,
+      raw: [],
+    };
+  }
+};
+
+
+
+
+
+
+
+
 const openstackPaged = openstackReq.raw?.slice(osPage * 5, (osPage + 1) * 5);
 const handleOSPageChange = (_, newPage) => setOSPage(newPage);
 
@@ -340,25 +392,30 @@ const handleK8sPageChange = (_, newPage) => setK8sPage(newPage);
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiClient.get("/vmdetails/overview/?page=1&size=500");
-        const data = res.data;
-
+        // If no date selected, fetch overall
+        const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
+  
+        // Fetch data from API
+        const data = await fetchVmRequests({ date: dateString });
+  
+        // Optional: calculate today count only when no date filter
         const todayCount =
-          data.data?.filter((vm) => dayjs(vm.created_at).isToday()).length || 0;
-
+          !dateString && data.raw.length
+            ? data.raw.filter(vm => dayjs(vm.request_timestamp).isToday()).length
+            : 0;
+  
+        // Update state
         setOpenstackReq({
-          total: data.total_records || 0,
-          pending: data.status_counts?.pending || 0,
-          accepted: data.status_counts?.accepted || 0,
-          rejected: data.status_counts?.rejected || 0,
+          ...data,
           today: todayCount,
-          raw: data.data || [],
         });
       } catch (err) {
-        console.error("OS Overview Error:", err);
+        console.error("OpenStack Requests Error:", err);
       }
     })();
-  }, []);
+  }, [date]); // <--- Important: re-run whenever 'date' changes
+  
+  
 
   // K8s service requests
   // Kubernetes Service Requests (Pending etc.)
@@ -913,7 +970,10 @@ const tableStyles = {
                 "& .react-calendar__tile": { padding: "6px 4px" },
               }}
             >
-              <Calendar onChange={setDate} value={date} />
+              <Calendar
+  onChange={(selectedDate) => setDate(selectedDate)}
+  value={date}
+/>
             </Box>
           </GlassCard>
         </Grid>
@@ -1150,7 +1210,6 @@ const tableStyles = {
     </Box>
   );
 }
-
 // import React, { useEffect, useState } from "react";
 // // import Cardone from "../Components/Cardone";
 // import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";

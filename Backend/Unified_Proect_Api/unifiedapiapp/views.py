@@ -18453,3 +18453,4 @@ class K8sOverviewAPIView(APIView):
             "nodes": node_list,
             "services": service_list
         }, status=status.HTTP_200_OK)
+
