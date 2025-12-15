@@ -166,6 +166,8 @@ urlpatterns = [
     path("api/vmrequests/delete/admin/", VMDeleteAdminApprovalAPIView.as_view(), name="vm-delete-admin"),
     path("api/vmrequests/delete/pending/", VMPendingDeleteRequestsAPIView.as_view(), name="vm-delete-pending"),
     path("api/vm-request/reject/", VmRequestRejectionReasonAPIView.as_view(), name="reject-vms"),
+    path("api/openstack/requests-by-date/", OpenStackRequestsByDateAPIView.as_view(), name="openstack-requests-by-date"),
+
 
     # -------------------------------
     # 6️⃣ Kubernetes APIs
@@ -199,6 +201,7 @@ urlpatterns = [
     path("api/k8s/workloadstati/", WorkloadStatsAPIView.as_view(), name="k8s-workloads"),
     path("api/persistent-volumes/", PersistentVolumeListAPIView.as_view(), name="persistent-volumes"),
     path("api/kube-volume-details/", PersistentVolumeDetailAPIView.as_view(), name="volume-details"),
+    path("api/kubernetes/requests-by-date/", K8sRequestsByDateAPIView.as_view(), name="kubernetes-requests-by-date"),
 
     # -------------------------------
     # 7️⃣ Kubernetes Service Request APIs

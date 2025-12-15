@@ -63,6 +63,7 @@ class VmRequest(models.Model):
     request_timestamp = models.DateTimeField(null=True, blank=True)
     fla_approved_timestamp = models.DateTimeField(null=True, blank=True)
     admin_approved_timestamp = models.DateTimeField(null=True, blank=True)
+    admin_action_timestamp = models.DateTimeField(null=True, blank=True)
     creation_status = models.TextField(blank=True, null=True)
     fla_rejection_reason = models.TextField(blank=True, null=True)
     admin_rejection_reason = models.TextField(blank=True, null=True)
