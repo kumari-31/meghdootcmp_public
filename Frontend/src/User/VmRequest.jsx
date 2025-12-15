@@ -1,4 +1,4 @@
-import  { useState, useEffect, useCallback ,useRef} from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import axios from "axios";
 import apiClient from "../Axios";
 import { useAuth } from "../Pages/Authentication/authContext";
@@ -69,6 +69,11 @@ const VmRequest = () => {
     severity: "success", // "success" | "error"
   });
 
+  const enableDateRef = useRef(null);
+  const enableTimeRef = useRef(null);
+  const disableDateRef = useRef(null);
+  const disableTimeRef = useRef(null);
+
   useEffect(() => {
     apiClient
       .get("/flavorslist/")
@@ -84,36 +89,35 @@ const VmRequest = () => {
     setAnchorEl(null);
   };
 
- const cancelRequest = useRef(null);
-const debounceTimer = useRef(null);
+  const cancelRequest = useRef(null);
+  const debounceTimer = useRef(null);
 
   const getTrimmedName = (name) => {
     const parts = name.split("_");
     return parts.length > 1 ? parts.slice(1).join("_") : name;
   };
 
+  const checkVMName = useCallback(
+    async (name) => {
+      if (!name) {
+        setIsAvailable(null);
+        setMessage("");
+        return;
+      }
 
-const checkVMName = useCallback(
-  async (name) => {
-    if (!name) {
-      setIsAvailable(null);
-      setMessage("");
-      return;
-    }
-
-    try {
-      const trimmedName = getTrimmedName(name);
+      try {
+        const trimmedName = getTrimmedName(name);
         // Cancel previous request if still in progress
-    if (cancelRequest.current) {
-      cancelRequest.current.cancel("Cancelled stale request");
-    }
+        if (cancelRequest.current) {
+          cancelRequest.current.cancel("Cancelled stale request");
+        }
 
-    cancelRequest.current = axios.CancelToken.source();
+        cancelRequest.current = axios.CancelToken.source();
 
-      const response = await apiClient.get("/check-vm-name/", {
-        params: { vm_name: trimmedName },
-        cancelToken: cancelRequest.current.token,
-      });
+        const response = await apiClient.get("/check-vm-name/", {
+          params: { vm_name: trimmedName },
+          cancelToken: cancelRequest.current.token,
+        });
 
         setIsAvailable(!response.data.exists);
         setMessage(response.data.message);
@@ -124,20 +128,20 @@ const checkVMName = useCallback(
       }
     },
     [] // add dependencies if needed
-);
+  );
 
   // Native debounce using useCallback and setTimeout
   // eslint-disable-next-line
-  
-const debouncedCheck = useCallback(
-  (name) => {
-    clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(() => {
-      checkVMName(name);
-    }, 800); // Adjust delay for your UX
-  },
-  [checkVMName]
-);
+
+  const debouncedCheck = useCallback(
+    (name) => {
+      clearTimeout(debounceTimer.current);
+      debounceTimer.current = setTimeout(() => {
+        checkVMName(name);
+      }, 800); // Adjust delay for your UX
+    },
+    [checkVMName]
+  );
 
   useEffect(() => {
     debouncedCheck(vmName);
@@ -225,6 +229,19 @@ const debouncedCheck = useCallback(
     }
   }, [user]);
 
+  useEffect(() => {
+    const now = new Date();
+
+    const currentDate = now.toISOString().split("T")[0]; // YYYY-MM-DD
+    const currentTime = now.toTimeString().slice(0, 5); // HH:MM
+
+    setFormData((prev) => ({
+      ...prev,
+      login_enable_date: prev.login_enable_date || currentDate,
+      login_enable_time: prev.login_enable_time || currentTime,
+    }));
+  }, []);
+
   // Submit form data to API
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -296,30 +313,6 @@ const debouncedCheck = useCallback(
             <Paper elevation={2} style={{ padding: "20px", marginTop: "20px" }}>
               <form onSubmit={handleSubmit}>
                 <Grid2 container spacing={2}>
-                  {/* <Grid2 size={6}>
-              <TextField
-                label="Employee ID"
-                value={formData.employee_id}
-                fullWidth
-                readOnly
-              />
-            </Grid2>
-            <Grid2 size={6}>
-              <TextField
-                label="Employee Name"
-                value={formData.name}
-                fullWidth
-                readOnly
-              />
-            </Grid2>
-            <Grid2 size={6}>
-              <TextField
-                label="Email"
-                value={formData.email}
-                fullWidth
-                readOnly
-              />
-            </Grid2> */}
                   <Grid2 size={6}>
                     {" "}
                     <FormControl fullWidth required>
@@ -352,11 +345,6 @@ const debouncedCheck = useCallback(
                         helperText={message}
                         error={isAvailable === false}
                       />
-                      {/* {isAvailable !== null && (
-        <Typography color={isAvailable ? "green" : "red"}>
-          {isAvailable ? "VM name is available" : "VM name is already taken"}
-        </Typography>
-      )} */}
                     </div>
                   </Grid2>
                   <Grid2 size={6}>
@@ -421,20 +409,6 @@ const debouncedCheck = useCallback(
                       required
                     />
                   </Grid2>
-                  {/* <Grid2 size={8}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={formData.vdi_required}
-                    onChange={handleChange}
-                    name="vdi_required"
-                  />
-                }
-                label="VDI Required"
-              />
-            </Grid2> */}
-                  {/* {formData.vdi_required && (
-              <> */}
                   <Grid2 size={6}>
                     <Autocomplete
                       options={imageOptions}
@@ -530,6 +504,8 @@ const debouncedCheck = useCallback(
                       type="date"
                       value={formData.login_enable_date}
                       onChange={handleChange}
+                      inputRef={enableDateRef}
+                      onFocus={() => enableDateRef.current.showPicker?.()}
                       fullWidth
                       required
                       slotProps={{ inputLabel: { shrink: true } }}
@@ -542,6 +518,8 @@ const debouncedCheck = useCallback(
                       type="time"
                       value={formData.login_enable_time}
                       onChange={handleChange}
+                      inputRef={enableTimeRef}
+                      onFocus={() => enableTimeRef.current.showPicker?.()}
                       fullWidth
                       required
                       slotProps={{ inputLabel: { shrink: true } }}
@@ -554,6 +532,8 @@ const debouncedCheck = useCallback(
                       type="date"
                       value={formData.login_disable_date}
                       onChange={handleChange}
+                      inputRef={disableDateRef}
+                      onFocus={() => disableDateRef.current.showPicker?.()}
                       fullWidth
                       required
                       slotProps={{ inputLabel: { shrink: true } }}
@@ -566,6 +546,8 @@ const debouncedCheck = useCallback(
                       type="time"
                       value={formData.login_disable_time}
                       onChange={handleChange}
+                      inputRef={disableTimeRef}
+                      onFocus={() => disableTimeRef.current.showPicker?.()}
                       fullWidth
                       required
                       slotProps={{ inputLabel: { shrink: true } }}
@@ -597,8 +579,7 @@ const debouncedCheck = useCallback(
                       />
                     </Grid2>
                   )}
-                  {/* </>
-          )} */}
+
                   <Grid2 item xs={12} className="sbt-btn">
                     <Button type="submit" variant="contained" color="primary">
                       Submit Request

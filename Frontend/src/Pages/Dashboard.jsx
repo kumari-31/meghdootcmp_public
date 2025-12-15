@@ -318,56 +318,21 @@ const [showK8s, setShowK8s] = useState(false);
 
   const [date, setDate] = useState(new Date());
 
-// ----------- Add this helper here -----------
-const fetchVmRequests = async ({ date = null, page = 1, size = 500 }) => {
-  try {
-    if (date) {
-      // Fetch filtered by date
-      const res = await apiClient.get(`/vm-requests/filter-by-date/?date=${date}`);
-      const data = res.data.data || [];
+  const [selectedDate, setSelectedDate] = useState(null);
+const [osData, setOsData] = useState([]);
+const [kubeData, setKubeData] = useState([]);
 
-      // Calculate counts
-      const accepted = data.filter(r => r.admin_status === "Accepted").length;
-      const rejected = data.filter(r => r.admin_status === "Rejected" || r.fla_status === "Rejected").length;
-      const pending = data.length - accepted - rejected;
+const [osCounts, setOsCounts] = useState({
+  pending: 0,
+  accepted: 0,
+  rejected: 0,
+});
 
-      return {
-        total: data.length,
-        pending,
-        accepted,
-        rejected,
-        raw: data,
-      };
-    } else {
-      // Fetch overall
-      const res = await apiClient.get(`/vmdetails/overview/?page=${page}&size=${size}`);
-      const data = res.data;
-
-      return {
-        total: data.total_records || 0,
-        pending: data.status_counts?.pending || 0,
-        accepted: data.status_counts?.accepted || 0,
-        rejected: data.status_counts?.rejected || 0,
-        raw: data.data || [],
-      };
-    }
-  } catch (err) {
-    console.error("fetchVmRequests Error:", err);
-    return {
-      total: 0,
-      pending: 0,
-      accepted: 0,
-      rejected: 0,
-      raw: [],
-    };
-  }
-};
-
-
-
-
-
-
+const [k8sCounts, setK8sCounts] = useState({
+  pending: 0,
+  accepted: 0,
+  rejected: 0,
+});
 
 
 const openstackPaged = openstackReq.raw?.slice(osPage * 5, (osPage + 1) * 5);
@@ -375,6 +340,67 @@ const handleOSPageChange = (_, newPage) => setOSPage(newPage);
 
 const k8sPaged = k8sReq.raw?.slice(k8sPage * 5, (k8sPage + 1) * 5);
 const handleK8sPageChange = (_, newPage) => setK8sPage(newPage);
+
+
+const fetchDashboardData = async (date) => {
+  const formatted = date ? dayjs(date).format("YYYY-MM-DD") : null;
+
+  try {
+    const osRes = await apiClient.get(
+      `/openstack/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+    );
+
+    const k8sRes = await apiClient.get(
+      `/kubernetes/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+    );
+
+    // -------------------------
+    // OPENSTACK (DATE-BASED)
+    // -------------------------
+    setOsCounts({
+      pending: osRes.data.pending || 0,
+      accepted: osRes.data.approved || 0,
+      rejected: osRes.data.rejected || 0,
+    });
+
+    setOpenstackReq((prev) => ({
+      ...prev,
+      raw: osRes.data.records || [],
+    }));
+
+    // -------------------------
+    // KUBERNETES (DATE-BASED)
+    // -------------------------
+    setK8sCounts({
+      pending: k8sRes.data.pending || 0,
+      accepted: k8sRes.data.approved || 0,
+      rejected: k8sRes.data.rejected || 0,
+    });
+
+    setK8sReq((prev) => ({
+      ...prev,
+      raw: k8sRes.data.records || [],
+    }));
+
+    // Reset pagination
+    setOSPage(0);
+    setK8sPage(0);
+
+  } catch (error) {
+    console.error("Date filtered dashboard error:", error);
+  }
+};
+
+useEffect(() => {
+  fetchDashboardData(selectedDate);
+}, [selectedDate]);
+
+// --------------------------------------------
+// DATE CHANGE HANDLER (Calendar Picker)
+// --------------------------------------------
+const handleDateChange = (newValue) => {
+  setSelectedDate(newValue);
+};
 
   // Fetch overview (your /overview)
   useEffect(() => {
@@ -647,9 +673,9 @@ const tableStyles = {
             <StatTile
               icon={<HourglassEmptyIcon />}
               title="OpenStack Request Pending"
-              value={openstackReq.pending}
+              value={osCounts.pending}
               sparkData={openstackPendingTrend}
-              delta={openstackReq.pending > 0 ? "+2%" : "-"}
+              delta={osCounts.pending > 0 ? "+2%" : "-"}
               color="var(--openstack-color)"
               badge="OPENSTACK"
             />
@@ -661,9 +687,9 @@ const tableStyles = {
             <StatTile
               icon={<CloudIcon />} // choose icon of Kubernetes style
               title="Kubernetes Request Pending"
-              value={k8sReq.pending}
+              value={k8sCounts.pending}
               sparkData={k8sPendingTrend}
-              delta={k8sReq.pending > 0 ? "+1%" : "-"}
+              delta={k8sCounts.pending > 0 ? "+1%" : "-"}
               color="var(--k8s-color)" // e.g. Blue
               badge="KUBERNETES"
             />
@@ -952,7 +978,7 @@ const tableStyles = {
         <Grid item xs={12} md={3}>
           <GlassCard sx={{ p: 2, minHeight: 220 }}>
             <Typography variant="subtitle2" color="text.secondary">
-              Maintenance Calendar
+              Maintenance  Calendar
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               Planned maintenance
@@ -970,10 +996,7 @@ const tableStyles = {
                 "& .react-calendar__tile": { padding: "6px 4px" },
               }}
             >
-              <Calendar
-  onChange={(selectedDate) => setDate(selectedDate)}
-  value={date}
-/>
+              <Calendar onChange={handleDateChange} value={selectedDate} />
             </Box>
           </GlassCard>
         </Grid>
@@ -987,7 +1010,7 @@ const tableStyles = {
             <StatTile
               icon={<CheckCircleIcon />}
               title="OpenStack Accepted Request"
-              value={openstackReq.accepted}
+              value={osCounts.accepted}
               sparkData={getDailyTrend(openstackReq.raw, "Accepted")}
               delta={openstackReq.accepted > 0 ? "+3%" : "-"}
               color="var(--openstack-color)"
@@ -1002,7 +1025,7 @@ const tableStyles = {
             <StatTile
               icon={<CheckCircleIcon />}
               title="Kubernetes Accepted Request"
-              value={k8sReq.accepted}
+              value={k8sCounts.accepted}
               sparkData={getDailyTrend(k8sReq.raw, "Accepted")}
               delta={k8sReq.accepted > 0 ? "+2%" : "-"}
               color="var(--k8s-color)"
@@ -1017,7 +1040,7 @@ const tableStyles = {
             <StatTile
               icon={<CancelIcon />}
               title="OpenStack Rejected Request"
-              value={openstackReq.rejected}
+              value={osCounts.rejected}
               sparkData={getDailyTrend(openstackReq.raw, "Rejected")}
               delta={openstackReq.rejected > 0 ? "+1%" : "-"}
               color="#FFB3B3"
@@ -1032,7 +1055,7 @@ const tableStyles = {
             <StatTile
               icon={<CancelIcon />}
               title="Kubernetes Rejected Request "
-              value={k8sReq.rejected}
+              value={k8sCounts.rejected}
               sparkData={getDailyTrend(k8sReq.raw, "Rejected")}
               delta={k8sReq.rejected > 0 ? "+1%" : "-"}
               color="#FFB3B3"

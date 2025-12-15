@@ -6184,6 +6184,7 @@ class VmRequestStatusUpdateAPIView(APIView):
                     vm_request.creation_status = "Success"
                     vm_request.creation_error_message = None
                     vm_request.admin_approved_timestamp = timezone.now()
+                    vm_request.admin_action_timestamp = timezone.now()
                     vm_request.save()
 
                     return Response(
@@ -6192,8 +6193,8 @@ class VmRequestStatusUpdateAPIView(APIView):
                     )
 
                 else:
-                    vm_request.admin_status = new_status
-                    vm_request.admin_approved_timestamp = timezone.now()
+                    vm_request.admin_status = "Rejected"
+                    vm_request.admin_action_timestamp = timezone.now()
                 vm_request.save()
 
             else:
@@ -8573,21 +8574,8 @@ class VMDeleteAdminApprovalAPIView(APIView):
                     print("Guacamole connection deletion failed:",
                       getattr(delete_conn_resp, "text", delete_conn_resp))
                     
-            # -----------------------------------
-            # 2️⃣ DELETE GUACAMOLE USER IF NO OTHER VM USES IT
-            # -----------------------------------
-            other_vms_using_user = VMInfo.objects.filter(username=guac_username).exclude(vm_name=vm_name).exists()
-
-            if not other_vms_using_user:
-                delete_user_resp = delete_guac_user(guac_username, authToken)
-
-                if delete_user_resp.status_code in [200, 204]:
-                    print(f"Guacamole User Deleted: {guac_username}")
-                else:
-                    print("Guacamole user deletion failed:",
-                        getattr(delete_user_resp, "text", delete_user_resp))
-            else:
-                print("User NOT deleted — still used by another VM")
+  
+                print(f"Skipping deletion of Guacamole user '{guac_username}' as requested")
 
 
             # -----------------------------------
@@ -12214,6 +12202,7 @@ class VMExpiryNotificationAPIView(APIView):
         user_role = self.get_user_role_from_token(request)
         print(f"User role: {user_role}")
 
+
         # Base query for VMs expiring within the next 7 days
         if user_role.upper() == "ADMIN":
             # For admin, get all VMs expiring between today and 7 days from now
@@ -12602,6 +12591,127 @@ class HypervisorDataAPIView(APIView):
                 "resource_providers": resource_providers,
             }
         )
+    
+from django.utils.dateparse import parse_date
+
+class OpenStackRequestsByDateAPIView(APIView):
+    def get(self, request):
+        date_str = request.GET.get("date")
+        selected_date = parse_date(date_str) if date_str else None
+
+        if date_str and not selected_date:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # -----------------------------
+        # BASE QUERYSETS
+        # -----------------------------
+        base_qs = VmRequest.objects.all()
+
+        # -----------------------------
+        # COUNTS
+        # -----------------------------
+        pending_qs = base_qs.filter(admin_status="Pending")
+        approved_qs = base_qs.filter(admin_status="Accepted")
+        rejected_qs = base_qs.filter(admin_status="Rejected")
+
+        if selected_date:
+            pending_qs = pending_qs.filter(
+                request_timestamp__date=selected_date
+            )
+            approved_qs = approved_qs.filter(
+                admin_approved_timestamp__date=selected_date
+            )
+            rejected_qs = rejected_qs.filter(
+                admin_action_timestamp__date=selected_date
+            )
+
+        # -----------------------------
+        # TABLE DATA
+        # -----------------------------
+        table_qs = base_qs
+        if selected_date:
+            table_qs = base_qs.filter(
+                Q(request_timestamp__date=selected_date) |
+                Q(admin_approved_timestamp__date=selected_date) |
+                Q(admin_action_timestamp__date=selected_date)
+            )
+
+        table_data = table_qs.values(
+            "vm_name",
+            "employee_id",
+            "project_name",
+            "admin_status",
+            "fla_status",
+            "request_timestamp",
+        )
+        print("Table Data:", list(table_data))
+        return Response({
+            "date": selected_date,
+            "pending": pending_qs.count(),
+            "approved": approved_qs.count(),
+            "rejected": rejected_qs.count(),
+            "records": list(table_data),
+        })
+
+
+class K8sRequestsByDateAPIView(APIView):
+    def get(self, request):
+        date_str = request.GET.get("date")
+        selected_date = parse_date(date_str) if date_str else None
+
+        if date_str and not selected_date:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        base_qs = ServiceRequest.objects.all()
+
+        pending_qs = base_qs.filter(admin_status="Pending")
+        approved_qs = base_qs.filter(admin_status="Accepted")
+        rejected_qs = base_qs.filter(admin_status="Rejected")
+
+        if selected_date:
+            pending_qs = pending_qs.filter(
+                request_timestamp__date=selected_date
+            )
+            approved_qs = approved_qs.filter(
+                admin_approved_timestamp__date=selected_date
+            )
+            rejected_qs = rejected_qs.filter(
+                admin_action_timestamp__date=selected_date
+            )
+
+        table_qs = base_qs
+        if selected_date:
+            table_qs = base_qs.filter(
+                Q(request_timestamp__date=selected_date) |
+                Q(admin_approved_timestamp__date=selected_date) |
+                Q(admin_action_timestamp__date=selected_date)
+            )
+
+        table_data = table_qs.values(
+            "service_name",
+            "employee_id",
+            "project_name",
+            "admin_status",
+            "fla_status",
+            "request_timestamp",
+        )
+        print("Table Data:", list(table_data))
+        return Response({
+            "date": selected_date,
+            "pending": pending_qs.count(),
+            "approved": approved_qs.count(),
+            "rejected": rejected_qs.count(),
+            "records": list(table_data),
+        })
+
+
+
 
 
 # ------------------------2 June 2025--------------------------
@@ -14283,18 +14393,13 @@ class ServiceRequestPendingAdminAPIView(APIView):
 
             service_request = ServiceRequest.objects.get(id=request_id)
             service_request.admin_status = new_status
-            service_request.admin_approved_timestamp = timezone.now()
-            if remarks:
-                service_request.admin_remarks = remarks
-            service_request.save()
+            service_request.admin_action_timestamp = timezone.now()
+            if new_status == "Accepted":
+                service_request.admin_approved_timestamp = timezone.now()
+            else:  # Rejected
+                service_request.admin_approved_timestamp = None
+                service_request.admin_rejection_reason = remarks
 
-            # pod_name = f"{service_request.app_name}-service-{request_id}"
-
-            service_request = ServiceRequest.objects.get(id=request_id)
-            service_request.admin_status = new_status
-            service_request.admin_approved_timestamp = timezone.now()
-            if remarks:
-                service_request.admin_remarks = remarks
             service_request.save()
 
             # Retrieve app_name from service_request

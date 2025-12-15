@@ -247,24 +247,22 @@ OPENSTACK_MEMBER_ROLE = (
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_USE_TLS = False
-EMAIL_USE_SSL = True
-EMAIL_PORT = 465
-# EMAIL_HOST_USER = "rakshanavg20@gmail.com"
-EMAIL_HOST_USER = "tejascdac97@gmail.com"
-# EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
-EMAIL_HOST_PASSWORD = "aqdx gfas pghz snqi "
-DEFAULT_FROM_EMAIL = "tejascdac97@gmail.com"
-SERVER_EMAIL = "tejascdac97@gmail.com"
-# EMAIL_HOST = "smtp.cdac.in"
-# EMAIL_USE_TLS = True
-# EMAIL_USE_SSL = False
-# EMAIL_PORT = 587
-# EMAIL_HOST_USER = "cloud-chn@cdac.in"
-# EMAIL_HOST_PASSWORD = "MeghdooT"
-
-
+# EMAIL_HOST = "smtp.gmail.com"
+# EMAIL_USE_TLS = False
+# EMAIL_USE_SSL = True
+# EMAIL_PORT = 465
+# # EMAIL_HOST_USER = "rakshanavg20@gmail.com"
+# EMAIL_HOST_USER = "tejascdac97@gmail.com"
+# # EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
+# EMAIL_HOST_PASSWORD = "aqdx gfas pghz snqi "
+# DEFAULT_FROM_EMAIL = "tejascdac97@gmail.com"
+# SERVER_EMAIL = "tejascdac97@gmail.com"
+EMAIL_HOST = "smtp.cdac.in"
+EMAIL_USE_TLS = True
+EMAIL_USE_SSL = False
+EMAIL_PORT = 587
+EMAIL_HOST_USER = "cloud-chn@cdac.in"
+EMAIL_HOST_PASSWORD = "MeghdooT"
 DEFAULT_FROM_EMAIL = "cloud-chn@cdac.in"
 SERVER_EMAIL = "cloud-chn@cdac.in"
 
