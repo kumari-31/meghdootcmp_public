@@ -24,6 +24,8 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useEffect, useState } from "react";
 import apiClient from "../Axios";
+import { useNotificationRefresh } from "../Components/PendingRequestContext";
+
 
 // Styled Table Components (same as Roles page)
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -96,6 +98,9 @@ const AdminServiceApproval = () => {
     data: [],
   });
 
+
+const { triggerNotificationRefresh } = useNotificationRefresh();
+
   // ✅ Fetch function (moved outside useEffect)
   const fetchRequests = async () => {
     try {
@@ -144,7 +149,7 @@ const AdminServiceApproval = () => {
 
       if (response.status === 200) {
         await fetchRequests(); // 🔥 Auto refresh
-
+        triggerNotificationRefresh();
         setAlertDialog({
           open: true,
           message: `Request ${status} successfully.`,
@@ -179,7 +184,7 @@ const AdminServiceApproval = () => {
 
       if (response.status === 200) {
         await fetchRequests(); // 🔥 Auto refresh
-
+        triggerNotificationRefresh();
         setAlertDialog({
           open: true,
           message: "Request rejected successfully.",

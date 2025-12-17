@@ -207,7 +207,8 @@ def create_bootable_volume(
             VmRequest.objects.filter(id=vm_req_id).update(
                 creation_status="Failed", creation_error_message=error_message
             )
-            return None, None, error_message
+            return None, None, None, error_message
+
 
         # Volume ready, create VM
         if volume.status == "available":
@@ -228,7 +229,7 @@ def create_bootable_volume(
             if vm_instance["status"]:
                 vm_req_obj.creation_status = "Created"
                 vm_req_obj.creation_error_message = None
-                vm_req_obj.save()
+                # vm_req_obj.save()
             else:
                 vm_req_obj.creation_status = "Failed"
                 vm_req_obj.creation_error_message = vm_instance.get(
@@ -252,7 +253,8 @@ def create_bootable_volume(
 
         # Unexpected status
         print(f"Volume {created_volume_id} is in unexpected status: {volume.status}")
-        return None, None, f"Volume in unexpected status: {volume.status}"
+        return None, None, None, f"Volume in unexpected status: {volume.status}"
+
 
     except Exception as e:
         import traceback

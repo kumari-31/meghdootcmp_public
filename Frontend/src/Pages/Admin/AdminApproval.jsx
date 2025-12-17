@@ -16,15 +16,15 @@ import {
   DialogActions,
   Button,
   TextField,
-  CircularProgress,
   Tooltip,
+  Checkbox,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-
-import '../style.css';
+import { useNotificationRefresh } from "../../Components/PendingRequestContext";
+import "../style.css";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
-import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import { GoAlert } from "react-icons/go";
@@ -83,9 +83,9 @@ const AdminApproval = () => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
-
-
-   const theme = useTheme();
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const theme = useTheme();
   const [statusFilter, setStatusFilter] = useState("");
   const [filteredRows, setFilteredRows] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
@@ -101,6 +101,7 @@ const AdminApproval = () => {
     message: "",
     severity: "success",
   });
+  const { triggerNotificationRefresh } = useNotificationRefresh();
 
   // Fetch data from backend
   const fetchOverview = async () => {
@@ -170,6 +171,7 @@ const AdminApproval = () => {
           severity: "success",
         });
         await fetchOverview(page + 1, rowsPerPage); // Refresh immediately
+        triggerNotificationRefresh(); // Notify other components
       } else {
         throw new Error("Unexpected server response");
       }
@@ -184,6 +186,61 @@ const AdminApproval = () => {
       setDisabledActions((prev) => prev.filter((r) => r !== id));
     }
   };
+
+ const handleBulkApprove = async () => {
+  setBulkLoading(true);
+
+  try {
+    const res = await apiClient.post("/vmrequest/bulk-approve/", {
+      vm_request_ids: selectedIds,
+      status: "Accepted",
+    });
+
+    const results = res.data.results || [];
+
+    const successCount = results.filter(
+      (r) => r.status === "Accepted"
+    ).length;
+
+    const failedCount = results.filter(
+      (r) => r.status === "Failed" || r.status === "Error" || r.status === "Pending"
+    ).length;
+
+    let message = "";
+    let severity = "success";
+
+    if (failedCount > 0 && successCount > 0) {
+      message = `Bulk approval completed. ${successCount} succeeded, ${failedCount} failed.`;
+      severity = "warning";
+    } else if (failedCount > 0) {
+      message = `Bulk approval completed. ${failedCount} request(s) failed.`;
+      severity = "error";
+    } else {
+      message = `Bulk approval completed successfully. ${successCount} request(s) approved.`;
+      severity = "success";
+    }
+
+    setAlertDialog({
+      open: true,
+      message,
+      severity,
+    });
+
+    setSelectedIds([]);
+    await fetchOverview(page + 1, rowsPerPage);
+    triggerNotificationRefresh();
+  } catch (error) {
+    console.error("Bulk approve failed:", error);
+
+    setAlertDialog({
+      open: true,
+      message: "Bulk approval request failed completely.",
+      severity: "error",
+    });
+  } finally {
+    setBulkLoading(false);
+  }
+};
 
   const handleChangePage = (event, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
@@ -214,7 +271,10 @@ const AdminApproval = () => {
   if (loading) {
     return (
       <div className="cloud-container">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="7.87722 9.61948 33.01 16.88"
+        >
           <path
             d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
             className="cloud-back"
@@ -229,7 +289,6 @@ const AdminApproval = () => {
     );
   }
 
- 
   if (error) {
     return (
       <Stack
@@ -254,11 +313,17 @@ const AdminApproval = () => {
         justifyContent="center"
         sx={{ mt: 4, mb: 3 }}
       >
-        <Paper sx={{ p: 2, minWidth: 220, backgroundColor:
-      theme.palette.mode === "dark"
-        ? "#1e293b"   // dark slate
-        : "#e3f2fd",
-    color: theme.palette.mode === "dark" ? "#f1f5f9" : "inherit", }}>
+        <Paper
+          sx={{
+            p: 2,
+            minWidth: 220,
+            backgroundColor:
+              theme.palette.mode === "dark"
+                ? "#1e293b" // dark slate
+                : "#e3f2fd",
+            color: theme.palette.mode === "dark" ? "#f1f5f9" : "inherit",
+          }}
+        >
           <Typography variant="subtitle1">Total Pending Requests</Typography>
           <Typography variant="h3" color="primary">
             {counts.pending}
@@ -269,7 +334,8 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: theme.palette.mode === "dark" ? "#1f3323" : "#e8f5e9",
+            backgroundColor:
+              theme.palette.mode === "dark" ? "#1f3323" : "#e8f5e9",
             color: theme.palette.mode === "dark" ? "#d1fae5" : "inherit",
 
             cursor: "pointer",
@@ -286,7 +352,8 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: theme.palette.mode === "dark" ? "#3b1f22" : "#ffebee",
+            backgroundColor:
+              theme.palette.mode === "dark" ? "#3b1f22" : "#ffebee",
             color: theme.palette.mode === "dark" ? "#fecaca" : "inherit",
 
             cursor: "pointer",
@@ -302,9 +369,10 @@ const AdminApproval = () => {
           sx={{
             p: 2,
             minWidth: 220,
-            backgroundColor: theme.palette.mode === "dark" ? "#3b2d1f" : "#fff3e0",
+            backgroundColor:
+              theme.palette.mode === "dark" ? "#3b2d1f" : "#fff3e0",
             color: theme.palette.mode === "dark" ? "#ffedd5" : "inherit",
- // Light Orange for failed
+            // Light Orange for failed
             cursor: "pointer",
           }}
           onClick={() => handleCardClick("failed")}
@@ -328,30 +396,67 @@ const AdminApproval = () => {
           justifyContent: "center",
           border: "none !important",
           boxShadow: "none !important",
-          backgroundColor: "transparent !important"
+          backgroundColor: "transparent !important",
         }}
       >
-        <Typography variant="h5" sx={{ mb: 2, fontWeight: "bold" }}>
-          Pending Approval Requests
-        </Typography>
-        <TableContainer 
-        
+       
+        <Stack
+          direction="row"
+          spacing={2}
+          justifyContent="space-between"
+          sx={{ mb: 2 }}
         >
-          <Table 
-          sx={{
-            width: "100%",
-            minWidth: 650,
-            tableLayout: "auto",
-        
-            // REMOVE ALL BORDERS
-            border: "none !important",
-            "& td, & th": { border: "none !important" },
-            "& .MuiTableCell-root": { borderBottom: "none !important" },
-            "& .MuiTableRow-root": { border: "none !important" },
-          }}
+          <Typography variant="h5" sx={{ fontWeight: "bold" }}>
+            Pending Approval Requests
+          </Typography>
+
+          <Button
+            variant="contained"
+            color="success"
+            disabled={selectedIds.length === 0 || bulkLoading}
+            onClick={handleBulkApprove}
+          >
+            {bulkLoading
+              ? "Approving..."
+              : `Approve Selected (${selectedIds.length})`}
+          </Button>
+        </Stack>
+
+        <TableContainer>
+          <Table
+            sx={{
+              width: "100%",
+              minWidth: 650,
+              tableLayout: "auto",
+
+              // REMOVE ALL BORDERS
+              border: "none !important",
+              "& td, & th": { border: "none !important" },
+              "& .MuiTableCell-root": { borderBottom: "none !important" },
+              "& .MuiTableRow-root": { border: "none !important" },
+            }}
           >
             <TableHead>
               <StyledTableRow>
+                <StyledTableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={
+                      selectedIds.length > 0 &&
+                      selectedIds.length < paginatedPendingRows.length
+                    }
+                    checked={
+                      paginatedPendingRows.length > 0 &&
+                      selectedIds.length === paginatedPendingRows.length
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(paginatedPendingRows.map((r) => r.id));
+                      } else {
+                        setSelectedIds([]);
+                      }
+                    }}
+                  />
+                </StyledTableCell>
                 <StyledTableCell>Sr. No.</StyledTableCell>
                 <StyledTableCell>Email</StyledTableCell>
                 <StyledTableCell>VM Name</StyledTableCell>
@@ -377,6 +482,22 @@ const AdminApproval = () => {
                         : "inherit",
                   }}
                 >
+                  <StyledTableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedIds.includes(req.id)}
+                      disabled={disabledActions.includes(req.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedIds((prev) => [...prev, req.id]);
+                        } else {
+                          setSelectedIds((prev) =>
+                            prev.filter((id) => id !== req.id)
+                          );
+                        }
+                      }}
+                    />
+                  </StyledTableCell>
+
                   <StyledTableCell>
                     {page * rowsPerPage + (index + 1)}
                   </StyledTableCell>
@@ -384,16 +505,18 @@ const AdminApproval = () => {
                   <StyledTableCell>
                     {req.vm_name.split("_").slice(1).join("_")}
                     {req.creation_status?.toLowerCase() === "failed" && (
-                      <Tooltip title={req.creation_error_message || "Unknown failure"} arrow>
-                      <ErrorOutlineIcon
-                        sx={{
-                          color: "red",
-                          ml: 1,
-                          verticalAlign: "middle",
-                          fontSize: 18,
-                        }}
-                       
-                      />
+                      <Tooltip
+                        title={req.creation_error_message || "Unknown failure"}
+                        arrow
+                      >
+                        <ErrorOutlineIcon
+                          sx={{
+                            color: "red",
+                            ml: 1,
+                            verticalAlign: "middle",
+                            fontSize: 18,
+                          }}
+                        />
                       </Tooltip>
                     )}
                   </StyledTableCell>
