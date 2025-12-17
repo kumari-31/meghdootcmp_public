@@ -5827,7 +5827,7 @@ class VmRequestPendingAdminAPIView(APIView):
         try:
             # Ensure the user has admin role
             role = getattr(request.user, "role", None)
-            print("Role from user:", role)
+            
 
             # print(role)
             # if role != 'ADMIN':
@@ -6040,6 +6040,68 @@ class VmRequestRejectionReasonAPIView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class VmRequestBulkApproveAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        vm_request_ids = request.data.get("vm_request_ids", [])
+
+        results = []
+
+        for req_id in vm_request_ids:
+            try:
+                vm_request = VmRequest.objects.get(id=req_id)
+
+                if vm_request.fla_status != "Accepted":
+                    results.append({
+                        "id": req_id,
+                        "status": "Skipped",
+                        "reason": "FLA not approved"
+                    })
+                    continue
+
+                vm_request.admin_status = "Processing"
+                vm_request.save()
+
+                response = vm_approve_request(req_id)
+
+                if response["status"]:
+                    vm_request.admin_status = "Accepted"
+                    vm_request.creation_status = "Success"
+                else:
+                    vm_request.admin_status = "Pending"
+                    vm_request.creation_status = "Failed"
+                    vm_request.creation_error_message = response["message"]
+
+                vm_request.admin_action_timestamp = timezone.now()
+                vm_request.save()
+
+                results.append({
+                    "id": req_id,
+                    "status": vm_request.admin_status,
+                    "message": response["message"]
+                })
+
+            except Exception as e:
+                VmRequest.objects.filter(id=req_id).update(
+                    admin_status="Pending",
+                    creation_status="Failed",
+                    creation_error_message=str(e),
+                    admin_action_timestamp=timezone.now(),
+                )
+
+                results.append({
+                    "id": req_id,
+                    "status": "Pending",
+                    "message": str(e),
+                })
+
+        return Response({
+            "message": "Bulk approval completed",
+            "results": results
+        })
+
 
 
 class ServiceRequestRejectionAPIView(APIView):
@@ -9690,7 +9752,7 @@ class ListNodesAndVMsAPIView(APIView):
             return Response({"error": str(e)}, status=500)
 
 
-# ------------------------------------27 Feb 2025---------------------------------
+# ------------------------------------ZABBIX API---------------------------------
 
 import base64
 import json
@@ -9699,288 +9761,637 @@ import requests
 from django.http import JsonResponse
 from django.views import View
 
-# Zabbix server details
-ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
-ZABBIX_USER = "Admin"
-ZABBIX_PASSWORD = "zabbix"
+from .zabbix_client import ZabbixClient
+from .zabbix_metrics import get_item_history
 
 
-class ZabbixAPI:
-    def __init__(self):
-        self.session = requests.Session()
-        self.auth_token = self.login()
+class HostAvailabilityAPIView(APIView):
+    def get(self, request):
+        zabbix = ZabbixClient()
 
-    def login(self):
-        """Authenticate with Zabbix API and return auth token."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "user.login",
-            "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
-            "id": 1,
-            "auth": None,
-        }
-        response = self.session.post(
-            ZABBIX_URL, json=payload, headers={"Content-Type": "application/json"}
-        )
-        result = response.json()
-        return result.get("result")
-
-    def get_graphs(self, hostid):
-        """Fetch all graphs for a given host."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "graph.get",
-            "params": {
-                "hostids": hostid,
-                "output": ["graphid", "name"],
+        hosts = zabbix.call(
+            "host.get",
+            {
+                "output": ["hostid", "host"],
+                "selectInterfaces": ["ip", "available"],
             },
-            "auth": self.auth_token,
-            "id": 2,
-        }
-        response = self.session.post(
-            ZABBIX_URL, json=payload, headers={"Content-Type": "application/json"}
         )
-        return response.json().get("result", [])
 
-    def download_graph_image_base64(self, graphid, width=500, height=200):
-        """Download graph as a base64-encoded image."""
-        # Zabbix UI Login URL
-        login_url = "http://10.184.49.245/zabbix/index.php"
-        payload = {"name": ZABBIX_USER, "password": ZABBIX_PASSWORD, "enter": "Sign in"}
+        availability_map = {
+            "0": "Unknown",
+            "1": "Available",
+            "2": "Not available",
+        }
 
-        # Perform UI login (this is different from the API login)
-        self.session.post(login_url, data=payload)
+        data = []
 
-        # Fetch graph image
-        chart_url = f"http://10.184.49.245/zabbix/chart2.php?graphid={graphid}&width={width}&height={height}&period=3600&stime=now"
-        response = self.session.get(chart_url)
+        for h in hosts:
+            interfaces = h.get("interfaces", [])
 
-        if response.status_code == 200:
-            return f"data:image/png;base64,{base64.b64encode(response.content).decode('utf-8')}"
-        else:
-            return None
+            # Default values
+            ip = "N/A"
+            status = "Unknown"
 
-
-class ZabbixGraphAPI(View):
-    def get(self, request, hostid):
-        """Fetch graphs for a host and return as base64 images."""
-        zabbix_api = ZabbixAPI()
-        graphs = zabbix_api.get_graphs(hostid)
-
-        # Graphs to fetch
-        graph_names = [
-            "Memory usage",
-            "CPU usage",
-            "System load",
-            "CPU utilization",
-            "Memory utilization",
-        ]
-
-        # Filter graphs based on predefined names
-        selected_graphs = []
-        for graph in graphs:
-            if graph["name"] in graph_names:
-                base64_image = zabbix_api.download_graph_image_base64(graph["graphid"])
-                if base64_image:
-                    selected_graphs.append(
-                        {
-                            "name": graph["name"],
-                            "graphid": graph["graphid"],
-                            "base64_image": base64_image,
-                        }
-                    )
-
-        return JsonResponse({"graphs": selected_graphs}, safe=False)
-
-
-# ----------------------------28 Feb 2025--------------------------------
-
-
-# Zabbix API credentials
-ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
-ZABBIX_USER = "Admin"
-ZABBIX_PASSWORD = "zabbix"
-
-
-# Function to authenticate with Zabbix API
-def zabbix_login():
-    payload = {
-        "jsonrpc": "2.0",
-        "method": "user.login",
-        "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
-        "id": 1,
-        "auth": None,
-    }
-    response = requests.post(ZABBIX_URL, json=payload)
-    return response.json().get("result")
-
-
-# Function to list all hosts in Zabbix
-def list_hosts(auth_token):
-    payload = {
-        "jsonrpc": "2.0",
-        "method": "host.get",
-        "params": {"output": ["hostid", "host"]},
-        "auth": auth_token,
-        "id": 2,
-    }
-    response = requests.post(ZABBIX_URL, json=payload)
-    return response.json().get("result", [])
-
-
-class UpdateZabbixHostID(APIView):
-    def post(self, request):
-        auth_token = zabbix_login()
-        if not auth_token:
-            return Response(
-                {"error": "Failed to authenticate with Zabbix API"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        # Fetch hosts from Zabbix
-        zabbix_hosts = list_hosts(auth_token)
-        print("zabbix_hosts", zabbix_hosts)
-        # Store host mappings (IP -> Host ID)
-        host_map = {host["host"]: host["hostid"] for host in zabbix_hosts}
-
-        # Update VmInfo objects
-        updated_vms = []
-        for vm in VMInfo.objects.all():
-            if vm.ip in host_map:
-                vm.zabbix_hostid = host_map[vm.ip]
-                vm.save()
-                updated_vms.append({"ip": vm.ip, "zabbix_hostid": vm.zabbix_hostid})
-
-        return Response({"updated_vms": updated_vms}, status=status.HTTP_200_OK)
-
-
-# --------------------------------4 Mar 2025--------------------------
-
-
-class UpdateZabbixHostID1(APIView):
-    def post(self, request):
-        auth_token = zabbix_login()
-        if not auth_token:
-            return Response(
-                {"error": "Failed to authenticate with Zabbix API"},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        # Fetch hosts from Zabbix
-        zabbix_hosts = list_hosts(auth_token)
-        print("zabbix_hosts", zabbix_hosts)
-
-        # Store host mappings (Zabbix host name -> Host ID)
-        host_map = {
-            host["host"]: host["hostid"] for host in zabbix_hosts
-        }  # Change: Use Zabbix host names
-
-        # Update VmInfo objects based on name
-        updated_vms = []
-        for vm in VMInfo.objects.all():
-            if vm.vm_name in host_map:  # Change: Check vm.name instead of vm.ip
-                vm.zabbix_hostid = host_map[vm.vm_name]
-                vm.save()
-                updated_vms.append(
-                    {"name": vm.vm_name, "zabbix_hostid": vm.zabbix_hostid}
+            if interfaces:
+                iface = h["interfaces"][0] if h.get("interfaces") else {}
+                status = availability_map.get(
+                    int(iface.get("available", 0)), "Unknown"
                 )
 
-        return Response({"updated_vms": updated_vms}, status=status.HTTP_200_OK)
+            data.append(
+                {
+                    "hostid": h["hostid"],
+                    "host": h["host"],
+                    "ip": ip,
+                    "status": status,
+                }
+            )
 
+        return Response(data)
 
-# ----------------------25 March 2025---------------------------------------
-
-
-class CPUUtilizationView(APIView):
-    """Fetch CPU utilization data from Zabbix API."""
-
-    def get_auth_token(self):
-        """Authenticate with Zabbix API and get auth token."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "user.login",
-            "params": {
-                "user": settings.ZABBIX_USER,
-                "password": settings.ZABBIX_PASSWORD,
-            },
-            "id": 1,
-            "auth": None,
-        }
-        response = requests.post(settings.ZABBIX_URL, json=payload).json()
-        return response.get("result")
-
-    def get_cpu_itemid(self, auth_token, host_id):
-        """Fetch the item ID for CPU utilization from Zabbix API."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "item.get",
-            "params": {
-                "output": ["itemid", "name"],
-                "hostids": host_id,
-                "search": {
-                    "name": "CPU utilization"
-                },  # Adjust based on your Zabbix naming
-                "sortfield": "name",
-            },
-            "auth": auth_token,
-            "id": 2,
-        }
-        response = requests.post(settings.ZABBIX_URL, json=payload).json()
-        items = response.get("result", [])
-        return items[0]["itemid"] if items else None
-
-    def get_cpu_utilization(self, auth_token, item_id):
-        """Fetch CPU utilization history from Zabbix API."""
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "history.get",
-            "params": {
-                "output": ["clock", "value"],
-                "history": 0,  # Numeric data type
-                "itemids": item_id,
-                "sortfield": "clock",
-                "sortorder": "DESC",
-                "limit": 50,  # Fetch last 50 records
-            },
-            "auth": auth_token,
-            "id": 3,
-        }
-        response = requests.post(settings.ZABBIX_URL, json=payload).json()
-        return response.get("result", [])
-
-    def convert_timestamp(self, unix_timestamp):
-        """Convert Unix timestamp to human-readable format."""
-        return datetime.datetime.fromtimestamp(int(unix_timestamp)).strftime(
-            "%Y-%m-%d %H:%M:%S"
+    
+class CPUUtilizationAPIView(APIView):
+    def get(self, request, hostid):
+        data = get_item_history(
+            hostid,
+            {"name": "CPU utilization"},
         )
 
-    def format_cpu_value(self, raw_value):
-        """Convert raw CPU utilization value to a human-readable percentage."""
-        return f"{float(raw_value):.2f}%"  # Format as percentage with 2 decimal places
+        return Response(data)
 
-    def get(self, request, host_id, *args, **kwargs):
-        """Main API endpoint to fetch CPU utilization graph data."""
-        auth_token = self.get_auth_token()
-        if not auth_token:
-            return Response({"error": "Authentication failed"}, status=401)
+class MemoryUtilizationAPIView(APIView):
+    def get(self, request, hostid):
+        data = get_item_history(
+            hostid,
+            {"name": "Memory utilization"},
+        )
 
-        item_id = self.get_cpu_itemid(auth_token, host_id)
-        if not item_id:
-            return Response({"error": "CPU utilization item not found"}, status=404)
+        return Response(data)
 
-        cpu_data = self.get_cpu_utilization(auth_token, item_id)
-        formatted_data = [
+class DiskUtilizationAPIView(APIView):
+    def get(self, request, hostid):
+        data = get_item_history(
+            hostid,
+            {"key_": "vfs.fs.size[/,pused]"},
+        )
+        return Response(data)
+
+class SystemMetricsAPIView(APIView):
+    """
+    Fetch Load Average (1m, 5m, 15m) and Process counts from Zabbix
+    """
+
+    def get(self, request, hostid):
+
+        load_average = {
+            "avg1": get_item_history(
+                hostid,
+                {"key_": "system.cpu.load[all,avg1]"},
+            ),
+            "avg5": get_item_history(
+                hostid,
+                {"key_": "system.cpu.load[all,avg5]"},
+            ),
+            "avg15": get_item_history(
+                hostid,
+                {"key_": "system.cpu.load[all,avg15]"},
+            ),
+        }
+
+        running_processes = {
+            "running": get_item_history(
+                hostid,
+                {"key_": "proc.num[,,run]"},
+            ),
+            "total": get_item_history(
+                hostid,
+                {"key_": "proc.num"},
+            ),
+        }
+
+        return Response({
+            "load_average": load_average,
+            "running_processes": running_processes,
+        })
+
+class ZabbixProblemsAPIView(APIView):
+    def get(self, request, hostid):
+        zabbix = ZabbixClient()
+
+        # 1️⃣ Get active triggers
+        triggers = zabbix.call(
+            "trigger.get",
             {
-                "timestamp": entry["clock"],
-                "human_readable_time": self.convert_timestamp(entry["clock"]),
-                "raw_value": float(entry["value"]),
-                "formatted_value": self.format_cpu_value(
-                    entry["value"]
-                ),  # Add formatted percentage
-            }
-            for entry in cpu_data
-        ]
-        return Response(formatted_data)
+                "output": ["triggerid"],
+                "hostids": hostid,
+                "filter": {"value": 1},  # ACTIVE ONLY
+            },
+        )
+
+        trigger_ids = [t["triggerid"] for t in triggers]
+
+        if not trigger_ids:
+            return Response([])
+
+        # 2️⃣ Get events for those triggers
+        events = zabbix.call(
+            "event.get",
+            {
+                "output": [
+                    "eventid",
+                    "name",
+                    "severity",
+                    "clock",
+                    "value",
+                ],
+                "source": 0,
+                "object": 0,
+                "value": 1,  # PROBLEM
+                "objectids": trigger_ids,
+                "selectHosts": ["hostid", "host"],
+                "sortfield": "clock",
+                "sortorder": "DESC",
+            },
+        )
+
+        return Response(events)
+
+
+
+def get_cpu_cores(hostid):
+        data = get_item_history(
+            hostid,
+            {"key_": "system.cpu.num"},
+        )
+        for _, values in data.items():
+            if values:
+                return int(float(values[-1]["value"]))
+        return 1
+    
+def calculate_health(cpu, memory, disk, load, cores):
+        score = 100
+        status = "Healthy"
+
+        # CPU
+        if cpu > 85:
+            score -= 30
+            status = "Critical"
+        elif cpu > 70:
+            score -= 15
+            status = "Warning"
+
+        # Memory
+        if memory > 90:
+            score -= 25
+            status = "Critical"
+        elif memory > 75:
+            score -= 10
+            status = "Warning"
+
+        # Disk
+        if disk > 90:
+            score -= 20
+            status = "Critical"
+        elif disk > 80:
+            score -= 10
+            status = "Warning"
+
+        # Load normalized
+        load_per_core = load / max(cores, 1)
+        if load_per_core > 1.5:
+            score -= 15
+            status = "Critical"
+        elif load_per_core > 1:
+            score -= 5
+            status = "Warning"
+
+        return max(score, 0), status, round(load_per_core, 2)
+    
+def get_latest_value(hostid, key):
+    data = get_item_history(hostid, {"key_": key})
+    for _, values in data.items():
+        if values:
+            return float(values[-1]["value"])
+    return 0.0
+
+def get_host_health_summary(hostid):
+    cpu = get_latest_value(hostid, "system.cpu.util")
+    memory = get_latest_value(hostid, "vm.memory.utilization")
+    disk = get_latest_value(hostid, "vfs.fs.size[/,pused]")
+    load = get_latest_value(hostid, "system.cpu.load[all,avg1]")
+    cores = get_cpu_cores(hostid)
+
+    score, status, load_norm = calculate_health(
+        cpu, memory, disk, load, cores
+    )
+
+    alerts = ZabbixClient().call(
+        "event.get",
+        {
+            "hostids": hostid,
+            "value": 1,
+            "sortfield": "clock",
+            "sortorder": "DESC",
+            "limit": 2,
+            "output": ["eventid", "name", "severity", "clock"],
+        },
+    )
+
+    return {
+        "health_score": score,
+        "status": status,
+        "cpu": round(cpu, 2),
+        "memory": round(memory, 2),
+        "disk": round(disk, 2),
+        "load_per_core": load_norm,
+        "alerts": alerts,
+    }
+
+
+class HostHealthSummaryAPIView(APIView):
+    def get(self, request, hostid):
+        return Response(get_host_health_summary(hostid))
+
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+import tempfile
+import os
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+
+
+
+class HostHealthPDFAPIView(APIView):
+    def get(self, request, hostid):
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="host_{hostid}_health.pdf"'
+
+        c = canvas.Canvas(response, pagesize=A4)
+        width, height = A4
+
+        summary = HostHealthSummaryAPIView().get(request, hostid).data
+
+        c.setFont("Helvetica-Bold", 16)
+        c.drawString(50, height - 50, "Host Health Report")
+
+        c.setFont("Helvetica", 12)
+        y = height - 100
+
+        for key, value in summary.items():
+            if key != "alerts":
+                c.drawString(50, y, f"{key.replace('_', ' ').title()}: {value}")
+                y -= 20
+
+        c.drawString(50, y - 10, "Recent Alerts:")
+        y -= 30
+
+        for a in summary["alerts"]:
+            c.drawString(60, y, f"- {a['name']}")
+            y -= 15
+
+        c.showPage()
+        c.save()
+
+        return response
+
+
+class HealthReportAPIView(APIView):
+    def get(self, request):
+        zabbix = ZabbixClient()
+
+        hosts = zabbix.call(
+            "host.get",
+            {
+                "output": ["host"],
+                "selectInterfaces": ["available"],
+            },
+        )
+
+        availability_map = {
+            "0": "Unknown",
+            "1": "Available",
+            "2": "Not available",
+        }
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        doc = SimpleDocTemplate(tmp.name)
+        styles = getSampleStyleSheet()
+        story = []
+
+        story.append(Paragraph("Infrastructure Health Report", styles["Title"]))
+
+        for h in hosts:
+            iface = h["interfaces"][0] if h["interfaces"] else {}
+            status = availability_map.get(
+                iface.get("available", "0"), "Unknown"
+            )
+
+            story.append(
+                Paragraph(
+                    f"{h['host']} - {status}",
+                    styles["Normal"],
+                )
+            )
+
+        doc.build(story)
+        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Zabbix server details
+# ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
+# ZABBIX_USER = "Admin"
+# ZABBIX_PASSWORD = "zabbix"
+
+
+# class ZabbixAPI:
+#     def __init__(self):
+#         self.session = requests.Session()
+#         self.auth_token = self.login()
+
+#     def login(self):
+#         """Authenticate with Zabbix API and return auth token."""
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "user.login",
+#             "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
+#             "id": 1,
+#             "auth": None,
+#         }
+#         response = self.session.post(
+#             ZABBIX_URL, json=payload, headers={"Content-Type": "application/json"}
+#         )
+#         result = response.json()
+#         return result.get("result")
+
+#     def get_graphs(self, hostid):
+#         """Fetch all graphs for a given host."""
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "graph.get",
+#             "params": {
+#                 "hostids": hostid,
+#                 "output": ["graphid", "name"],
+#             },
+#             "auth": self.auth_token,
+#             "id": 2,
+#         }
+#         response = self.session.post(
+#             ZABBIX_URL, json=payload, headers={"Content-Type": "application/json"}
+#         )
+#         return response.json().get("result", [])
+
+#     def download_graph_image_base64(self, graphid, width=500, height=200):
+#         """Download graph as a base64-encoded image."""
+#         # Zabbix UI Login URL
+#         login_url = "http://10.184.49.245/zabbix/index.php"
+#         payload = {"name": ZABBIX_USER, "password": ZABBIX_PASSWORD, "enter": "Sign in"}
+
+#         # Perform UI login (this is different from the API login)
+#         self.session.post(login_url, data=payload)
+
+#         # Fetch graph image
+#         chart_url = f"http://10.184.49.245/zabbix/chart2.php?graphid={graphid}&width={width}&height={height}&period=3600&stime=now"
+#         response = self.session.get(chart_url)
+
+#         if response.status_code == 200:
+#             return f"data:image/png;base64,{base64.b64encode(response.content).decode('utf-8')}"
+#         else:
+#             return None
+
+
+# class ZabbixGraphAPI(View):
+#     def get(self, request, hostid):
+#         """Fetch graphs for a host and return as base64 images."""
+#         zabbix_api = ZabbixAPI()
+#         graphs = zabbix_api.get_graphs(hostid)
+
+#         # Graphs to fetch
+#         graph_names = [
+#             "Memory usage",
+#             "CPU usage",
+#             "System load",
+#             "CPU utilization",
+#             "Memory utilization",
+#         ]
+
+#         # Filter graphs based on predefined names
+#         selected_graphs = []
+#         for graph in graphs:
+#             if graph["name"] in graph_names:
+#                 base64_image = zabbix_api.download_graph_image_base64(graph["graphid"])
+#                 if base64_image:
+#                     selected_graphs.append(
+#                         {
+#                             "name": graph["name"],
+#                             "graphid": graph["graphid"],
+#                             "base64_image": base64_image,
+#                         }
+#                     )
+
+#         return JsonResponse({"graphs": selected_graphs}, safe=False)
+
+
+# # ----------------------------28 Feb 2025--------------------------------
+
+
+# # Zabbix API credentials
+# ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
+# ZABBIX_USER = "Admin"
+# ZABBIX_PASSWORD = "zabbix"
+
+
+# # Function to authenticate with Zabbix API
+# def zabbix_login():
+#     payload = {
+#         "jsonrpc": "2.0",
+#         "method": "user.login",
+#         "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
+#         "id": 1,
+#         "auth": None,
+#     }
+#     response = requests.post(ZABBIX_URL, json=payload)
+#     return response.json().get("result")
+
+
+# # Function to list all hosts in Zabbix
+# def list_hosts(auth_token):
+#     payload = {
+#         "jsonrpc": "2.0",
+#         "method": "host.get",
+#         "params": {"output": ["hostid", "host"]},
+#         "auth": auth_token,
+#         "id": 2,
+#     }
+#     response = requests.post(ZABBIX_URL, json=payload)
+#     return response.json().get("result", [])
+
+
+# class UpdateZabbixHostID(APIView):
+#     def post(self, request):
+#         auth_token = zabbix_login()
+#         if not auth_token:
+#             return Response(
+#                 {"error": "Failed to authenticate with Zabbix API"},
+#                 status=status.HTTP_401_UNAUTHORIZED,
+#             )
+
+#         # Fetch hosts from Zabbix
+#         zabbix_hosts = list_hosts(auth_token)
+#         print("zabbix_hosts", zabbix_hosts)
+#         # Store host mappings (IP -> Host ID)
+#         host_map = {host["host"]: host["hostid"] for host in zabbix_hosts}
+
+#         # Update VmInfo objects
+#         updated_vms = []
+#         for vm in VMInfo.objects.all():
+#             if vm.ip in host_map:
+#                 vm.zabbix_hostid = host_map[vm.ip]
+#                 vm.save()
+#                 updated_vms.append({"ip": vm.ip, "zabbix_hostid": vm.zabbix_hostid})
+
+#         return Response({"updated_vms": updated_vms}, status=status.HTTP_200_OK)
+
+
+# # --------------------------------4 Mar 2025--------------------------
+
+
+# class UpdateZabbixHostID1(APIView):
+#     def post(self, request):
+#         auth_token = zabbix_login()
+#         if not auth_token:
+#             return Response(
+#                 {"error": "Failed to authenticate with Zabbix API"},
+#                 status=status.HTTP_401_UNAUTHORIZED,
+#             )
+
+#         # Fetch hosts from Zabbix
+#         zabbix_hosts = list_hosts(auth_token)
+#         print("zabbix_hosts", zabbix_hosts)
+
+#         # Store host mappings (Zabbix host name -> Host ID)
+#         host_map = {
+#             host["host"]: host["hostid"] for host in zabbix_hosts
+#         }  # Change: Use Zabbix host names
+
+#         # Update VmInfo objects based on name
+#         updated_vms = []
+#         for vm in VMInfo.objects.all():
+#             if vm.vm_name in host_map:  # Change: Check vm.name instead of vm.ip
+#                 vm.zabbix_hostid = host_map[vm.vm_name]
+#                 vm.save()
+#                 updated_vms.append(
+#                     {"name": vm.vm_name, "zabbix_hostid": vm.zabbix_hostid}
+#                 )
+
+#         return Response({"updated_vms": updated_vms}, status=status.HTTP_200_OK)
+
+
+# # ----------------------25 March 2025---------------------------------------
+
+
+# class CPUUtilizationView(APIView):
+#     """Fetch CPU utilization data from Zabbix API."""
+
+#     def get_auth_token(self):
+#         """Authenticate with Zabbix API and get auth token."""
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "user.login",
+#             "params": {
+#                 "user": settings.ZABBIX_USER,
+#                 "password": settings.ZABBIX_PASSWORD,
+#             },
+#             "id": 1,
+#             "auth": None,
+#         }
+#         response = requests.post(settings.ZABBIX_URL, json=payload).json()
+#         return response.get("result")
+
+#     def get_cpu_itemid(self, auth_token, host_id):
+#         """Fetch the item ID for CPU utilization from Zabbix API."""
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "item.get",
+#             "params": {
+#                 "output": ["itemid", "name"],
+#                 "hostids": host_id,
+#                 "search": {
+#                     "name": "CPU utilization"
+#                 },  # Adjust based on your Zabbix naming
+#                 "sortfield": "name",
+#             },
+#             "auth": auth_token,
+#             "id": 2,
+#         }
+#         response = requests.post(settings.ZABBIX_URL, json=payload).json()
+#         items = response.get("result", [])
+#         return items[0]["itemid"] if items else None
+
+#     def get_cpu_utilization(self, auth_token, item_id):
+#         """Fetch CPU utilization history from Zabbix API."""
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "history.get",
+#             "params": {
+#                 "output": ["clock", "value"],
+#                 "history": 0,  # Numeric data type
+#                 "itemids": item_id,
+#                 "sortfield": "clock",
+#                 "sortorder": "DESC",
+#                 "limit": 50,  # Fetch last 50 records
+#             },
+#             "auth": auth_token,
+#             "id": 3,
+#         }
+#         response = requests.post(settings.ZABBIX_URL, json=payload).json()
+#         return response.get("result", [])
+
+#     def convert_timestamp(self, unix_timestamp):
+#         """Convert Unix timestamp to human-readable format."""
+#         return datetime.datetime.fromtimestamp(int(unix_timestamp)).strftime(
+#             "%Y-%m-%d %H:%M:%S"
+#         )
+
+#     def format_cpu_value(self, raw_value):
+#         """Convert raw CPU utilization value to a human-readable percentage."""
+#         return f"{float(raw_value):.2f}%"  # Format as percentage with 2 decimal places
+
+#     def get(self, request, host_id, *args, **kwargs):
+#         """Main API endpoint to fetch CPU utilization graph data."""
+#         auth_token = self.get_auth_token()
+#         if not auth_token:
+#             return Response({"error": "Authentication failed"}, status=401)
+
+#         item_id = self.get_cpu_itemid(auth_token, host_id)
+#         if not item_id:
+#             return Response({"error": "CPU utilization item not found"}, status=404)
+
+#         cpu_data = self.get_cpu_utilization(auth_token, item_id)
+#         formatted_data = [
+#             {
+#                 "timestamp": entry["clock"],
+#                 "human_readable_time": self.convert_timestamp(entry["clock"]),
+#                 "raw_value": float(entry["value"]),
+#                 "formatted_value": self.format_cpu_value(
+#                     entry["value"]
+#                 ),  # Add formatted percentage
+#             }
+#             for entry in cpu_data
+#         ]
+#         return Response(formatted_data)
 
 
 # ---------------------10 Mar 2025--------------------

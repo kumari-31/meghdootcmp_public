@@ -336,8 +336,18 @@ def vm_approve_request(id):
                     )
 
                     os_size = conn.image.find_image(image_id)
-                    print(os_size, os_size.size / (1024**3), "++++++++++=")
-                    size_gb = 20
+                    # Convert virtual size to GB (round up)
+                    image_virtual_gb = int(os_size.virtual_size / (1024 ** 3))
+                    if os_size.virtual_size % (1024 ** 3) != 0:
+                        image_virtual_gb += 1
+
+                    # Minimum 20GB, always add buffer
+                    size_gb = max(image_virtual_gb + 2, 20)
+
+                    print(
+                        f"Image virtual size: {image_virtual_gb}GB → "
+                        f"Creating volume of size: {size_gb}GB"
+                    )
 
                     # Determine volume type based on designation
                     if vm_req.designation in ["HR", "Finance", "Senior Management"]:

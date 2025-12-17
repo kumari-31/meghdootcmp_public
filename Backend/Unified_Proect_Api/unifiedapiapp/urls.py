@@ -154,6 +154,7 @@ urlpatterns = [
     path("api/vmrequests/update/<int:request_id>/", VmRequestUpdateAPIView.as_view(), name="vm-request-update"),
     path("api/vmrequests/admin/", VmRequestPendingAdminAPIView.as_view(), name="vm-requests-pending-admin"),
     path("api/vmrequest/status/", VmRequestStatusUpdateAPIView.as_view(), name="vm-requests-status-update"),
+    path("api/vmrequest/bulk-approve/", VmRequestBulkApproveAPIView.as_view(), name="vm-requests-bulk-approval"),
     path("api/vmrequests/fla/", FlaVmRequestAPIView.as_view(), name="vm_requests_fla"),
     path("api/vmrequests/employee/", EmployeeVmRequestAPIView.as_view(), name="vm_requests_employee"),
     path("api/vmdetails/overview/", VmRequestOverviewAPIView.as_view(), name="vm_overview"),
@@ -215,6 +216,22 @@ urlpatterns = [
     path("api/services/deployed/", EmployeeDeployedServicesAPIView.as_view(), name="deployed-services"),
 
     # -------------------------------
+    # 8 Zabbix APIs
+    # -------------------------------
+   
+    path("api/hosts/", HostAvailabilityAPIView.as_view(), name="host-availability"),
+    path("api/cpu/<str:hostid>/", CPUUtilizationAPIView.as_view(), name="cpu-utilization"),
+    path("api/memory/<str:hostid>/", MemoryUtilizationAPIView.as_view(), name="memory-utilization"),
+    path("api/disk/<str:hostid>/", DiskUtilizationAPIView.as_view(), name="disk-utilization"),
+    path("api/system-metrics/<str:hostid>/", SystemMetricsAPIView.as_view(), name="system-metrics"),
+    path("api/alerts/<str:hostid>/", ZabbixProblemsAPIView.as_view(), name="zabbix-problems"),
+    # path("api/k8s/<str:hostid>/", KubernetesNodeMetricsAPIView.as_view(), name="kubernetes-node-metrics"),
+    path("api/health-report/", HealthReportAPIView.as_view(), name="health-report"),
+    path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view(), name="host-health-summary"),
+    path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view(), name="zabbix-host-list"),
+
+
+    # -------------------------------
     # 8️⃣ Miscellaneous / Helpdesk / Metrics / Email / Zabbix
     # -------------------------------
     path("api/overview/", OpenStackOverviewAPIView.as_view(), name="overview-api"),
@@ -227,8 +244,8 @@ urlpatterns = [
     path("api/employees/update/<str:employee_id>/", EmployeeUpdateAPIView.as_view(), name="update-employee"),
     path("api/send-email/", SendEmailView.as_view(), name="send-test-email"),
     # path("api/guacamole/update-password/", GuacamoleUpdatePasswordAPIView.as_view(), name="update-guac-password"),
-    path("api/usage/<str:hostid>/", ZabbixGraphAPI.as_view(), name="usage"),
-    path("api/update_zabbix_hostid/", UpdateZabbixHostID1.as_view(), name="update_zabbix_hostid"),
+    # path("api/usage/<str:hostid>/", ZabbixGraphAPI.as_view(), name="usage"),
+    # path("api/update_zabbix_hostid/", UpdateZabbixHostID1.as_view(), name="update_zabbix_hostid"),
     path("api/cdacprojects/", ProjectListAPIView.as_view(), name="project-list"),
     path("api/cdacprojects/create/", CreateCdacProjectAPIView.as_view(), name="create-project"),
     path("api/cdacprojects/delete/<int:project_id>/", DeleteCdacProjectAPIView.as_view(), name="delete-project"),

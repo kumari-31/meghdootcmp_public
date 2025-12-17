@@ -23,6 +23,7 @@ import ErrorIcon from "@mui/icons-material/Error";
 import { styled } from "@mui/material/styles";
 import { tableCellClasses } from "@mui/material/TableCell";
 import { GoAlert } from "react-icons/go";
+import { useNotificationRefresh } from "../../Components/PendingRequestContext";
 
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {
@@ -79,6 +80,9 @@ const Approval = () => {
     data: [],
   });
 
+  const { triggerNotificationRefresh } = useNotificationRefresh();
+  
+
   // Fetch all requests
   const fetchRequests = async () => {
     setError(null);
@@ -124,6 +128,7 @@ const Approval = () => {
           severity: "success",
         });
         fetchRequests(); // refresh data
+        triggerNotificationRefresh();
       }
     } catch (error) {
       console.error("Error approving:", error);
@@ -157,6 +162,7 @@ const Approval = () => {
         });
         setReasonDialog({ open: false, id: null, reason: "" });
         fetchRequests(); // refresh after reject
+        triggerNotificationRefresh();
       }
     } catch (error) {
       console.error("Error rejecting:", error);

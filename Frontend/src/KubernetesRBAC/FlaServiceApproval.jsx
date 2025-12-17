@@ -21,6 +21,7 @@ import { tableCellClasses } from "@mui/material/TableCell";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import { useEffect, useState } from "react";
+import { useNotificationRefresh } from "../Components/PendingRequestContext";
 import apiClient from "../Axios";
 
 // Styled Table Components
@@ -94,6 +95,9 @@ const FlaServiceApproval = () => {
     data: [],
   });
 
+  const { triggerNotificationRefresh } = useNotificationRefresh();
+  
+
   // ✔ Move fetchRequests outside useEffect so it can be reused
   const fetchRequests = async () => {
     try {
@@ -135,7 +139,7 @@ const FlaServiceApproval = () => {
 
       if (response.status === 200) {
         await fetchRequests(); // Auto refresh table
-
+        triggerNotificationRefresh();
         setAlertDialog({
           open: true,
           message: `Request ${status} successfully.`,
@@ -167,7 +171,7 @@ const FlaServiceApproval = () => {
 
       if (response.status === 200) {
         await fetchRequests(); // auto refresh
-
+        triggerNotificationRefresh();
         setAlertDialog({
           open: true,
           message: "Request rejected successfully.",

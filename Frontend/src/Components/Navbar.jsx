@@ -19,6 +19,10 @@ import { useTheme } from "./ThemeProvider";
 import apiClient from "../Axios";
 import Badge from "@mui/material/Badge";
 import NotificationsIcon from "@mui/icons-material/Notifications";
+import { useNotificationRefresh } from "./PendingRequestContext";
+import dayjs from "dayjs";
+import isToday from "dayjs/plugin/isToday";
+dayjs.extend(isToday);
 import "./Navbar.css";
 
 /* -------------------- 🌗 THEME SWITCH -------------------- */
@@ -81,7 +85,9 @@ const Navbar = () => {
   );
   const { darkMode, toggleTheme } = useTheme();
 
-  const [pendingRequests, setPendingRequests] = useState([]);
+  const [openstackPending, setOpenstackPending] = useState([]);
+  const [k8sPending, setK8sPending] = useState([]);
+
   const { logout, user } = useAuth();
   const userRole = user?.role;
   console.log("User Role in Navbar:", userRole);
@@ -100,39 +106,60 @@ const Navbar = () => {
     setNotificationAnchor(null);
   };
 
-  const handleApprovalonClick = () => {
-    if (userRole === "ADMIN") navigate("/app/openstack/admin/approvals");
-    else if (userRole === "FLA") navigate("/app/openstack/fla/approvals");
-    handleNotificationClose();
-  };
-
+ 
   /* -------------------- 👤 PROFILE HANDLERS -------------------- */
   const handleProfileClick = (event) => setProfileAnchor(event.currentTarget);
   const handleProfileClose = () => setProfileAnchor(null);
 
   /* -------------------- 🔍 FETCH PENDING REQUESTS (ADMIN and FLA ONLY) -------------------- */
 
-  useEffect(() => {
-    if (userRole === "ADMIN" || userRole === "FLA") {
-      (async () => {
-        try {
-          let endpoint =
-            userRole === "ADMIN" ? "/vmrequests/admin/" : "/vmrequests/fla/";
+ 
+    const { refreshKey } = useNotificationRefresh();
 
-          const response = await apiClient.get(endpoint);
-          const all = response.data.data || [];
-          const pending = all.filter((req) =>
-            userRole === "ADMIN"
-              ? req.admin_status === "Pending"
-              : req.fla_status === "Pending"
-          );
-          setPendingRequests(pending);
-        } catch (error) {
-          console.error("Error fetching VM requests:", error);
-        }
-      })();
-    }
-  }, [userRole]);
+    const fetchNotifications = async () => {
+      if (userRole !== "ADMIN" && userRole !== "FLA") return;
+      try {
+        // OpenStack
+        const osEndpoint =
+          userRole === "ADMIN" ? "/vmrequests/admin/" : "/vmrequests/fla/";
+        const osRes = await apiClient.get(osEndpoint);
+        const osAll = osRes.data.data || [];
+
+        const osPending = osAll.filter((req) =>
+          userRole === "ADMIN"
+            ? req.fla_status === "Accepted" && req.admin_status === "Pending"
+            : req.fla_status === "Pending"
+        );
+
+        setOpenstackPending(osPending);
+
+        // Kubernetes
+        const k8sEndpoint =
+          userRole === "ADMIN"
+            ? "/service-requests/"
+            : "/fla/service-requests/";
+        const k8sRes = await apiClient.get(k8sEndpoint);
+        const k8sAll = k8sRes.data.data || [];
+
+        const k8sPending = k8sAll.filter((req) =>
+          userRole === "ADMIN"
+            ? req.fla_status === "Accepted" && req.admin_status === "Pending"
+            : req.fla_status === "Pending"
+        );
+
+        setK8sPending(k8sPending);
+      } catch (err) {
+        console.error("Notification fetch failed", err);
+      }
+    };
+
+ useEffect(() => {
+  fetchNotifications();
+ 
+}, [userRole, refreshKey]);
+
+
+  const totalPending = openstackPending.length + k8sPending.length;
 
   /* -------------------- 🧩 MENU GENERATOR -------------------- */
 
@@ -200,8 +227,8 @@ const Navbar = () => {
                 id: 3,
                 name: "Infrastructure",
                 subMenu: [
-                  "Group",
-                  "DR as a Service",
+                  // "Group",
+                  // "DR as a Service",
                   "Host",
                   "Hypervisors",
                 ].map((item) => ({
@@ -215,9 +242,9 @@ const Navbar = () => {
                 id: 4,
                 name: "Storage",
                 subMenu: [
-                  "Storage",
-                  "Swift Object Storage",
-                  "Fileshare",
+                  // "Storage",
+                  // "Swift Object Storage",
+                  // "Fileshare",
                   "Volumes",
                   "Volume Type",
                 ].map((item) => ({
@@ -247,8 +274,8 @@ const Navbar = () => {
                 id: 6,
                 name: "Monitoring",
                 subMenu: [
-                  "Log Monitoring",
-                  "Darpan",
+                  // "Log Monitoring",
+                  // "Darpan",
                   "Service Monitoring",
                   "Health Monitoring",
                 ].map((item) => ({
@@ -287,18 +314,18 @@ const Navbar = () => {
             ]
           : []),
 
-              {
-                id: 9,
-                name: "Support",
-                subMenu: [
-                  {
-                name: "Helpdesk",
-                action: "helpdesk_redirect",  // Instead of path
-                roles: ["ADMIN", "FLA", "EMPLOYEE"],
-                  }
-                ],
-              },
-            ],
+        // {
+        //   id: 9,
+        //   name: "Support",
+        //   subMenu: [
+        //     {
+        //       name: "Helpdesk",
+        //       action: "helpdesk_redirect", // Instead of path
+        //       roles: ["ADMIN", "FLA", "EMPLOYEE"],
+        //     },
+        //   ],
+        // },
+      ],
 
       kubernetes: [
         {
@@ -407,21 +434,19 @@ const Navbar = () => {
 
   // const handleSubMenuClick = (subMenuName) => setSelectedSubMenu(subMenuName);
 
-const handleSubMenuClick = async (item) => {
-  setSelectedSubMenu(item.name);
+  const handleSubMenuClick = async (item) => {
+    setSelectedSubMenu(item.name);
 
-  if (item.action === "helpdesk_redirect") {
-    if (userRole === "ADMIN") {
-      navigate("/app/helpdesk/dashboard");
-    } else {
-      navigate("/app/helpdesk/submit");
+    if (item.action === "helpdesk_redirect") {
+      if (userRole === "ADMIN") {
+        navigate("/app/helpdesk/dashboard");
+      } else {
+        navigate("/app/helpdesk/submit");
+      }
+    } else if (item.path) {
+      navigate(item.path);
     }
-  } else if (item.path) {
-    navigate(item.path);
-  }
-};
-
-
+  };
 
   const handlePlatformChange = (platform) => {
     setSelectedPlatform(platform);
@@ -451,7 +476,7 @@ const handleSubMenuClick = async (item) => {
   const handleLogoClick = (e) => {
     e.preventDefault();
     setSelectedPlatform("openstack");
-    
+
     if (userRole === "ADMIN") navigate("/app/dashboard");
     else if (userRole === "FLA") navigate("/app/openstack/fla/approvals");
     else if (userRole === "EMPLOYEE") navigate("/app/openstack/vmrequest");
@@ -496,9 +521,9 @@ const handleSubMenuClick = async (item) => {
             <>
               <IconButton color="inherit" onClick={handleNotificationClick}>
                 <Badge
-                  badgeContent={pendingRequests.length}
+                  badgeContent={totalPending}
                   color="error"
-                  invisible={pendingRequests.length === 0}
+                  invisible={totalPending === 0}
                 >
                   <NotificationsIcon />
                 </Badge>
@@ -510,51 +535,157 @@ const handleSubMenuClick = async (item) => {
                 onClose={handleNotificationClose}
                 PaperProps={{
                   sx: {
-                    width: 320,
-                    maxHeight: 400,
+                    width: 360,
+                    maxHeight: 420,
                     overflowY: "auto",
                     mt: 1.7,
+                    borderRadius: 2,
                   },
                 }}
               >
-                <Box sx={{ px: 2, py: 1 }}>
-                  <Typography variant="h6">
-                    {userRole === "ADMIN"
-                      ? "Pending VM Requests"
-                      : "Pending FLA Requests"}
+                {/* ================= OPENSTACK ================= */}
+                <Box sx={{ px: 2, py: 1, bgcolor: "#FFF7ED" }}>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    <SiOpenstack color="#F97316" />
+                    OpenStack Requests ({openstackPending.length})
                   </Typography>
                 </Box>
+
                 <Divider />
 
-                {pendingRequests.length === 0 ? (
-                  <MenuItem disabled>No pending requests</MenuItem>
+                {openstackPending.length === 0 ? (
+                  <MenuItem disabled>No pending OpenStack requests</MenuItem>
                 ) : (
-                  pendingRequests.map((req) => (
+                  openstackPending.map((req) => (
                     <MenuItem
-                      key={req.id}
-                      onClick={handleApprovalonClick}
-                      sx={{ alignItems: "flex-start" }}
+                      key={`os-${req.id}`}
+                      onClick={() => {
+                        navigate(
+                          userRole === "ADMIN"
+                            ? "/app/openstack/admin/approvals"
+                            : "/app/openstack/fla/approvals"
+                        );
+                        handleNotificationClose();
+                      }}
+                      sx={{
+                        alignItems: "flex-start",
+                        gap: 1.5,
+                        bgcolor: "#FFF7ED",
+                        "&:hover": { bgcolor: "#FFEDD5" },
+                      }}
                     >
-                      <Box>
-                        <Typography variant="body1" noWrap>
-                          <strong>{req.name}</strong> sent request for{" "}
-                          <strong>{req.project_name}</strong>
+                      {/* Icon */}
+                      <Box
+                        sx={{
+                          bgcolor: "#FDBA74",
+                          p: 1,
+                          borderRadius: "50%",
+                          display: "flex",
+                        }}
+                      >
+                        <SiOpenstack color="#9A3412" size={18} />
+                      </Box>
+
+                      {/* Content */}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {req.name}
                         </Typography>
                         <Typography
                           variant="caption"
                           color="text.secondary"
-                          sx={{ display: "block", mt: 0.5 }}
+                          noWrap
                         >
-                          {new Date(req.request_timestamp).toLocaleString(
-                            "en-IN",
-                            {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              hour12: true,
-                            }
+                          Project: {req.project_name}
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", mt: 0.5, textAlign: "right" }}
+                          color="text.secondary"
+                        >
+                          {dayjs(req.request_timestamp).format(
+                            "DD MMM YYYY, hh:mm A"
+                          )}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  ))
+                )}
+
+                <Divider sx={{ my: 1 }} />
+
+                {/* ================= KUBERNETES ================= */}
+                <Box sx={{ px: 2, py: 1, bgcolor: "#EFF6FF" }}>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                  >
+                    <AiOutlineKubernetes color="#2563EB" size={18} />
+                    Kubernetes Requests ({k8sPending.length})
+                  </Typography>
+                </Box>
+
+                <Divider />
+
+                {k8sPending.length === 0 ? (
+                  <MenuItem disabled>No pending Kubernetes requests</MenuItem>
+                ) : (
+                  k8sPending.map((req) => (
+                    <MenuItem
+                      key={`k8s-${req.id}`}
+                      onClick={() => {
+                        navigate(
+                          userRole === "ADMIN"
+                            ? "/app/kubernetes/admin-service-approval"
+                            : "/app/kubernetes/fla-service-approval"
+                        );
+                        handleNotificationClose();
+                      }}
+                      sx={{
+                        alignItems: "flex-start",
+                        gap: 1.5,
+                        bgcolor: "#EFF6FF",
+                        "&:hover": { bgcolor: "#DBEAFE" },
+                      }}
+                    >
+                      {/* Icon */}
+                      <Box
+                        sx={{
+                          bgcolor: "#93C5FD",
+                          p: 1,
+                          borderRadius: "50%",
+                          display: "flex",
+                        }}
+                      >
+                        <AiOutlineKubernetes color="#1E40AF" size={18} />
+                      </Box>
+
+                      {/* Content */}
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="body2" fontWeight={600} noWrap>
+                          {req.app_name}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                        >
+                          Service: {req.service_name}
+                        </Typography>
+
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", mt: 0.5, textAlign: "right" }}
+                          color="text.secondary"
+                        >
+                          {dayjs(req.request_timestamp).format(
+                            "DD MMM YYYY, hh:mm A"
                           )}
                         </Typography>
                       </Box>
@@ -651,9 +782,9 @@ const handleSubMenuClick = async (item) => {
                   <Link to={item.path} className="link">
                     {isApprovals ? (
                       <Badge
-                        badgeContent={pendingRequests.length}
+                        badgeContent={openstackPending.length}
                         color="error"
-                        invisible={pendingRequests.length === 0}
+                        invisible={openstackPending.length === 0}
                       >
                         <span>{item.name}</span>
                       </Badge>
