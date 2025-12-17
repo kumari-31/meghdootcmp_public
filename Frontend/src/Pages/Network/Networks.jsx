@@ -16,6 +16,7 @@ import {
   TablePagination, 
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
@@ -82,6 +83,9 @@ const Networks = () => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [networkToUpdate, setNetworkToUpdate] = useState(null);
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   const theme = useTheme(); 
   const [newNetwork, setNewNetwork] = useState({
@@ -250,9 +254,10 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
       const regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\/([0-9]|[1-2][0-9]|3[0-2])$/;
       return regex.test(cidr);
     };
-    const handleCreateNetwork = async (e) => {
-      e.preventDefault();
 
+   const handleCreateNetwork = async (e) => {
+      e.preventDefault();
+      if (creating) return; // ⛔ prevent double click
      
       // Check for empty fields
       if (!newNetwork.name || !newNetwork.subnet_name || !newNetwork.network_address || !newNetwork.gateway_ip) {
@@ -285,6 +290,7 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
     
       // Proceed with API request
       try {
+        setCreating(true); // 🔄 START LOADER
         const response = await apiClient.post('/networks/create/', {
           name: newNetwork.name,
           subnet_name: newNetwork.subnet_name,
@@ -301,11 +307,15 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
         console.error('Error creating network:', error);
         alert('Error creating network. Please check the inputs and try again.');
       }
+      finally {
+        setCreating(false); // ✅ STOP LOADER
+      }
     };
     
     const handleUpdateNetwork = async (e) => {
       e.preventDefault();
     
+      if (updating) return; // ⛔ prevent double submit
       if (!networkToUpdate) {
         alert('No network selected for update.');
         return;
@@ -333,6 +343,7 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
       }
     
       try {
+        setUpdating(true); // 🔄 START LOADER
         const response = await apiClient.put(`/networks/edit/${networkToUpdate.id}/`, {
           network_name: networkToUpdate.name,
           is_shared: networkToUpdate.is_shared,
@@ -350,6 +361,8 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
       } catch (error) {
         console.error('Error updating network:', error);
         alert('An error occurred while updating the network. Please try again later.');
+      } finally {
+        setUpdating(false); // ✅ STOP LOADER
       }
     };
     
@@ -444,7 +457,7 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New Network
@@ -458,8 +471,12 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
             <TextField label="Gateway IP" name="gateway_ip" onChange={handleInputChange} value={newNetwork.gateway_ip} fullWidth margin="normal" required error={!!formErrors.gateway_ip}
   helperText={formErrors.gateway_ip}/>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Create"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -469,7 +486,7 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined :  () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update Network
@@ -489,8 +506,12 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
               <input type="checkbox" name="is_shared" onChange={handleUpdateInputChange} checked={networkToUpdate?.is_shared || false} />
             </Box>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}  disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel

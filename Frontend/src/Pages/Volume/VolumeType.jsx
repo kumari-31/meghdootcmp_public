@@ -22,6 +22,7 @@ import {
   TablePagination,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -83,6 +84,9 @@ const VolumeTypes = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const theme = useTheme();
 
   const [fieldErrors, setFieldErrors] = useState({
@@ -240,7 +244,8 @@ const VolumeTypes = () => {
 
   const handleCreateVolumeType = async (e) => {
     e.preventDefault();
-  
+    if (creating) return; // ⛔ prevent double click
+
       // Check name
   if (!newVolumeType.name || !nameRegex.test(newVolumeType.name)) {
     showSnackbar(
@@ -256,6 +261,7 @@ const VolumeTypes = () => {
     return;
   }
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-volume-type/', newVolumeType);
   
       // 🔥 Handle duplicate
@@ -281,12 +287,16 @@ const VolumeTypes = () => {
         "error"
       );
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
   
 
   // Update volume type
   const handleUpdateVolumeType = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!volumeToUpdate) return;
      // Validate
   if (!volumeToUpdate.name || !nameRegex.test(volumeToUpdate.name)) {
@@ -302,6 +312,8 @@ const VolumeTypes = () => {
     return;
   }
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.put(`/update-volume-type/${volumeToUpdate.id}/`, volumeToUpdate);
       if (response.status === 200) {
         showSnackbar('Volume type updated successfully', 'success');
@@ -312,6 +324,9 @@ const VolumeTypes = () => {
     } catch (err) {
       console.error(err);
       showSnackbar('Error updating volume type', 'error');
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -392,7 +407,7 @@ const VolumeTypes = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () => setShowCreateForm(false)}>
         <Box  sx={modalStyle}>
           <h2>Create Volume Type</h2>
           <form onSubmit={handleCreateVolumeType}>
@@ -419,7 +434,13 @@ const VolumeTypes = () => {
 
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Create</Button>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
+                </Button>
               <Button type="button" variant="outlined" onClick={() => setShowCreateForm(false)}>Cancel</Button>
             </Box>
           </form>
@@ -427,7 +448,7 @@ const VolumeTypes = () => {
       </Modal>
 
       {/* Update Modal */}
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
       <Box  sx={modalStyle}>
 
           <h2>Update Volume Type</h2>
@@ -454,7 +475,13 @@ const VolumeTypes = () => {
 
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Update</Button>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
+                </Button>
               <Button type="button" variant="outlined" onClick={() => setShowUpdateForm(false)}>Cancel</Button>
             </Box>
           </form>

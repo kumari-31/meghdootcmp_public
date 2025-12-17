@@ -24,6 +24,7 @@ import {
   TablePagination,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -83,7 +84,7 @@ const FloatingIps = () => {
   const [projects, setProjects] = useState([]);
   const [networks, setNetworks] = useState([]);
   const [formErrors, setFormErrors] = useState({});
-
+  const [creating, setCreating] = useState(false);
   const theme = useTheme(); 
   const [associateData, setAssociateData] = useState({
     network_pool: 'External Network 10.184.53.0/24',
@@ -273,12 +274,14 @@ const FloatingIps = () => {
 
   const handleFloatingIpActions = async (e) => {
     e.preventDefault();
-  
+    if (creating) return; // ⛔ prevent double click
+
     if (!validateAssociateForm()) {
       return; // Stop submission if validation fails
     }
   
     try {
+      setCreating(true); // 🔄 START LOADER
       let floatingIp = associateData.floating_ip;
   
       if (!floatingIp) {
@@ -312,6 +315,7 @@ const FloatingIps = () => {
         network_name: '',
       });
       setShowAssociateForm(false);
+      setCreating(false); // ✅ STOP LOADER
     }
   };
   
@@ -403,7 +407,7 @@ const FloatingIps = () => {
         </div>
       </div>
 
-      <Modal open={showAssociateForm} onClose={() => setShowAssociateForm(false)}>
+      <Modal open={showAssociateForm} onClose={ creating ? undefined : () => setShowAssociateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Associate Floating IP
@@ -471,9 +475,13 @@ const FloatingIps = () => {
 
               </Select>
             </FormControl>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }} disabled={creating}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Associate/Create
+              {creating ? (
+              <CircularProgress size={22} sx={{ color: "#fff" }} />
+            ) : (
+              "Create"
+            )}
               </Button>
               <Button type="button" onClick={() => setShowAssociateForm(false)} variant="outlined">
                 Cancel

@@ -3,6 +3,8 @@ import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
+import { CircularProgress } from '@mui/material';
+
 import {
   Table,
   TableBody,
@@ -90,6 +92,9 @@ const Groups = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // State for custom confirmation modal
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
@@ -315,7 +320,7 @@ const Groups = () => {
   const handleCreateGroup = async (e) => {
     e.preventDefault();
 
-
+    if (creating) return; // ⛔ prevent double click
     if (!groupNameRegex.test(newGroup.name)) {
       showSnackbar("Group name can contain only letters, numbers, underscore (_) and hyphen (-). No spaces.", "error");
       return;
@@ -344,6 +349,7 @@ const Groups = () => {
     }
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-group-with-members/', payload);
       if (response.status === 201 || response.status === 200) {
         showSnackbar('Group created successfully', 'success');
@@ -356,13 +362,15 @@ const Groups = () => {
     } catch (error) {
       console.error('Error creating group:', error);
       showSnackbar('Error creating group. Please check the inputs and try again.', 'error');
+    } finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
   const handleUpdateGroup = async (e) => {
     e.preventDefault();
 
-
+    if (updating) return; // ⛔ prevent double submit
       if (!groupNameRegex.test(groupToUpdate.name)) {
         showSnackbar("Group name may contain only alphabets, numbers, underscore (_) and hyphen (-). No spaces.", "error");
         return;
@@ -383,6 +391,7 @@ const Groups = () => {
     };
 
     try {
+      setUpdating(true); // 🔄 START LOADER
       const response = await apiClient.put(`/update-group/${groupToUpdate.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('Group updated successfully', 'success');
@@ -395,6 +404,8 @@ const Groups = () => {
     } catch (error) {
       showSnackbar('Error updating group', 'error');
       console.error(error);
+    }  finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -492,7 +503,10 @@ const Groups = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal
+          open={showCreateForm}
+          onClose={creating ? undefined : () => setShowCreateForm(false)}
+        >
         <Box sx={modalStyle}>
           <h2>Create New Group</h2>
           <form onSubmit={handleCreateGroup}>
@@ -519,8 +533,12 @@ const Groups = () => {
               Add Member
             </Button>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -530,7 +548,10 @@ const Groups = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal
+          open={showUpdateForm}
+          onClose={updating ? undefined : () => setShowUpdateForm(false)}
+        >
         <Box sx={modalStyle}>
           <h2>Update Group</h2>
           <form onSubmit={handleUpdateGroup}>
@@ -544,9 +565,13 @@ const Groups = () => {
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              {updating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Update"
+                )}
               </Button>
-              <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
+              <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined" disabled={updating}>
                 Cancel
               </Button>
             </Box>

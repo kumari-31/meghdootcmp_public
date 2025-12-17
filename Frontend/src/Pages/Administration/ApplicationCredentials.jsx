@@ -20,6 +20,7 @@ import {
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { GoAlert } from 'react-icons/go';
 import '../style.css';
+import { CircularProgress } from '@mui/material';
 
 // ---------- Styled Components ----------
 // Styled Table Components
@@ -87,6 +88,8 @@ const ApplicationCredentials = () => {
     roles: [],
     unrestricted: false,
   });
+  const [creating, setCreating] = useState(false);
+
 
   // Snackbar
    const theme = useTheme();
@@ -214,8 +217,10 @@ const ApplicationCredentials = () => {
   // ---------- Create Credential ----------
   const handleCreateCredential = async (e) => {
     e.preventDefault();
+    if (creating) return; 
     const payload = { ...newCredential };
     try {
+      setCreating(true); 
       const res = await apiClient.post('/identity/application-credentials/', payload);
       if ([200, 201].includes(res.status)) {
         showSnackbar('Credential created successfully', 'success');
@@ -236,6 +241,9 @@ const ApplicationCredentials = () => {
     } catch (err) {
       console.error('Error creating credential:', err);
       showSnackbar(err.response?.data?.detail || 'Failed to create credential', 'error');
+    }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
@@ -362,7 +370,11 @@ const ApplicationCredentials = () => {
       </div>
 
       {/* ---------- Create Modal ---------- */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal
+          open={showCreateForm}
+          onClose={creating ? undefined : () => setShowCreateForm(false)}
+        >
+
         <Box sx={modalStyle}>
           <h2>Create Application Credential</h2>
           <form onSubmit={handleCreateCredential}>
@@ -434,9 +446,20 @@ const ApplicationCredentials = () => {
             </FormControl>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
-              </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              sx={{ mr: 1 }}
+              disabled={creating}
+            >
+              {creating ? (
+                <CircularProgress size={22} sx={{ color: '#fff' }} />
+              ) : (
+                'Create'
+              )}
+            </Button>
+
               <Button
                   type="button"
                   onClick={() => {

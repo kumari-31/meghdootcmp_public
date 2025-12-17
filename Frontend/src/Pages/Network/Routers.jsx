@@ -28,6 +28,8 @@ import {
   TablePagination,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import { CircularProgress } from '@mui/material';
+
 import { tableCellClasses } from '@mui/material/TableCell';
 
 // Styled Table Components
@@ -97,7 +99,9 @@ const Routers = () => {
     external_network_name: "",
     project_id: "",
   });
-  
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
 
   const [routerToUpdate, setRouterToUpdate] = useState(null);
   const [networks, setNetworks] = useState([]);
@@ -309,6 +313,7 @@ const Routers = () => {
   const handleCreateRouter = async (e) => {
     e.preventDefault();
 
+    if (creating) return; // ⛔ prevent double click
     if (!validateRouterForm()) {
       return;
     }
@@ -329,6 +334,7 @@ const Routers = () => {
     };
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-router/', payload);
       if (response.status === 201 || response.status === 200) {
         alert('Router created successfully');
@@ -350,10 +356,14 @@ const Routers = () => {
       console.error('Error creating router:', error);
       alert('Error creating router. Please check the inputs and try again.');
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   const handleUpdateRouter = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!validateUpdateForm()) return;
     
     const payload = {
@@ -362,6 +372,8 @@ const Routers = () => {
     };
 
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.put(`/edit-router/${routerToUpdate['Router ID']}/`, payload, {});
       if (response.status === 200) {
         alert('Router updated successfully');
@@ -371,6 +383,9 @@ const Routers = () => {
     } catch (error) {
       console.error('Error updating router:', error);
       alert('Failed to update router');
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -446,7 +461,7 @@ const Routers = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New Router
@@ -539,9 +554,13 @@ const Routers = () => {
             </FormControl>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
-              </Button>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
+              </Button> 
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
               </Button>
@@ -550,7 +569,7 @@ const Routers = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update Router
@@ -571,8 +590,12 @@ const Routers = () => {
               <FormControlLabel control={<Checkbox checked={routerToUpdate?.admin_state_up || false} onChange={handleUpdateRouterInputChange} name="admin_state_up" />} label="Admin State Up" />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}  disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel

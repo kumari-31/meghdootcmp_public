@@ -25,6 +25,7 @@ import {
   Checkbox, // Import Checkbox for selection
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -89,6 +90,7 @@ const Flavors = () => {
   const [rowsPerPage, setRowsPerPage] = useState(8);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [selectedFlavorsToDelete, setSelectedFlavorsToDelete] = useState([]);
+  const [creating, setCreating] = useState(false);
 
   const theme = useTheme(); 
   const [newFlavor, setNewFlavor] = useState({
@@ -207,7 +209,7 @@ const Flavors = () => {
 
   const handleCreateFlavor = async (e) => {
     e.preventDefault();
-
+    if (creating) return; // ⛔ prevent double click
     // Prepare payload, converting numeric fields to numbers
     const payload = {
       name: newFlavor.name,
@@ -231,6 +233,7 @@ const Flavors = () => {
     }
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/flavors/create/', payload);
       if (response.status === 201) {
         showSnackbar('Flavor created successfully', 'success');
@@ -252,6 +255,9 @@ const Flavors = () => {
     } catch (error) {
       console.error('Error creating flavor:', error);
       showSnackbar(`Error creating flavor: ${error.response?.data?.message || error.message}`, 'error');
+    }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
@@ -387,7 +393,7 @@ const Flavors = () => {
       </div>
 
       {/* Create Flavor Modal */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New Flavor
@@ -420,8 +426,12 @@ const Flavors = () => {
             </FormControl>
 
             <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Create"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel

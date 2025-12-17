@@ -28,6 +28,8 @@ import {
   Slide,
   TablePagination, // Import TablePagination
 } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+
 import { styled } from '@mui/material/styles';
 import { useTheme } from "@mui/material/styles";
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -100,6 +102,9 @@ const Users = () => {
     role: '',
     enabled: false,
   });
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const [userToUpdate, setUserToUpdate] = useState(null);
   const [projects, setProjects] = useState([]);
   const [availableRoles, setAvailableRoles] = useState([]);
@@ -363,6 +368,8 @@ const Users = () => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+
+    if (creating) return; // ⛔ prevent double click
     // Username format validation
     if (!usernameRegex.test(newUser.username)) {
       showSnackbar(
@@ -418,6 +425,7 @@ const Users = () => {
     };
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/users/create/', payload);
       if (response.status === 201 || response.status === 200) {
         showSnackbar('User created successfully', 'success');
@@ -448,10 +456,14 @@ const Users = () => {
         showSnackbar('Error creating user. Please check the inputs and try again.', 'error');
       }
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!userToUpdate?.id) {
       showSnackbar('Please select a user to update.', 'warning');
       return;
@@ -482,6 +494,8 @@ const Users = () => {
     };
 
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.patch(`/update-users/${userToUpdate.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('User updated successfully', 'success');
@@ -501,6 +515,8 @@ const Users = () => {
         console.error('Error:', error.message);
         showSnackbar('An error occurred during the update.', 'error');
       }
+    }finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -606,7 +622,7 @@ const Users = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() =>setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () =>setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New User
@@ -681,8 +697,14 @@ const Users = () => {
               />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" 
+              variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={creating}>
+                {creating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Create"
+                  )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -692,7 +714,7 @@ const Users = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update User
@@ -755,8 +777,13 @@ const Users = () => {
               />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }} disabled={updating}>
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel

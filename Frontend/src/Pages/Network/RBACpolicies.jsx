@@ -4,6 +4,7 @@ import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import {
   Table,
@@ -93,6 +94,9 @@ const RBACpolicies = () => {
   const theme = useTheme(); 
   const [formErrors, setFormErrors] = useState({});
 
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // Snackbar states and handlers
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -275,6 +279,7 @@ const RBACpolicies = () => {
   
   const createRbacPolicy = async (e) => {
     e.preventDefault();
+    if (creating) return; // ⛔ prevent double click
      // 🔥 ADD HERE (validation check)
     if (!validateCreateForm()) {
       showSnackbar("Please fix the form errors.", "error");
@@ -286,6 +291,7 @@ const RBACpolicies = () => {
       network_id: network,
     };
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-rbac-policy/', payload);
 
       if (response.status === 200 || response.status === 201) {
@@ -318,11 +324,14 @@ const RBACpolicies = () => {
       } else {
         showSnackbar('Network error. Please check your connection.', 'error');
       }
+    } finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
   const updateRbacPolicy = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!editingPolicy) return; // Should not happen if button is disabled, but good to check
 
     const payload = {
@@ -332,6 +341,8 @@ const RBACpolicies = () => {
       // If you intend to update them, add them to the update form and payload.
     };
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.patch(`/update-rbac-policy/${editingPolicy.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('RBAC Policy updated successfully!', 'success');
@@ -349,6 +360,9 @@ const RBACpolicies = () => {
       } else {
         showSnackbar('Failed to update RBAC Policy. Please try again.', 'error');
       }
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -473,7 +487,7 @@ const RBACpolicies = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New RBAC Policy
@@ -552,8 +566,12 @@ const RBACpolicies = () => {
             
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating} >
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -563,7 +581,7 @@ const RBACpolicies = () => {
         </Box>
       </Modal>
 
-      <Modal open={editingPolicy !== null} onClose={() => setEditingPolicy(null)}>
+      <Modal open={editingPolicy !== null} onClose={updating ? undefined : () => setEditingPolicy(null)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update RBAC Policy
@@ -590,8 +608,12 @@ const RBACpolicies = () => {
 
             {/* If you add other fields for update, they would go here */}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}  disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setEditingPolicy(null)} variant="outlined">
                 Cancel

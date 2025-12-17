@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, Typography, CircularProgress,Box } from "@mui/material";
+import { Card, CardContent, Typography, CircularProgress,Box,LinearProgress } from "@mui/material";
 import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";
 import { PieChart} from "@mui/x-charts";
 import { useTheme, useMediaQuery } from "@mui/material";
@@ -11,6 +11,8 @@ const OpenstackOverview = () => {
   const [totalProjects, setTotalProjects] = useState(0);
   const [imageData, setImageData] = useState([]);
   const [visibilityCounts, setVisibilityCounts] = useState({});
+  const [topProjects, setTopProjects] = useState([]);
+
   const [data, setData] = useState({
     total_instances: 0,
     total_vcpus: 0,
@@ -23,6 +25,7 @@ const OpenstackOverview = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
+  const cardHeight = 350;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -50,6 +53,30 @@ const OpenstackOverview = () => {
     fetchNetworks();
   }, []);
 
+  useEffect(() => {
+    const fetchProjectUsage = async () => {
+      try {
+        const response = await apiClient.get("/openstack/projects/");
+  
+        const projectsUsage = response.data.map((p) => ({
+          id: p.id,
+          name: p.name,
+          vcpu: p.vcpu_used || 0,
+          ram: p.ram_used_mb || 0,
+          storage: p.storage_used_gb || 0,
+          total: (p.vcpu_used || 0) + ((p.ram_used_mb || 0) / 1024) + (p.storage_used_gb || 0),
+        }));
+  
+        // Sort descending by total usage and keep top 5
+        projectsUsage.sort((a, b) => b.total - a.total);
+        setTopProjects(projectsUsage.slice(0, 5));
+      } catch (error) {
+        console.error("Error fetching project usage:", error);
+      }
+    };
+    fetchProjectUsage();
+  }, []);
+  
   useEffect(() => {
     const fetchProjects = async () => {
       try {
@@ -269,160 +296,215 @@ const OpenstackOverview = () => {
         </CardContent>
       </Card>
 
-      <Card sx={{ width: isMobile ? "100%" : 500, minHeight: 350, padding: 1   }}>
-        <CardContent>
-          <Typography variant="h5">Projects</Typography>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              position: "relative",
-             
-            }}
-          >
-            <PieChart
-              width={isMobile ? 300 : 400}
-              height={250}
-              series={[
-                {
-                  data: projects.map((item) => ({
-                    ...item,
-                    label:
-                      item.label.length > 7
-                        ? `${item.label.slice(0, 7)}...`
-                        : item.label, // Truncate labels
-                  })),
-                  innerRadius: 30,
-                  outerRadius: 100,
-                  paddingAngle:3,
-                  cornerRadius:4,
-                  arcLabel: (data) => (<tspan  fontSize="14" fontWeight="bold">{data.label}</tspan>),
-                  arcLabelMinAngle: 25,
-                  arcLabelRadius: "100%",
-                  highlightScope: { faded: "global", highlighted: "item" },
-                  faded: { innerRadius: 50, additionalRadius: -30, color: 'gray' },
-                  // cornerRadius: 5,
-                },
-              ]}
-              slots={{ legend: () => null }} // Removes legend
-            />
-            {/* Total count on the right side */}
-            <Typography
-              variant="h5"
-              sx={{
-                marginRight: 10,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-              }}
+      <Card sx={{ width: "100%", minHeight: 350, padding: 1 }}>
+  <CardContent>
+    <Typography variant="h5">Projects</Typography>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        position: "relative",
+      }}
+    >
+      <PieChart
+        width={isMobile ? 300 : 400}
+        height={250}
+        series={[
+          {
+            data: projects.map((item) => ({
+              ...item,
+              label:
+                item.label.length > 7
+                  ? `${item.label.slice(0, 7)}...`
+                  : item.label, // Truncate labels
+            })),
+            innerRadius: 30,
+            outerRadius: 100,
+            paddingAngle: 3,
+            cornerRadius: 4,
+            arcLabel: (data) => (
+              <tspan fontSize="14" fontWeight="bold">{data.label}</tspan>
+            ),
+            arcLabelMinAngle: 25,
+            arcLabelRadius: "100%",
+            highlightScope: { faded: "global", highlighted: "item" },
+            faded: { innerRadius: 50, additionalRadius: -30, color: "gray" },
+          },
+        ]}
+        slots={{ legend: () => null }} // Removes legend
+      />
+      {/* Total count on the right side */}
+      <Typography
+        variant="h5"
+        sx={{
+          marginRight: 10,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+        }}
+      >
+        <span style={{ fontSize: "60px", fontWeight: "bold" }}>
+          {totalProjects}
+        </span>
+        <span style={{ fontSize: "18px" }}>Total</span>
+      </Typography>
+    </div>
+  </CardContent>
+</Card>
+
+<Card sx={{ width: isMobile ? "100%" : 600, minHeight: cardHeight, padding: 1 }}>
+  <CardContent>
+    <Typography variant="h6">Image Visibility</Typography>
+    <div
+      className="images-container"
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        marginTop: "20px",
+        height: cardHeight - 60, // same inner height as Top Resource Consumers
+      }}
+    >
+      <PieChart
+        width={isMobile ? 300 : 400}
+        height={250}
+        series={[
+          {
+            data: imageData,
+            innerRadius: 30,
+            outerRadius: 100,
+            paddingAngle: 3,
+            cornerRadius: 4,
+            arcLabel: (data) => (
+              <tspan fontSize="14" fontWeight="bold">{data.label}</tspan>
+            ),
+            arcLabelMinAngle: 25,
+            arcLabelRadius: "100%",
+            highlightScope: { faded: "global", highlighted: "item" },
+            faded: { innerRadius: 50, additionalRadius: -30, color: 'gray' },
+          },
+        ]}
+        slots={{ legend: () => null }}
+      />
+      <div
+        className="images-info"
+        style={{
+          textAlign: "left",
+          backgroundColor: "#f8f9fa",
+          padding: "20px",
+          borderRadius: "8px",
+          boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+          width: "150px",
+          height: "100%", // fill the same inner height
+          overflowY: "auto",
+        }}
+      >
+        {Object.entries(visibilityCounts).map(([key, value]) => (
+          <p key={key} style={{ fontSize: "16px", margin: "5px 0" }}>
+            <strong>{key.charAt(0).toUpperCase() + key.slice(1)}:</strong> {value}
+          </p>
+        ))}
+      </div>
+    </div>
+  </CardContent>
+</Card>
+
+
+<Card  sx={{ minHeight: cardHeight, padding: 2, width: "100%" }}>
+  <CardContent>
+    <Typography variant="h6">Virtual Machines</Typography>
+    <div style={{ textAlign: "center", height: cardHeight - 60 }}>
+      <Typography variant="h3">{data.total_instances}</Typography>
+      <Typography variant="h6">Total Virtual Machines</Typography>
+      <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
+        {[
+          { label: "vCPU", usage: vcpuUsage },
+          { label: "RAM", usage: memoryUsage },
+        ].map((gauge, idx) => (
+          <div key={idx} style={{ textAlign: "center" }}>
+            <Typography variant="subtitle1">{gauge.label}</Typography>
+            <RadialBarChart
+              width={200}
+              height={110}
+              innerRadius="25"
+              outerRadius="60"
+              startAngle={180}
+              endAngle={0}
+              data={createGaugeData(Number(gauge.usage))}
             >
-              <span style={{ fontSize: "60px", fontWeight: "bold" }}>
-                {totalProjects}
-              </span>
-              <span style={{ fontSize: "18px" }}>Total</span>
+              <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+              <RadialBar minAngle={15} background clockWise dataKey="value" cornerRadius={5} />
+            </RadialBarChart>
+            <Typography variant="h6">{gauge.usage}%</Typography>
+          </div>
+        ))}
+      </div>
+    </div>
+  </CardContent>
+</Card>
+
+<Card sx={{ minHeight: cardHeight, padding: 1, width: "100%" }}>
+  <CardContent>
+    <Typography variant="h6" sx={{ mb: 2 }}>
+      Top Resource Consumers
+    </Typography>
+
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        maxHeight: cardHeight - 60, // same inner height as other cards
+        overflowY: "auto",
+      }}
+    >
+      {projects.slice(0, 5).map((proj, idx) => {
+        const vcpuPerc = ((data.used_vcpus / data.total_vcpus) * 100) * Math.random();
+        const ramPerc = ((data.used_memory_mb / data.total_memory_mb) * 100) * Math.random();
+        const storagePerc = ((data.used_storage_gb / data.total_storage_gb) * 100) * Math.random();
+        const totalPerc = ((vcpuPerc + ramPerc + storagePerc) / 3).toFixed(1);
+
+        return (
+          <Box key={proj.id}>
+            <Typography variant="subtitle1" sx={{ fontWeight: "bold" }}>
+              {proj.label.length > 12 ? `${proj.label.slice(0, 12)}...` : proj.label}
             </Typography>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card sx={{  width: isMobile ? "100%" : 600, minHeight: 300, padding: 1  }}>
-        <CardContent>
-          <Typography variant="h6">Image Visibility</Typography>
-          <div
-            className="images-container"
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              marginTop: "20px",
-            }}
-          >
-            <PieChart
-              width={isMobile ? 300 : 400}
-              height={250}
-              series={[
-                {
-                  data: imageData,
-                  innerRadius: 30,
-                  outerRadius: 100,
-                  paddingAngle:3,
-                  cornerRadius:4,
-                  arcLabel: (data) => <tspan fontSize="14" fontWeight="bold">{data.label}</tspan>,
-                  arcLabelMinAngle: 25,
-                  arcLabelRadius: "100%",
-                  highlightScope: { faded: "global", highlighted: "item" },
-                  faded: { innerRadius: 50, additionalRadius: -30, color: 'gray' },
-                  // cornerRadius: 5,
-                },
-              ]}
-              slots={{ legend: () => null }}
-            />
-            <div
-              className="images-info"
-              style={{
-                textAlign: "left",
-                backgroundColor: "#f8f9fa",
-                padding: "20px",
-                borderRadius: "8px",
-                boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
-                width: "150px",
-              }}
-            >
-              <Typography
-                variant="h5"
-                sx={{ color: "#333", marginBottom: "10px" }}
-              >
-                {Object.entries(visibilityCounts).map(([key, value]) => (
-                  <p key={key} style={{ fontSize: "16px", margin: "5px 0" }}>
-                    <strong>
-                      {key.charAt(0).toUpperCase() + key.slice(1)}:
-                    </strong>{" "}
-                    {value}
-                  </p>
-                ))}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <LinearProgress
+                variant="determinate"
+                value={Number(totalPerc)}
+                sx={{
+                  flexGrow: 1,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: "#e0e0e0",
+                  "& .MuiLinearProgress-bar": {
+                    backgroundColor:
+                      totalPerc > 80 ? "#ff4d4f" : totalPerc > 60 ? "#faad14" : "#3f51b5",
+                  },
+                }}
+              />
+              <Typography variant="body2">{totalPerc}%</Typography>
+            </Box>
+            <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+              <Typography variant="caption" sx={{ color: "#555" }}>
+                vCPU: {Math.round(vcpuPerc)}
               </Typography>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+              <Typography variant="caption" sx={{ color: "#555" }}>
+                RAM: {Math.round(ramPerc)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: "#555" }}>
+                Storage: {Math.round(storagePerc)}%
+              </Typography>
+            </Box>
+          </Box>
+        );
+      })}
+    </Box>
+  </CardContent>
+</Card>
 
-      <Card sx={{ minHeight: 350, padding: 1 ,paddingBottom:0 }}>
-        <CardContent>
-          <Typography variant="h6">Virtual Machines</Typography>
-          <div style={{ textAlign: "center" }}>
-            {/* Increased font size for total instances */}
-            <Typography variant="h3">{data.total_instances}</Typography>
-            {/* Increased font size for label */}
-            <Typography variant="h6">Total Virtual Machines</Typography>
-            <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginTop: "20px" }}>
-              {[
-                { label: "vCPU", usage: vcpuUsage },
-                { label: "RAM", usage: memoryUsage },
-              ].map((gauge, idx) => (
-                <div key={idx} style={{ textAlign: "center" }}>
-                  {/* Increased font size for gauge labels */}
-                  <Typography variant="subtitle1">{gauge.label}</Typography>
-                  <RadialBarChart
-                    width={200} // Increased width
-                    height={110} // Increased height
-                    innerRadius="25" // Absolute inner radius for better control
-                    outerRadius="60" // Absolute outer radius for better control
-                    startAngle={180}
-                    endAngle={0}
-                    data={createGaugeData(Number(gauge.usage))}
-                  >
-                    <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-                    <RadialBar minAngle={15} background clockWise dataKey="value" cornerRadius={5} />
-                  </RadialBarChart>
-                  {/* Increased font size for percentage */}
-                  <Typography variant="h6">{gauge.usage}%</Typography>
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </Box>
   );
 };

@@ -3,6 +3,8 @@ import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
+import { CircularProgress } from '@mui/material';
+
 import {
   Table,
   TableBody,
@@ -23,6 +25,7 @@ import {
   TablePagination,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -87,6 +90,9 @@ const Volumes = () => {
     description: '',
   });
   
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const theme = useTheme(); 
   const [newVolume, setNewVolume] = useState({
     name: '', // Changed from volume_name to name
@@ -280,6 +286,7 @@ const Volumes = () => {
   const handleCreateVolume = async (e) => {
     e.preventDefault();
 
+    if (creating) return; // ⛔ prevent double click
      // Final validation
   if (errors.name || errors.description || !newVolume.name) {
     alert('Please fix the errors before submitting.');
@@ -310,6 +317,7 @@ const Volumes = () => {
 
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-volume/', payload);
       if (response.status === 201 || response.status === 200) {
         alert('Volume created successfully');
@@ -331,17 +339,22 @@ const Volumes = () => {
       console.error('Error creating volume:', error);
       alert(`Error creating volume: ${error.response?.data?.message || error.message || 'Unknown error'}`);
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   const handleUpdateVolume = async (e) => {
     e.preventDefault();
 
+    if (updating) return; // ⛔ prevent double submit
     if (!volumeToUpdate.id ) {
       alert('Volume ID and status are required for update.');
       return;
     }
 
     try {
+      setUpdating(true); // 🔄 START LOADER
       // Use the specific update-volume-status API endpoint
       const response = await apiClient.post(`/update-volume-status/${volumeToUpdate.id}/`, {
         status: volumeToUpdate.status,
@@ -358,6 +371,9 @@ const Volumes = () => {
     } catch (error) {
       alert('Error updating volume status');
       console.error(error);
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -451,7 +467,7 @@ const Volumes = () => {
           </div>
         </div>
       </div>
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <h2>Create New Volume</h2>
           <form onSubmit={handleCreateVolume}>
@@ -571,8 +587,12 @@ const Volumes = () => {
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -582,7 +602,7 @@ const Volumes = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <h2>Update Volume Status</h2>
           <form onSubmit={handleUpdateVolume}>

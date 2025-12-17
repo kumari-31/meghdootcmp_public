@@ -26,6 +26,8 @@ import {
   ListItemText, // Added for multi-select text
   OutlinedInput, // Added for multi-select input
 } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+
 import { useTheme } from "@mui/material/styles";
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
 
@@ -111,6 +113,9 @@ const Projects = () => {
   const [selectedUser, setSelectedUser] = useState(''); // Currently selected user for role assignment
   const [selectedRole, setSelectedRole] = useState('member'); // Role for the selected user (default: member)
   const [selectedGroups, setSelectedGroups] = useState([]); // Currently selected groups for assignment
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // States for custom modal dialogs (alerts, success messages, confirmations)
   const [showAlertModal, setShowAlertModal] = useState(false);
@@ -315,6 +320,8 @@ const handleGroupSelectChange = (event) => {
   const handleCreateProject = async (e) => {
     e.preventDefault();
 
+    if (creating) return; // ⛔ prevent double click
+
     if (!projectNameRegex.test(newProject.name)) {
       setShowAlertModal(true);
       setAlertMessage("Project name can contain only alphabets, underscore (_) and hyphen (-). No spaces or numbers.");
@@ -347,6 +354,7 @@ const handleGroupSelectChange = (event) => {
     };
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/projects/create/', payload);
       if (response.status === 201 || response.status === 200) {
         setShowSuccessModal(true);
@@ -375,11 +383,15 @@ const handleGroupSelectChange = (event) => {
       setShowAlertModal(true);
       setAlertMessage('Error creating project. Please check the inputs and try again.');
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   // Handles the update of an existing project
   const handleUpdateProject = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
 
     if (!projectNameRegex.test(projectToUpdate.name)) {
       setShowAlertModal(true);
@@ -401,6 +413,7 @@ const handleGroupSelectChange = (event) => {
 
     // Validate for duplicate project name during update
     try {
+      setUpdating(true); // 🔄 START LOADER
       const projectsResponse = await apiClient.get('/openstack/projects/');
       const isDuplicate = projectsResponse.data.some(
         (project) =>
@@ -442,6 +455,8 @@ const handleGroupSelectChange = (event) => {
       setShowAlertModal(true);
       setAlertMessage('Error updating project');
       console.error(error);
+    }finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -552,7 +567,7 @@ const handleGroupSelectChange = (event) => {
       </div>
 
       {/* Create New Project Modal */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New Project
@@ -662,8 +677,13 @@ const handleGroupSelectChange = (event) => {
             </FormControl>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={creating}>
+                 {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -674,7 +694,7 @@ const handleGroupSelectChange = (event) => {
       </Modal>
 
       {/* Update Project Modal */}
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update Project
@@ -717,8 +737,13 @@ const handleGroupSelectChange = (event) => {
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={updating}>
+            {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}      
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel

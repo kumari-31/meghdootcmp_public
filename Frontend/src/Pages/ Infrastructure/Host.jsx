@@ -20,6 +20,8 @@ import {
   TablePagination,
 
 } from "@mui/material";
+import { CircularProgress } from '@mui/material';
+
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { styled } from "@mui/material/styles";
 
@@ -79,6 +81,9 @@ const HostAggregates = () => {
 
   const [newAgg, setNewAgg] = useState({ name: "", availability_zone: "", metadata: {} });
   const [aggToUpdate, setAggToUpdate] = useState(null);
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
@@ -223,6 +228,7 @@ const HostAggregates = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
   
+    if (creating) return; // ⛔ prevent double click
 
     if (!validateAggregate(newAgg)) {
       return; // Stop if validation fails
@@ -241,6 +247,7 @@ const HostAggregates = () => {
     }
   
     try {
+      setCreating(true); // 🔄 START LOADER
       const payload = {
         ...newAgg,
         metadata: newAgg.metadata ? JSON.parse(JSON.stringify(newAgg.metadata)) : {},
@@ -260,11 +267,15 @@ const HostAggregates = () => {
       console.error("Error creating aggregate:", error);
       showSnackbar("Error creating host aggregate. Please try again.", "error");
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
   
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!aggToUpdate) return;
 
       if (!validateAggregate(aggToUpdate)) {
@@ -272,12 +283,17 @@ const HostAggregates = () => {
       }
 
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       await apiClient.put(`infrastructure/host-aggregates/${aggToUpdate.id}/`, aggToUpdate);
       showSnackbar("Updated successfully", "success");
       setShowUpdate(false);
       fetchAggregates();
     } catch {
       showSnackbar("Update failed", "error");
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -364,7 +380,7 @@ const HostAggregates = () => {
       </Box>
 
      {/* CREATE MODAL */}
-           <Modal open={showCreate} onClose={() => setShowCreate(false)}>
+           <Modal open={showCreate} onClose={ creating ? undefined : () => setShowCreate(false)}>
              <Box sx={modalStyle}>
                <h3>Create Host Aggregate</h3>
                <form onSubmit={handleCreate}>
@@ -394,13 +410,19 @@ const HostAggregates = () => {
                      setNewAgg({ ...newAgg, metadata: JSON.parse(e.target.value || "{}") })
                    } /> */}
      
-                 <Button type="submit" variant="contained" sx={{ mt: 2 }}>Create</Button>
+                 <Button type="submit" variant="contained" sx={{ mt: 2 }} disabled={creating}>
+                 {creating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Create"
+                  )}
+                  </Button>
                </form>
              </Box>
            </Modal>
      
            {/* UPDATE MODAL */}
-           <Modal open={showUpdate} onClose={() => setShowUpdate(false)}>
+           <Modal open={showUpdate} onClose={ updating ? undefined : () => setShowUpdate(false)}>
              <Box sx={modalStyle}>
                <h3>Update Host Aggregate</h3>
                <form onSubmit={handleUpdate}>
@@ -429,7 +451,13 @@ const HostAggregates = () => {
                      setAggToUpdate({ ...aggToUpdate, metadata: JSON.parse(e.target.value || "{}") })
                    }/>
      
-                 <Button type="submit" variant="contained" sx={{ mt: 2 }}>Update</Button>
+                 <Button type="submit" variant="contained" sx={{ mt: 2 }}  disabled={updating}> 
+                 {updating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Update"
+                  )}
+                  </Button>
                </form>
              </Box>
            </Modal>
