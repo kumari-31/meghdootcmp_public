@@ -229,6 +229,9 @@ urlpatterns = [
     path("api/health-report/", HealthReportAPIView.as_view(), name="health-report"),
     path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view(), name="host-health-summary"),
     path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view(), name="zabbix-host-list"),
+   
+    
+
 
 
     # -------------------------------
@@ -240,6 +243,7 @@ urlpatterns = [
     path("api/metrics/", get_metrics, name="get_metrics"),
     path("api/employee-details/", get_employee_details, name="employee-details"),
     path("api/employees/", EmployeeCreateAPIView.as_view(), name="employee-create"),
+    path("api/employees/bulk-upload/", EmployeeBulkUploadAPIView.as_view(), name="bulk-employee-create"),
     path("api/employees/delete/<str:employee_id>/", EmployeeDeleteAPIView.as_view(), name="delete-employee"),
     path("api/employees/update/<str:employee_id>/", EmployeeUpdateAPIView.as_view(), name="update-employee"),
     path("api/send-email/", SendEmailView.as_view(), name="send-test-email"),

@@ -14,13 +14,13 @@ const HealthMonitoring = () => {
   const [hosts, setHosts] = useState([]);
   const [selectedHost, setSelectedHost] = useState("");
   const [summary, setSummary] = useState(null);
-
   const [cpu, setCPU] = useState([]);
   const [memory, setMemory] = useState([]);
   const [disk, setDisk] = useState([]);
   const [loadAverage, setLoadAverage] = useState({});
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
+
 
   /* -------------------- LOAD HOSTS -------------------- */
   useEffect(() => {
@@ -58,12 +58,11 @@ const HealthMonitoring = () => {
     })) || [];
 
   const downloadPDF = () => {
-  window.open(
-    `${apiClient.defaults.baseURL}host-health-pdf/${selectedHost}/`,
-    "_blank"
-  );
-};
-
+    window.open(
+      `${apiClient.defaults.baseURL}host-health-pdf/${selectedHost}/`,
+      "_blank"
+    );
+  };
 
   /* -------------------- UI -------------------- */
   return (
@@ -86,7 +85,23 @@ const HealthMonitoring = () => {
         </select>
 
         {selectedHost && (
-          <button onClick={downloadPDF}>📄 Download PDF</button>
+          <button
+            onClick={downloadPDF}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: "none",
+              background: "#1976d2",
+              color: "#fff",
+              cursor: "pointer",
+              fontWeight: "bold",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            📄 Download Health Report
+          </button>
         )}
       </div>
 
@@ -210,7 +225,6 @@ const Metric = ({ title, data }) => (
 );
 
 export default HealthMonitoring;
-
 
 // import { useState, useEffect } from "react";
 // import {

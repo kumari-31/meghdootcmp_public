@@ -272,6 +272,8 @@ ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
 
 
+
+
 # """
 # Django settings for Unified_Proect_Api project.
 # Production-ready, using .env for all secrets.

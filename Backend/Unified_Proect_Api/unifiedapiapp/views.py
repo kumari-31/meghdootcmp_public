@@ -2575,6 +2575,55 @@ class EmployeeCreateAPIView(APIView):
             # Return validation errors if any
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+import csv
+import io
+
+
+class EmployeeBulkUploadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        file = request.FILES.get("file")
+
+        if not file:
+            return Response(
+                {"error": "CSV file is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not file.name.endswith(".csv"):
+            return Response(
+                {"error": "Only CSV files are allowed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        decoded_file = file.read().decode("utf-8")
+        io_string = io.StringIO(decoded_file)
+        reader = csv.DictReader(io_string)
+
+        created = []
+        errors = []
+
+        for index, row in enumerate(reader, start=1):
+            serializer = EmployeeSerializer(data=row)
+            if serializer.is_valid():
+                serializer.save()
+                created.append(serializer.data)
+            else:
+                errors.append({
+                    "row": index,
+                    "errors": serializer.errors
+                })
+
+        return Response(
+            {
+                "created_count": len(created),
+                "failed_count": len(errors),
+                "errors": errors
+            },
+            status=status.HTTP_201_CREATED if not errors else status.HTTP_207_MULTI_STATUS
+        )
+
 
 class AllRegistrationRequestsAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -9788,15 +9837,16 @@ class HostAvailabilityAPIView(APIView):
         for h in hosts:
             interfaces = h.get("interfaces", [])
 
-            # Default values
+            # Defaults
             ip = "N/A"
             status = "Unknown"
 
             if interfaces:
-                iface = h["interfaces"][0] if h.get("interfaces") else {}
-                status = availability_map.get(
-                    int(iface.get("available", 0)), "Unknown"
-                )
+                iface = interfaces[0]
+                ip = iface.get("ip", "N/A")
+
+                available = str(iface.get("available", "0"))
+                status = availability_map.get(available, "Unknown")
 
             data.append(
                 {
@@ -9809,15 +9859,14 @@ class HostAvailabilityAPIView(APIView):
 
         return Response(data)
 
+
     
 class CPUUtilizationAPIView(APIView):
     def get(self, request, hostid):
-        data = get_item_history(
-            hostid,
-            {"name": "CPU utilization"},
+         return Response(
+            get_item_history(hostid, {"key_": "system.cpu.util"})
         )
 
-        return Response(data)
 
 class MemoryUtilizationAPIView(APIView):
     def get(self, request, hostid):
@@ -10021,40 +10070,120 @@ import os
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from django.http import HttpResponse
+from .zabbix_pdf_charts import draw_line_chart
 
 class HostHealthPDFAPIView(APIView):
     def get(self, request, hostid):
         response = HttpResponse(content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="host_{hostid}_health.pdf"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="host_{hostid}_health.pdf"'
+        )
 
         c = canvas.Canvas(response, pagesize=A4)
         width, height = A4
 
         summary = HostHealthSummaryAPIView().get(request, hostid).data
+        cpu = get_item_history(hostid, {"key_": "system.cpu.util"})
+        memory = get_item_history(hostid, {"key_": "vm.memory.utilization"})
+        disk = get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"})
 
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, height - 50, "Host Health Report")
+        # ===== HEADER =====
+        logo_path = os.path.join(settings.BASE_DIR, "static", "logo191.png")
+        c.drawImage(logo_path, 40, height - 80, width=80, height=40)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(140, height - 60, "Host Health Report")
 
-        c.setFont("Helvetica", 12)
-        y = height - 100
+        c.setStrokeColor(colors.grey)
+        c.line(40, height - 90, width - 40, height - 90)
 
-        for key, value in summary.items():
-            if key != "alerts":
-                c.drawString(50, y, f"{key.replace('_', ' ').title()}: {value}")
-                y -= 20
+        # ===== HEALTH SCORE =====
+        status_color = {
+            "Healthy": colors.green,
+            "Warning": colors.orange,
+            "Critical": colors.red,
+        }[summary["status"]]
 
-        c.drawString(50, y - 10, "Recent Alerts:")
-        y -= 30
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(status_color)
+        c.drawString(40, height - 120,
+                     f"Health Score: {summary['health_score']} ({summary['status']})")
+        c.setFillColor(colors.black)
+
+        # ===== METRICS =====
+        y = height - 150
+        c.setFont("Helvetica", 11)
+        for k in ["cpu", "memory", "disk", "load_per_core"]:
+            c.drawString(40, y, f"{k.replace('_',' ').title()}: {summary[k]}")
+            y -= 18
+
+        # ===== CHARTS =====
+        # ===== CHARTS =====
+        cpu_data = list(cpu.values())[0] if cpu else []
+        memory_data = list(memory.values())[0] if memory else []
+        disk_data = list(disk.values())[0] if disk else []
+
+        if cpu_data:
+            draw_line_chart(
+                c,
+                40,
+                y - 140,
+                230,
+                120,
+                cpu_data,
+                "CPU Utilization (%)",
+            )
+
+        if memory_data:
+            draw_line_chart(
+                c,
+                310,
+                y - 140,
+                230,
+                120,
+                memory_data,
+                "Memory Utilization (%)",
+            )
+
+        if disk_data:
+            draw_line_chart(
+                c,
+                40,
+                y - 300,
+                230,
+                120,
+                disk_data,
+                "Disk Utilization (%)",
+            )
+
+
+
+        # ===== ALERTS =====
+        ay = y - 340
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(40, ay, "Recent Alerts")
+        ay -= 16
 
         for a in summary["alerts"]:
-            c.drawString(60, y, f"- {a['name']}")
-            y -= 15
+            severity = int(a.get("severity", 0))
+            sev_color = colors.red if severity >= 3 else colors.orange
+            c.setFillColor(sev_color)
+            c.drawString(50, ay, f"- {a['name']}")
+            ay -= 14
+
+        # ===== FOOTER =====
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 9)
+        c.drawCentredString(width / 2, 20,
+                             "Generated by Cloud Management Platform")
 
         c.showPage()
         c.save()
-
         return response
+
 
 
 class HealthReportAPIView(APIView):
@@ -10097,6 +10226,7 @@ class HealthReportAPIView(APIView):
 
         doc.build(story)
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
 
 
 
