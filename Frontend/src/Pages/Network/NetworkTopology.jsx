@@ -1,333 +1,196 @@
-// Add after imports
 import { LegendToggle } from '@mui/icons-material';
-
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Tooltip, Chip, CircularProgress, Alert } from '@mui/material';
+import {
+    Box,
+    Typography,
+    Tooltip,
+    Chip,
+    CircularProgress,
+    Alert
+} from '@mui/material';
 import { styled } from '@mui/system';
 import RouterIcon from '@mui/icons-material/Router';
 import StorageIcon from '@mui/icons-material/Storage';
-
-
 import apiClient from "../../Axios";
+
+/* ===================== Styled ===================== */
 
 const NetworkLine = styled(Box)(({ color }) => ({
     width: '30px',
-    minHeight: 'calc(100vh - 250px)',
+    minHeight: 'calc(100vh - 220px)',
     backgroundColor: color,
     borderRadius: '6px',
-    position: 'relative',
-    margin: '0 40px',
-    flexShrink: 0,
+    position: 'absolute',
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '10px 0',
 }));
 
 const NetworkNameTypography = styled(Typography)(() => ({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: '0.7rem',
-    whiteSpace: 'nowrap',
     transform: 'rotate(-90deg)',
-    transformOrigin: 'center',
+    whiteSpace: 'nowrap',
 }));
 
-const NodeContainer = styled(Box)(({ theme, isRouter }) => ({
+const NodeContainer = styled(Box)(({ theme }) => ({
     width: '120px',
     padding: theme.spacing(0.5),
     borderRadius: theme.shape.borderRadius,
     backgroundColor: theme.palette.background.paper,
-    boxShadow: theme.shadows[1],
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
+    boxShadow: theme.shadows[2],
     textAlign: 'center',
-    cursor: 'pointer',
-    '&:hover': {
-        boxShadow: theme.shadows[3],
-    },
-    border: isRouter ? `1px solid ${theme.palette.primary.light}` : 'none',
-    zIndex: 2,
     position: 'absolute',
+    transform: 'translateY(-50%)',
     fontSize: '0.7rem',
-    '& .MuiTypography-root': {
-        fontSize: '0.7rem',
-        lineHeight: 1.2,
-    },
-    '& .MuiChip-root': {
-        height: '16px',
-        fontSize: '0.6rem',
-        padding: '0 4px',
-    }
+    cursor: 'pointer',
 }));
 
-const ConnectionLine = styled(Box)(({ theme, top, networkLeft, nodeWidth }) => ({
+const ConnectionLine = styled(Box)(({ theme, top, left }) => ({
     position: 'absolute',
-    top: top,
-    left: networkLeft + 'px',
-    width: `calc(30px + ${nodeWidth / 2}px)`,
+    top,
+    left,
+    width: '60px',
     height: '1px',
     backgroundColor: theme.palette.grey[400],
-    zIndex: 1,
     transform: 'translateY(-50%)',
-    '&::before': {
-        content: '""',
-        position: 'absolute',
-        left: '-3px',
-        top: '50%',
-        transform: 'translateY(-50%)',
-        width: '6px',
-        height: '6px',
-        borderRadius: '50%',
-        backgroundColor: theme.palette.grey[400],
-    },
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
 }));
 
-const IPOffsetChip = styled(Chip)(({ theme }) => ({
-    backgroundColor: theme.palette.info.main,
-    color: theme.palette.info.contrastText,
-    fontWeight: 'bold',
-    ml: 'auto',
-    mr: '2px',
-    height: '16px',
-    fontSize: '0.6rem',
-}));
+/* ===================== Helpers ===================== */
 
-const getRandomColor = () => {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-};
+const getRandomColor = () =>
+    '#' + Math.floor(Math.random() * 16777215).toString(16);
 
-const renderTooltipContent = (data) => {
-    if (!data) return null;
-    return (
-        <Box sx={{ p: 1 }}>
-            {Object.entries(data).map(([key, value]) => (
-                <Typography variant="caption" key={key} sx={{ display: 'block' }}>
-                    <strong>{key}:</strong> {
-                        Array.isArray(value)
-                            ? value.join(', ')
-                            : typeof value === 'object' && value !== null
-                                ? Object.entries(value).map(([ipKey, ipValue]) => (
-                                    <span key={ipKey}>{ipKey}: {Array.isArray(ipValue) ? ipValue.join(', ') : String(ipValue)}</span>
-                                ))
-                                : String(value)
-                    }
-                </Typography>
-            ))}
-        </Box>
-    );
-};
+const renderTooltipContent = (data) => (
+    <Box sx={{ p: 1 }}>
+        {Object.entries(data).map(([k, v]) => (
+            <Typography key={k} variant="caption" display="block">
+                <strong>{k}:</strong> {String(v)}
+            </Typography>
+        ))}
+    </Box>
+);
+
+/* ===================== Component ===================== */
 
 function NetworkTopology() {
     const [networks, setNetworks] = useState([]);
     const [routers, setRouters] = useState([]);
     const [instances, setInstances] = useState([]);
-    const [networkColors, setNetworkColors] = useState({});
+    const [colors, setColors] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [hoveredNetwork, setHoveredNetwork] = useState(null);
 
     useEffect(() => {
-        const fetchData = async () => {
+        const loadData = async () => {
             try {
-                setLoading(true);
-                setError(null);
-
-                const [netRes, routerRes, instanceRes] = await Promise.all([
+                const [n, r, i] = await Promise.all([
                     apiClient.get("/networks/"),
                     apiClient.get("/routers/"),
-                    apiClient.get("/instances/"),
+                    apiClient.get("/instances/")
                 ]);
 
-                setNetworks(netRes.data);
-                setRouters(routerRes.data);
-                setInstances(instanceRes.data);
+                setNetworks(n.data);
+                setRouters(r.data);
+                setInstances(i.data);
 
-                const colors = {};
-                netRes.data.forEach(net => {
-                    colors[net.name] = getRandomColor();
-                });
-                setNetworkColors(colors);
+                const map = {};
+                n.data.forEach(net => map[net.name] = getRandomColor());
+                setColors(map);
 
-            } catch (err) {
-                console.error("Error fetching data:", err);
-                setError("Failed to load network topology data. Please ensure the apiClient is correctly configured and the API endpoints are accessible.");
+            } catch (e) {
+                setError("Failed to load network topology");
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchData();
+        loadData();
     }, []);
 
-    const calculateVerticalPosition = (index) => {
-        const spacing = 70;
-        const startOffset = 40;
-        return startOffset + (index * spacing);
-    };
+    const yPos = (i) => 50 + i * 70;
 
-    const renderNetworkTooltip = (networkName) => {
-        const relatedRouters = routers.filter(r => r["Network Name"] === networkName);
-        const relatedInstances = instances.filter(i => Object.keys(i["IP Addresses"]).includes(networkName));
-        return (
-            <Box sx={{ p: 1 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>{networkName}</Typography>
-                <Typography variant="caption">Routers: {relatedRouters.length}</Typography><br />
-                <Typography variant="caption">Instances: {relatedInstances.length}</Typography>
-            </Box>
-        );
-    };
+    /* ===================== States ===================== */
 
     if (loading) {
         return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}>
                 <CircularProgress />
-                <Typography sx={{ ml: 2 }}>Loading network topology...</Typography>
+                <Typography sx={{ ml: 2 }}>Loading topology…</Typography>
             </Box>
         );
     }
 
     if (error) {
-        return (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
-                <Alert severity="error">{error}</Alert>
-            </Box>
-        );
+        return <Alert severity="error">{error}</Alert>;
     }
 
-    const maxNodesPerNetwork = Math.max(
-        ...networks.map(net =>
-            routers.filter(r => r["Network Name"] === net.name).length +
-            instances.filter(i => Object.keys(i["IP Addresses"]).includes(net.name)).length
-        ),
-        0
-    );
-    const estimatedContentHeight = calculateVerticalPosition(maxNodesPerNetwork) + 80;
+    /* ===================== Render ===================== */
 
     return (
-        <Box sx={{
-            p: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            backgroundColor: '#f0f2f5',
-            minHeight: '100%',
-            fontFamily: 'Inter, sans-serif',
-            overflow: 'hidden',
-        }}>
-            <Box sx={{
-                display: 'flex',
-                overflowX: 'auto',
-                overflowY: 'hidden',
-                flexGrow: 1,
-                width: '100%',
-                justifyContent: 'center',
-                position: 'relative',
-                minHeight: estimatedContentHeight > (window.innerHeight - 80) ? estimatedContentHeight : 'auto',
-                maxHeight: 'calc(100vh - 80px)',
-                alignItems: 'flex-start',
-                pt: 1,
-            }}>
-                {networks.map((network, netIndex) => {
-                    const routersOnThisNetwork = routers.filter(router => router["Network Name"] === network.name);
-                    const instancesOnThisNetwork = instances.filter(instance => Object.keys(instance["IP Addresses"]).includes(network.name));
+        <Box sx={{ p: 2, background: '#f4f6f8', minHeight: '100vh' }}>
 
-                    const networkLineLeftOffset = netIndex * (30 + 120 + 30);
-                    const networkLineRightEdge = networkLineLeftOffset + 50;
+            {/* Summary */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                <Chip label={`Networks: ${networks.length}`} />
+                <Chip label={`Routers: ${routers.length}`} />
+                <Chip label={`Instances: ${instances.length}`} />
+            </Box>
 
+            <Box sx={{ position: 'relative', overflowX: 'auto', height: '80vh' }}>
+
+                {networks.map((net, index) => {
+                    const netRouters = routers.filter(
+                        r => r["Network Name"] === net.name
+                    );
+                    const netInstances = instances.filter(
+                        i => Object.keys(i["IP Addresses"] || {}).includes(net.name)
+                    );
+
+                    const left = index * 220;
                     let nodeIndex = 0;
 
                     return (
-                        <React.Fragment key={network.id}>
-                            <Tooltip title={renderNetworkTooltip(network.name)} arrow placement="top">
-                                <NetworkLine
-                                    color={networkColors[network.name] || '#ccc'}
-                                    sx={{ left: networkLineLeftOffset + 'px', position: 'absolute' }}
-                                    onMouseEnter={() => setHoveredNetwork(network.name)}
-                                    onMouseLeave={() => setHoveredNetwork(null)}
-                                >
-                                    <NetworkNameTypography>
-                                        {network.name}
-                                    </NetworkNameTypography>
-                                </NetworkLine>
-                            </Tooltip>
+                        <React.Fragment key={net.id}>
+                            {/* Network Line */}
+                            <NetworkLine
+                                color={colors[net.name]}
+                                sx={{ left }}
+                            >
+                                <NetworkNameTypography>
+                                    {net.name}
+                                </NetworkNameTypography>
+                            </NetworkLine>
 
-                            {routersOnThisNetwork.map((router) => {
-                                const verticalPosition = calculateVerticalPosition(nodeIndex++);
-                                const routerIp = router["Subnets Associated"]?.find(s => s.startsWith(network.name))?.split(' ')[1] || 'N/A';
-
+                            {/* Routers */}
+                            {netRouters.map(router => {
+                                const top = yPos(nodeIndex++);
                                 return (
                                     <React.Fragment key={router["Router ID"]}>
-                                        <ConnectionLine
-                                            top={verticalPosition}
-                                            networkLeft={networkLineRightEdge}
-                                            nodeWidth={120}
-                                        >
-                                            {routerIp !== 'N/A' && <IPOffsetChip label={routerIp} />}
-                                        </ConnectionLine>
-                                        <Tooltip
-                                            title={renderTooltipContent(router)}
-                                            arrow
-                                            placement="right"
-                                        >
-                                            <NodeContainer
-                                                isRouter={true}
-                                                sx={{
-                                                    top: verticalPosition,
-                                                    left: networkLineRightEdge + 40 + 'px',
-                                                    transform: 'translateY(-50%)',
-                                                }}
-                                            >
-                                                <RouterIcon sx={{ fontSize: 20, mb: 0.2, color: (theme) => theme.palette.primary.main }} />
-                                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                    Router
-                                                </Typography>
-                                                <Typography variant="body2">{router["Router Name"]}</Typography>
+                                        <ConnectionLine top={top} left={left + 30} />
+                                        <Tooltip title={renderTooltipContent(router)} arrow>
+                                            <NodeContainer sx={{ top, left: left + 100 }}>
+                                                <RouterIcon color="primary" />
+                                                <Typography fontWeight="bold">Router</Typography>
+                                                <Typography>{router["Router Name"]}</Typography>
                                             </NodeContainer>
                                         </Tooltip>
                                     </React.Fragment>
                                 );
                             })}
 
-                            {instancesOnThisNetwork.map((instance) => {
-                                const verticalPosition = calculateVerticalPosition(nodeIndex++);
-
+                            {/* Instances */}
+                            {netInstances.map(instance => {
+                                const top = yPos(nodeIndex++);
                                 return (
                                     <React.Fragment key={instance["Instance ID"]}>
-                                        <ConnectionLine
-                                            top={verticalPosition}
-                                            networkLeft={networkLineRightEdge}
-                                            nodeWidth={120}
-                                        />
-                                        <Tooltip
-                                            title={renderTooltipContent(instance)}
-                                            arrow
-                                            placement="right"
-                                        >
-                                            <NodeContainer
-                                                isRouter={false}
-                                                sx={{
-                                                    top: verticalPosition,
-                                                    left: networkLineRightEdge + 40 + 'px',
-                                                    transform: 'translateY(-50%)',
-                                                }}
-                                            >
-                                                <StorageIcon sx={{ fontSize: 20, mb: 0.2, color: (theme) => theme.palette.secondary.main }} />
-                                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                    Instance
-                                                </Typography>
-                                                <Typography variant="body2">{instance["Instance Name"]}</Typography>
+                                        <ConnectionLine top={top} left={left + 30} />
+                                        <Tooltip title={renderTooltipContent(instance)} arrow>
+                                            <NodeContainer sx={{ top, left: left + 100 }}>
+                                                <StorageIcon color="secondary" />
+                                                <Typography fontWeight="bold">Instance</Typography>
+                                                <Typography>{instance["Instance Name"]}</Typography>
                                             </NodeContainer>
                                         </Tooltip>
                                     </React.Fragment>
@@ -338,17 +201,19 @@ function NetworkTopology() {
                 })}
             </Box>
 
-            <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
-                <LegendToggle color="action" />
-                <Chip label="Router" icon={<RouterIcon sx={{ fontSize: 14 }} />} size="small" />
-                <Chip label="Instance" icon={<StorageIcon sx={{ fontSize: 14 }} />} size="small" />
-                <Chip label="Network Line" sx={{ height: 16, backgroundColor: '#ccc' }} size="small" />
+            {/* Legend */}
+            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                <LegendToggle />
+                <Chip label="Router" icon={<RouterIcon />} size="small" />
+                <Chip label="Instance" icon={<StorageIcon />} size="small" />
             </Box>
         </Box>
     );
 }
 
 export default NetworkTopology;
+
+
 
 
 

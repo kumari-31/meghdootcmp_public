@@ -2868,8 +2868,22 @@ class InstanceDetailsAPIView(APIView):
             servers = conn.compute.servers(details=True)
             instances = []
             # print("instance")
+            db_instances = VMInfo.objects.all()
+            db_instance_map = {
+                vm.vm_name: vm for vm in db_instances
+            }
+           
+
+            
+
             for server in servers:
                 print("server------->", server)
+
+                db_instance = db_instance_map.get(server.name)
+                instance_internal_name = (
+                    db_instance.instance_name if db_instance else "Unknown"
+                )
+                
                 # Get flavor details
                 flavor_id = server.flavor["id"] if server.flavor else None
                 # print("flavor_id",flavor_id)
@@ -2938,11 +2952,13 @@ class InstanceDetailsAPIView(APIView):
                 power_state_str = POWER_STATE_MAP.get(
                     power_state_num, str(power_state_num)
                 )
+              
                 # Construct instance details
                 instances.append(
                     {
                         "Instance ID": server.id if server.id else "Unknown",
-                        "Instance Name": server.name if server.name else "Unknown",
+                        "VM Name": server.name if server.name else "Unknown",
+                        "Instance Name": instance_internal_name,
                         "Image Name": image_name,  # Now handles cases where booted from volume
                         "Flavor Name": flavor.name if flavor else "-",
                         "RAM": f"{flavor.ram} MB" if flavor else "-",
@@ -2962,20 +2978,26 @@ class InstanceDetailsAPIView(APIView):
                     }
                 )
                 print(instances)
+            
             return Response(instances, status=200)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
     def calculate_age(self, created_at):
-        """Calculate the age of the instance."""
-        created_time = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
+        created_time = datetime.strptime(
+            created_at, "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+
         now = datetime.now(timezone.utc)
-        age = now - created_time
-        days = age.days
-        hours = age.seconds // 3600
-        return f"{days} days, {hours} hours"
+        delta = now - created_time
+
+        days = delta.days
+        hours = delta.seconds // 3600
+
+        if days > 0:
+            return f"{days} days, {hours} hour{'s' if hours != 1 else ''}"
+        else:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
 
     # def calculate_age(self, created_at):
     #     """Calculate the age of the instance."""
@@ -5677,17 +5699,14 @@ class VmRequestUpdateAPIView(APIView):
             vm_request = VmRequest.objects.get(id=request_id)
 
             # Check if FLA status is already accepted
-            if vm_request.fla_status == "Accepted":
+            if vm_request.admin_status == "Accepted":
                 return Response(
-                    {"message": "Already approved by FLA, updates not allowed."},
+                    {"message": "Already approved by Admin, updates not allowed."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Check if Admin & FLA status are still Pending
-            if (
-                vm_request.admin_status == "Pending"
-                and vm_request.fla_status == "Pending"
-            ):
+            if vm_request.admin_status == "Pending":
+              
                 allowed_fields = [
                     "vm_name",
                     "purpose",

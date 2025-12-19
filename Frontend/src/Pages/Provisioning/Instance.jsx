@@ -1,12 +1,9 @@
 // src/Pages/Instance.jsx
-import React, { useEffect, useState } from "react";
+import  { useEffect, useState } from "react";
 import apiClient from "../../Axios";
 import "../style.css";
 
 import {
-  Box,
-  Grid,
-  Typography,
   TextField,
   Paper,
   Table,
@@ -278,6 +275,7 @@ const Instance = () => {
         >
           <TableHead>
             <TableRow>
+              <StyledTableCell>Vm Name</StyledTableCell>
               <StyledTableCell>Instance Name</StyledTableCell>
               <StyledTableCell>Flavor</StyledTableCell>
               <StyledTableCell>IP Address</StyledTableCell>
@@ -295,7 +293,10 @@ const Instance = () => {
             {currentInstances.map((item, index) => (
               <StyledTableRow key={item["Instance ID"] || index}>
                 <StyledTableCell>
-                  {item["Instance Name"].split("_").slice(1).join("_")}
+                  {item["VM Name"].split("_").slice(1).join("_")}
+                </StyledTableCell>
+                 <StyledTableCell>
+                  {item["Instance Name"]}
                 </StyledTableCell>
                 <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
                 <StyledTableCell>
