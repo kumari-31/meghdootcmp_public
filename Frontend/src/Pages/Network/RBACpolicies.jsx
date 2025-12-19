@@ -5,6 +5,7 @@ import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
 import { useTheme } from "@mui/material/styles";
 import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import {
   Table,
@@ -206,8 +207,10 @@ const RBACpolicies = () => {
     fetchProjects(); 
   }, []);
 
+// 🔹 Show cloud loader only on first load
+const showInitialLoader = loading && rbacPolicies.length === 0;
 
-  if (loading) {
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -234,6 +237,17 @@ const RBACpolicies = () => {
     );
   }
 
+
+  const RbacPolicySkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 8 }).map((_, index) => (
+        <StyledTableCell key={index}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -664,33 +678,57 @@ const RBACpolicies = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+          
           <TableBody>
-            {filteredPolicies
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((policy, index) => (
-                <StyledTableRow key={policy.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input type="checkbox" checked={selectedPolicies.includes(policy.id)} onChange={() => handleSelectPolicy(policy.id)} />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                  <StyledTableCell>{policy.id}</StyledTableCell>
-                  <StyledTableCell>{policy.object_type}</StyledTableCell>
-                  <StyledTableCell>{policy.target_project_id}</StyledTableCell>
-                  <StyledTableCell>{policy.action}</StyledTableCell>
-                  <StyledTableCell>{policy.object_id}</StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined"  onClick={() => handleEditClick(policy)}>
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => deleteRbacPolicy(policy.id)}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-          </TableBody>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <RbacPolicySkeletonRow key={i} />
+      ))
+    : filteredPolicies
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+        .map((policy, index) => (
+          <StyledTableRow key={policy.id}>
+            <StyledTableCell padding="checkbox">
+              <input
+                type="checkbox"
+                checked={selectedPolicies.includes(policy.id)}
+                onChange={() => handleSelectPolicy(policy.id)}
+              />
+            </StyledTableCell>
+
+            <StyledTableCell>
+              {page * rowsPerPage + index + 1}
+            </StyledTableCell>
+
+            <StyledTableCell>{policy.id}</StyledTableCell>
+
+            <StyledTableCell>{policy.object_type}</StyledTableCell>
+
+            <StyledTableCell>{policy.target_project_id}</StyledTableCell>
+
+            <StyledTableCell>{policy.action}</StyledTableCell>
+
+            <StyledTableCell>{policy.object_id}</StyledTableCell>
+
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Button variant="outlined" onClick={() => handleEditClick(policy)}>
+                  Update
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => deleteRbacPolicy(policy.id)}
+                >
+                  Delete
+                </Button>
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+</TableBody>
+
+
         </Table>
            {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

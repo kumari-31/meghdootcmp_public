@@ -17,6 +17,7 @@ import {
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
 import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
@@ -123,23 +124,26 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
   }, []);
 
 
-  if (loading) {
-    return (
-      <div className="cloud-container">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
-          <path
-            d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-            className="cloud-back"
-          />
-          <path
-            d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-            className="cloud-front"
-          />
-        </svg>
-        <div className="loading-message">Loading...</div>
-      </div>
-    );
-  }
+  const showInitialLoader = loading && networks.length === 0;
+
+if (showInitialLoader) {
+  return (
+    <div className="cloud-container">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <path
+          d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-back"
+        />
+        <path
+          d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-front"
+        />
+      </svg>
+      <div className="loading-message">Loading...</div>
+    </div>
+  );
+}
+
 
   if (error) {
     return (
@@ -149,6 +153,17 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
       </div>
     );
   }
+
+  const NetworkSkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 12 }).map((_, index) => (
+        <StyledTableCell key={index}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const validateNetworkField = (name, value) => {
     let error = "";
@@ -571,30 +586,41 @@ const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredNetworks.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((network, index) => (
-              <StyledTableRow key={network.id}>
-                <StyledTableCell padding="checkbox">
-                  <input type="checkbox" checked={selectedNetworks.includes(network.id)} onChange={() => handleSelectNetwork(network.id)} />
-                </StyledTableCell>
-                <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{network.project}</StyledTableCell>
-                <StyledTableCell>{network.network_name}</StyledTableCell>
-                <StyledTableCell>{network.subnets?.join(', ')}</StyledTableCell>
-                <StyledTableCell>{network.dhcp_agents?.join(', ')}</StyledTableCell>
-                <StyledTableCell>{network.shared ? 'Yes' : 'No'}</StyledTableCell>
-                <StyledTableCell>{network.external ? 'Yes' : 'No'}</StyledTableCell>
-                <StyledTableCell>{network.status}</StyledTableCell>
-                <StyledTableCell>{network.admin_state_up ? 'Up' : 'Down'}</StyledTableCell>
-                <StyledTableCell>{network.availability_zones?.join(', ')}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" onClick={() => { setNetworkToUpdate(network); setShowUpdateForm(true); }}>Update</Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteNetwork(network.id)}>Delete</Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <NetworkSkeletonRow key={i} />
+      ))
+    : filteredNetworks
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+        .map((network, index) => (
+          <StyledTableRow key={network.id}>
+            <StyledTableCell padding="checkbox">
+              <input
+                type="checkbox"
+                checked={selectedNetworks.includes(network.id)}
+                onChange={() => handleSelectNetwork(network.id)}
+              />
+            </StyledTableCell>
+            <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+            <StyledTableCell>{network.project}</StyledTableCell>
+            <StyledTableCell>{network.network_name}</StyledTableCell>
+            <StyledTableCell>{network.subnets?.join(', ')}</StyledTableCell>
+            <StyledTableCell>{network.dhcp_agents?.join(', ')}</StyledTableCell>
+            <StyledTableCell>{network.shared ? 'Yes' : 'No'}</StyledTableCell>
+            <StyledTableCell>{network.external ? 'Yes' : 'No'}</StyledTableCell>
+            <StyledTableCell>{network.status}</StyledTableCell>
+            <StyledTableCell>{network.admin_state_up ? 'Up' : 'Down'}</StyledTableCell>
+            <StyledTableCell>{network.availability_zones?.join(', ')}</StyledTableCell>
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Button variant="outlined" onClick={() => { setNetworkToUpdate(network); setShowUpdateForm(true); }}>Update</Button>
+                <Button variant="outlined" color="error" onClick={() => handleDeleteNetwork(network.id)}>Delete</Button>
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+</TableBody>
+
         </Table>
              {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

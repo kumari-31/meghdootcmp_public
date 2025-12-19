@@ -211,6 +211,7 @@ urlpatterns = [
     path("api/service-requests/create/", ServiceRequestCreateAPIView.as_view(), name="service-requests"),
     path("api/fla/service-requests/", FlaServiceRequestAPIView.as_view(), name="fla-service-requests"),
     path("api/admin/pending-service-requests/", ServiceRequestPendingAdminAPIView.as_view(), name="admin-pending-service-requests"),
+    path("api/admin/service-requests/bulk-approve/",ServiceRequestBulkAdminApproveAPIView.as_view(),name="admin-bulk-approve-service-requests",),
     path("api/fla/employees/", FLAEmployeesListAPIView.as_view(), name="fla-employees-list"),
     path("api/service-request/reject/", ServiceRequestRejectionAPIView.as_view(), name="reject-service-request"),
     path("api/services/deployed/", EmployeeDeployedServicesAPIView.as_view(), name="deployed-services"),

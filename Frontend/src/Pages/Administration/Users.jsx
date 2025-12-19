@@ -29,6 +29,7 @@ import {
   TablePagination, // Import TablePagination
 } from '@mui/material';
 import { CircularProgress } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
 
 import { styled } from '@mui/material/styles';
 import { useTheme } from "@mui/material/styles";
@@ -180,7 +181,9 @@ const Users = () => {
     fetchRoles();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && users.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -197,6 +200,7 @@ const Users = () => {
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -206,6 +210,53 @@ const Users = () => {
       </div>
     );
   }
+
+
+  const UserTableSkeleton = ({ rows = 5 }) => {
+    return (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell padding="checkbox">
+              <Skeleton variant="rectangular" width={18} height={18} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={160} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={40} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Skeleton variant="rectangular" width={70} height={30} />
+                <Skeleton variant="rectangular" width={70} height={30} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+  };
+  
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -841,63 +892,45 @@ const Users = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+         
           <TableBody>
-            {filteredUsers
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((user,index) => (
-                <StyledTableRow key={user.id}>
-                  <StyledTableCell padding="checkbox">
-                    <Checkbox
-                      color="primary"
-                      checked={selectedUsers.includes(user.id)}
-                      onChange={() => handleSelectUser(user.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell> {/* Sr. No. data is now after the checkbox data */}
-          
-                  <StyledTableCell>
-                    <Tooltip title={user.name}>
-                      <span>{user.name}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.id}>
-                      <span>{user.id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.enabled ? 'Yes' : 'No'}>
-                      <span>{user.enabled ? 'Yes' : 'No'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.domain_id}>
-                      <span>{user.domain_id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.default_project_id}>
-                      <span>{user.default_project_id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined"  onClick={() => handleOpenUpdateModal(user)}>
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => handleDeleteUser(user.id)}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-            {emptyRows > 0 && (
-              <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={7} />
-              </TableRow>
-            )}
-          </TableBody>
+  {loading ? (
+    <UserTableSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredUsers
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((user, index) => (
+        <StyledTableRow key={user.id}>
+          <StyledTableCell padding="checkbox">
+            <Checkbox
+              checked={selectedUsers.includes(user.id)}
+              onChange={() => handleSelectUser(user.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>{user.name}</StyledTableCell>
+          <StyledTableCell>{user.id}</StyledTableCell>
+          <StyledTableCell>{user.enabled ? "Yes" : "No"}</StyledTableCell>
+          <StyledTableCell>{user.domain_id}</StyledTableCell>
+          <StyledTableCell>{user.default_project_id}</StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button onClick={() => handleOpenUpdateModal(user)}>Update</Button>
+              <Button color="error" onClick={() => handleDeleteUser(user.id)}>
+                Delete
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
         
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

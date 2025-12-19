@@ -20,6 +20,7 @@ import {
   Alert,
   Slide,
   TablePagination,
+  Skeleton,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
 import { CircularProgress } from '@mui/material';
@@ -110,6 +111,7 @@ const VolumeTypes = () => {
   const maxDescriptionLength = 200;
   // Fetch volume types
   const fetchVolumeTypes = async () => {
+    setLoading(true);  
     setError(null);
     try {
       const response = await apiClient.get('/volume-types/');
@@ -126,8 +128,9 @@ const VolumeTypes = () => {
     fetchVolumeTypes();
   }, []);
 
-  
-    if (loading) {
+  const showInitialLoader = loading && volumeTypes.length === 0;
+
+    if (showInitialLoader) {
       return (
         <div className="cloud-container">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -153,6 +156,36 @@ const VolumeTypes = () => {
         </div>
       );
     }
+
+    const VolumeTypeTableSkeleton = ({ rows = 5 }) => (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell>
+              <Skeleton width={18} height={18} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={200} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={180} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center">
+                <Skeleton variant="rectangular" width={90} height={28} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+    
 
   // Pagination
   const currentVolumeTypes = volumeTypes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -530,25 +563,51 @@ const VolumeTypes = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+          
           <TableBody>
-            {currentVolumeTypes.map((vt, index) => (
-              <StyledTableRow key={vt.id}>
-                <StyledTableCell>
-                  <input type="checkbox" checked={selectedVolumeTypes.includes(vt.id)} onChange={() => handleSelectVolume(vt.id)} />
-                </StyledTableCell>
-                <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{vt.name}</StyledTableCell>
-                <StyledTableCell>{vt.description}</StyledTableCell>
-                <StyledTableCell>{vt.id}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" onClick={() => { setVolumeToUpdate(vt); setShowUpdateForm(true); }}>Update</Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteVolumeType(vt.id)}>Delete</Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading ? (
+    <VolumeTypeTableSkeleton rows={rowsPerPage} />
+  ) : (
+    currentVolumeTypes.map((vt, index) => (
+      <StyledTableRow key={vt.id}>
+        <StyledTableCell>
+          <input
+            type="checkbox"
+            checked={selectedVolumeTypes.includes(vt.id)}
+            onChange={() => handleSelectVolume(vt.id)}
+          />
+        </StyledTableCell>
+
+        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>{vt.name}</StyledTableCell>
+        <StyledTableCell>{vt.description}</StyledTableCell>
+        <StyledTableCell>{vt.id}</StyledTableCell>
+
+        <StyledTableCell>
+          <Box display="flex" justifyContent="center" gap={1}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setVolumeToUpdate(vt);
+                setShowUpdateForm(true);
+              }}
+            >
+              Update
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleDeleteVolumeType(vt.id)}
+            >
+              Delete
+            </Button>
+          </Box>
+        </StyledTableCell>
+      </StyledTableRow>
+    ))
+  )}
+</TableBody>
+
         </Table>
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

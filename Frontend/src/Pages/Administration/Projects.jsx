@@ -27,6 +27,7 @@ import {
   OutlinedInput, // Added for multi-select input
 } from '@mui/material';
 import { CircularProgress } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
 
 import { useTheme } from "@mui/material/styles";
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
@@ -175,22 +176,24 @@ const Projects = () => {
 
 
   // Display loading animation while data is being fetched
-  if (loading) {
-    return (
-        <div className="cloud-container">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
-                <path
-                    d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-                    className="cloud-back"
-                />
-                <path
-                    d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-                    className="cloud-front"
-                />
-            </svg>
-            <div className="loading-message">Loading...</div>
-        </div>
-    );
+const showInitialLoader = loading && projects.length === 0;
+
+if (showInitialLoader) {
+  return (
+    <div className="cloud-container">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <path
+          d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-back"
+        />
+        <path
+          d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-front"
+        />
+      </svg>
+      <div className="loading-message">Loading...</div>
+    </div>
+  );
 }
 
 // Display error message if an error occurred during data fetching
@@ -202,6 +205,47 @@ if (error) {
         </div>
     );
 }
+
+const ProjectTableSkeleton = ({ rows = 5 }) => {
+  return (
+    <>
+      {[...Array(rows)].map((_, index) => (
+        <StyledTableRow key={index}>
+          <StyledTableCell padding="checkbox">
+            <Skeleton variant="rectangular" width={18} height={18} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={30} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={140} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={180} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={200} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={60} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Skeleton variant="rectangular" width={70} height={30} />
+              <Skeleton variant="rectangular" width={70} height={30} />
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))}
+    </>
+  );
+};
 
 // Handles changes in the search input field
 const handleSearchChange = (e) => {
@@ -802,53 +846,67 @@ const handleGroupSelectChange = (event) => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-          {filteredProjects
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((project,index) => (
-                <StyledTableRow key={project.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedProjects.includes(project.id)}
-                      onChange={() => handleSelectProject(project.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
           
-                <StyledTableCell>
-                  <Tooltip title={project.name}>
-                    <span>{project.name}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.description}>
-                    <span>{project.description}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.id}>
-                    <span>{project.id}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.enabled ? 'Yes' : 'No'}>
-                    <span>{project.enabled ? 'Yes' : 'No'}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined"  onClick={() => { setProjectToUpdate(project); setShowUpdateForm(true); }}>
-                      Update
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteProject(project.id)}>
-                      Delete
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+          <TableBody>
+  {loading ? (
+    <ProjectTableSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredProjects
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((project, index) => (
+        <StyledTableRow key={project.id}>
+          <StyledTableCell padding="checkbox">
+            <input
+              type="checkbox"
+              checked={selectedProjects.includes(project.id)}
+              onChange={() => handleSelectProject(project.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.name}>
+              <span>{project.name}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.description}>
+              <span>{project.description}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.id}>
+              <span>{project.id}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {project.enabled ? "Yes" : "No"}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => {
+                setProjectToUpdate(project);
+                setShowUpdateForm(true);
+              }}>
+                Update
+              </Button>
+              <Button variant="outlined" color="error" onClick={() => handleDeleteProject(project.id)}>
+                Delete
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

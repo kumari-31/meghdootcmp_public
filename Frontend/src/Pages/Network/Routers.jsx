@@ -29,6 +29,7 @@ import {
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import { tableCellClasses } from '@mui/material/TableCell';
 
@@ -145,7 +146,9 @@ const Routers = () => {
     fetchProjects();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && routers.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -158,10 +161,11 @@ const Routers = () => {
             className="cloud-front"
           />
         </svg>
-        <div className="loading-message">Loading...</div>
+        <div className="loading-message">Loading ...</div>
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -171,6 +175,17 @@ const Routers = () => {
       </div>
     );
   }
+
+  const SkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 10 }).map((_, i) => (
+        <StyledTableCell key={i}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const validateRouterForm = () => {
     let errors = {};
@@ -653,74 +668,89 @@ const Routers = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-            {filteredRouters
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((router, index) => (
-                <StyledTableRow key={router['Router ID']}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedRouters.includes(router['Router ID'])}
-                      onChange={() => handleSelectRouter(router['Router ID'])}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Router Name']}>
-                      <span>{router['Router Name']}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Router ID']}>
-                      <span>{router['Router ID']}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Network Name']}>
-                      <span>{router['Network Name']}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router.Status}>
-                      <span>{router.Status}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Admin State'] ? 'Active' : 'Inactive'}>
-                      <span>{router['Admin State'] ? 'Active' : 'Inactive'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Project Name']}>
-                      <span>{router['Project Name']}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={router['Availability Zones'].join(', ')}>
-                      <span>{router['Availability Zones'].join(', ')}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button
-                        variant="outlined"
-                        
-                        onClick={() => {
-                          setRouterToUpdate(router);
-                          setShowUpdateForm(true);
-                        }}
-                      >
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => handleDeleteRouter(router['Router ID'])}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-          </TableBody>
+         
+<TableBody>
+  {loading ? (
+    Array.from({ length: rowsPerPage }).map((_, i) => (
+      <SkeletonRow key={i} />
+    ))
+  ) : (
+    filteredRouters
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((router, index) => (
+        <StyledTableRow key={router['Router ID']}>
+          <StyledTableCell padding="checkbox">
+            <input
+              type="checkbox"
+              checked={selectedRouters.includes(router['Router ID'])}
+              onChange={() => handleSelectRouter(router['Router ID'])}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={router['Router Name']}>
+              <span>{router['Router Name']}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={router['Router ID']}>
+              <span>{router['Router ID']}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={router['Network Name']}>
+              <span>{router['Network Name']}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {router.Status}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {router['Admin State'] ? "Active" : "Inactive"}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {router['Project Name']}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {router['Availability Zones'].join(", ")}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" gap={1} justifyContent="center">
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  setRouterToUpdate(router);
+                  setShowUpdateForm(true);
+                }}
+              >
+                Update
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                onClick={() => handleDeleteRouter(router['Router ID'])}
+              >
+                Delete
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
+
         </Table>
          {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

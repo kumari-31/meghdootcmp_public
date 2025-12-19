@@ -263,6 +263,33 @@ const Hypervisors = () => {
   }
 
 
+
+  const formatRelativeTime = (isoDate) => {
+    if (!isoDate) return "-";
+  
+    const date = new Date(isoDate);
+    const now = new Date();
+  
+    const diffMs = now - date;
+    if (diffMs < 0) return "Just now";
+  
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+    if (days > 0) {
+      const remHours = hours % 24;
+      return `${days} day${days !== 1 ? "s" : ""}, ${remHours} hour${remHours !== 1 ? "s" : ""} ago`;
+    }
+  
+    if (hours > 0) {
+      const remMinutes = minutes % 60;
+      return `${hours} hour${hours !== 1 ? "s" : ""}, ${remMinutes} min ago`;
+    }
+  
+    return `${minutes} min ago`;
+  };
+  
   const handleTabChange = (_, newValue) => {
     setTab(newValue);
     
@@ -554,7 +581,7 @@ const Hypervisors = () => {
                       <StyledTableCell>{host.availability_zone}</StyledTableCell>
                       <StyledTableCell>{host.status}</StyledTableCell>
                       <StyledTableCell>{host.state}</StyledTableCell>
-                      <StyledTableCell>{host.last_updated || "-"}</StyledTableCell>
+                      <StyledTableCell>{formatRelativeTime(host.last_updated)}</StyledTableCell>
                       <StyledTableCell>{host.action}</StyledTableCell>
                     </StyledTableRow>
                   ))}

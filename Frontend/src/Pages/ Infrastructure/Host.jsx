@@ -21,6 +21,7 @@ import {
 
 } from "@mui/material";
 import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { styled } from "@mui/material/styles";
@@ -160,7 +161,8 @@ const HostAggregates = () => {
 
 
   // ⭐⭐⭐⭐⭐ ADD LOADING UI HERE ⭐⭐⭐⭐⭐
-  if (loading) {
+  const showInitialLoader = loading && aggregates.length === 0;
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -188,6 +190,16 @@ const HostAggregates = () => {
     );
   }
 
+  const HostAggregateSkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 7 }).map((_, i) => (
+        <StyledTableCell key={i}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const validateAggregate = (agg) => {
     let newErrors = { name: "", availability_zone: "" };
@@ -510,32 +522,36 @@ const HostAggregates = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {current.map((ag, i) => (
-              <StyledTableRow key={ag.id}>
-                <StyledTableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedAggs.includes(ag.id)}
-                    onChange={() => toggleSelectAgg(ag.id)}
-                  />
-                </StyledTableCell>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <HostAggregateSkeletonRow key={i} />
+      ))
+    : current.map((ag, i) => (
+        <StyledTableRow key={ag.id}>
+          <StyledTableCell>
+            <input
+              type="checkbox"
+              checked={selectedAggs.includes(ag.id)}
+              onChange={() => toggleSelectAgg(ag.id)}
+            />
+          </StyledTableCell>
+          <StyledTableCell>{page * rowsPerPage + i + 1}</StyledTableCell>
+          <StyledTableCell>{ag.name}</StyledTableCell>
+          <StyledTableCell>{ag.availability_zone || "-"}</StyledTableCell>
+          <StyledTableCell>{ag.hosts?.join(", ") || "-"}</StyledTableCell>
+          <StyledTableCell>{JSON.stringify(ag.metadata || {})}</StyledTableCell>
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => { setAggToUpdate(ag); setShowUpdate(true); }}>Update</Button>
+              <Button variant="outlined" color="error" onClick={() => deleteAggregate(ag.id)}>
+                Delete <RiDeleteBin6Line />
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))}
+</TableBody>
 
-                <StyledTableCell>{page * rowsPerPage + i + 1}</StyledTableCell>
-                <StyledTableCell>{ag.name}</StyledTableCell>
-                <StyledTableCell>{ag.availability_zone || "-"}</StyledTableCell>
-                <StyledTableCell>{ag.hosts?.join(", ") || "-"}</StyledTableCell>
-                <StyledTableCell>{JSON.stringify(ag.metadata || {})}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                  <Button variant="outlined" onClick={() => { setAggToUpdate(ag); setShowUpdate(true); }}>Update</Button>
-                  <Button variant="outlined" color="error" onClick={() => deleteAggregate(ag.id)}>
-                    Delete <RiDeleteBin6Line />
-                  </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
         </Table>
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
                   <TablePagination

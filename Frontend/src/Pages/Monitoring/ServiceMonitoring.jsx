@@ -7,7 +7,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
 import SentimentSatisfiedAltIcon from "@mui/icons-material/SentimentSatisfiedAlt"; 
 import SentimentDissatisfiedIcon from "@mui/icons-material/SentimentDissatisfied";
-
+import '../style.css';
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
   [`&.${tableCellClasses.head}`]: {

@@ -3,7 +3,7 @@ import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
-import { CircularProgress } from '@mui/material';
+
 
 import {
   Table,
@@ -26,7 +26,7 @@ import {
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
 import { CircularProgress } from '@mui/material';
-
+import Skeleton from "@mui/material/Skeleton";
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
 
@@ -121,6 +121,7 @@ const Volumes = () => {
   ];
 
   const fetchVolumes = async () => {
+    setLoading(true);
     setError(null);
     try {
       const response = await apiClient.get('/volumes/');
@@ -170,7 +171,8 @@ const Volumes = () => {
   }, []);
 
 
-  if (loading) {
+  const showInitialLoader = loading && volumes.length === 0;
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -196,6 +198,20 @@ const Volumes = () => {
       </div>
     );
   }
+
+  const VolumeTableSkeleton = ({ rows = 5 }) => (
+    <>
+      {[...Array(rows)].map((_, index) => (
+        <StyledTableRow key={index}>
+          {Array.from({ length: 13 }).map((_, i) => (
+            <StyledTableCell key={i}>
+              <Skeleton width={i === 0 ? 20 : "80%"} height={18} />
+            </StyledTableCell>
+          ))}
+        </StyledTableRow>
+      ))}
+    </>
+  );
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -426,6 +442,36 @@ const Volumes = () => {
     }
   };
 
+  //------------------------------
+  //      Format created At
+  //-------------------------------
+
+  const formatAge = (isoDate) => {
+    if (!isoDate) return "N/A";
+  
+    const created = new Date(isoDate);
+    const now = new Date();
+  
+    let diffMs = now - created;
+    if (diffMs < 0) return "Just now";
+  
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  
+    if (days > 0) {
+      const remainingHours = hours % 24;
+      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${remainingHours !== 1 ? "s" : ""}`;
+    }
+  
+    if (hours > 0) {
+      const remainingMinutes = minutes % 60;
+      return `${hours} hour${hours > 1 ? "s" : ""}, ${remainingMinutes} min`;
+    }
+  
+    return `${minutes} min`;
+  };
+  
   const modalStyle = {
     position: 'absolute',
     top: '50%',
@@ -688,88 +734,41 @@ const Volumes = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredVolumes
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((volume, index) => (
-                <StyledTableRow key={volume.id}>
-                  <StyledTableCell>
-                    <input
-                      type="checkbox"
-                      checked={selectedVolumes.includes(volume.id)}
-                      onChange={() => handleSelectVolume(volume.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-
-                  <StyledTableCell>
-                    <Tooltip title={volume.name}>
-                      <span>{volume.name}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.host}>
-                      <span>{volume.host}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.attached_to}>
-                      <span>{volume.attached_to}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.id}>
-                      <span>{volume.id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.status}>
-                      <span>{volume.status}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.volume_type}>
-                      <span>{volume.volume_type}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.size}>
-                      <span>{volume.size}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.created_at}>
-                      <span>{volume.created_at}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.bootable}>
-                      <span>{volume.bootable ? 'Yes' : 'No'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={volume.encryption}>
-                      <span>{volume.encryption ? 'Yes' : 'No'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
+            {loading ? (
+              <VolumeTableSkeleton rows={rowsPerPage} />
+            ) : (
+              filteredVolumes
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((volume, index) => (
+                  <StyledTableRow key={volume.id}>
+                    <StyledTableCell>
+                      <input type="checkbox" />
+                    </StyledTableCell>
+                    <StyledTableCell>
+                      {page * rowsPerPage + index + 1}
+                    </StyledTableCell>
+                    <StyledTableCell>{volume.name}</StyledTableCell>
+                    <StyledTableCell>{volume.host}</StyledTableCell>
+                    <StyledTableCell>{volume.attached_to}</StyledTableCell>
+                    <StyledTableCell>{volume.id}</StyledTableCell>
+                    <StyledTableCell>{volume.status}</StyledTableCell>
+                    <StyledTableCell>{volume.volume_type}</StyledTableCell>
+                    <StyledTableCell>{volume.size}</StyledTableCell>
+                    <StyledTableCell>{formatAge(volume.created_at)}</StyledTableCell>
+                    <StyledTableCell>{volume.bootable ? "Yes" : "No"}</StyledTableCell>
+                    <StyledTableCell>{volume.encryption ? "Yes" : "No"}</StyledTableCell>
+                    <StyledTableCell>
                       <Button
-                        variant="outlined"
-                        color="primary"
-                        onClick={() => {
-                          setVolumeToUpdate(volume);
-                          setShowUpdateForm(true);
-                        }}
+                        size="small"
+                        color="error"
+                        onClick={() => handleDeleteVolume(volume.id)}
                       >
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => handleDeleteVolume(volume.id)}>
                         Delete
                       </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
+                    </StyledTableCell>
+                  </StyledTableRow>
+                ))
+            )}
           </TableBody>
         </Table>
          {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

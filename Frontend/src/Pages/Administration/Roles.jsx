@@ -21,6 +21,8 @@ import {
   Slide,
   TablePagination, // Import TablePagination
 } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
+
 import { useTheme } from "@mui/material/styles";
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -127,7 +129,9 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
     fetchRoles();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && roles.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -144,6 +148,7 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -165,6 +170,40 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
     setRoles(filtered);
     setPage(0); // Reset page on search
   };
+
+  const RoleTableSkeleton = ({ rows = 5 }) => {
+    return (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell>
+              <Skeleton variant="rectangular" width={18} height={18} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={80} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Skeleton variant="rectangular" width={70} height={30} />
+                <Skeleton variant="rectangular" width={70} height={30} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+  };
+  
 
   const handleChangePage = (_, newPage) => {
     setPage(newPage);
@@ -535,7 +574,10 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
   </TableHead>
 
   <TableBody>
-    {currentRoles.map((role, index) => (
+  {loading ? (
+    <RoleTableSkeleton rows={rowsPerPage} />
+  ) : (
+    currentRoles.map((role, index) => (
       <StyledTableRow key={role.id}>
         <StyledTableCell>
           <input
@@ -545,7 +587,10 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
           />
         </StyledTableCell>
 
-        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>
+          {page * rowsPerPage + index + 1}
+        </StyledTableCell>
+
         <StyledTableCell>{role.name}</StyledTableCell>
         <StyledTableCell>{role.id}</StyledTableCell>
 
@@ -560,14 +605,20 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
             >
               Update
             </Button>
-            <Button variant="outlined" color="error" onClick={() => handleDeleteRole(role.id)}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleDeleteRole(role.id)}
+            >
               Delete
             </Button>
           </Box>
         </StyledTableCell>
       </StyledTableRow>
-    ))}
-  </TableBody>
+    ))
+  )}
+</TableBody>
+
 </Table>
 
 {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

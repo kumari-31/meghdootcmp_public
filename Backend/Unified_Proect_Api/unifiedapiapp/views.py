@@ -1938,6 +1938,8 @@ def list_hypervisors(request):
     )
 
 
+
+
 # -----------------------------6 Dec 2024-------------------------------------------
 
 
@@ -18970,3 +18972,90 @@ class K8sOverviewAPIView(APIView):
             "services": service_list
         }, status=status.HTTP_200_OK)
 
+
+
+class ServiceRequestBulkAdminApproveAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUserPermission]
+
+    def post(self, request):
+        role = request.auth.get("role")
+
+        if role != "ADMIN":
+            return Response(
+                {"error": "Only ADMIN can perform bulk approval"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        request_ids = request.data.get("service_request_ids")
+
+        if not isinstance(request_ids, list) or not request_ids:
+            return Response(
+                {"error": "service_request_ids must be a non-empty list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+
+        for req_id in request_ids:
+            try:
+                service_request = ServiceRequest.objects.get(id=req_id)
+
+                # ---- Eligibility Checks ----
+                if service_request.fla_status != "Accepted":
+                    results.append({
+                        "id": req_id,
+                        "status": "Skipped",
+                        "reason": "FLA not approved",
+                    })
+                    continue
+
+                if service_request.admin_status == "Accepted":
+                    results.append({
+                        "id": req_id,
+                        "status": "Skipped",
+                        "reason": "Already approved",
+                    })
+                    continue
+
+                # ---- Mark Admin Approved ----
+                service_request.admin_status = "Accepted"
+                service_request.admin_action_timestamp = timezone.now()
+                service_request.admin_approved_timestamp = timezone.now()
+                service_request.save()
+
+                # ---- Deploy Service ----
+                deploy_result = deploy_service_request(service_request)
+
+                if deploy_result["success"]:
+                    results.append({
+                        "id": req_id,
+                        "status": "Accepted",
+                        "node_port": deploy_result.get("node_port"),
+                    })
+                else:
+                    results.append({
+                        "id": req_id,
+                        "status": "Failed",
+                        "error": deploy_result.get("error"),
+                    })
+
+            except ServiceRequest.DoesNotExist:
+                results.append({
+                    "id": req_id,
+                    "status": "Failed",
+                    "error": "Service request not found",
+                })
+            except Exception as e:
+                results.append({
+                    "id": req_id,
+                    "status": "Failed",
+                    "error": str(e),
+                })
+
+        return Response(
+            {
+                "message": "Bulk admin approval completed",
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )

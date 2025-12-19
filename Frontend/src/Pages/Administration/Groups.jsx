@@ -4,7 +4,7 @@ import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
 import { CircularProgress } from '@mui/material';
-
+import Skeleton from "@mui/material/Skeleton";
 import {
   Table,
   TableBody,
@@ -174,7 +174,9 @@ const Groups = () => {
     fetchUsers();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && groups.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -200,6 +202,37 @@ const Groups = () => {
       </div>
     );
   }
+
+
+const TableRowSkeleton = ({ rows = 5 }) => {
+  return Array.from({ length: rows }).map((_, index) => (
+    <StyledTableRow key={`skeleton-${index}`}>
+      <StyledTableCell padding="checkbox">
+        <Skeleton variant="rectangular" width={16} height={16} />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width={30} />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="80%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="70%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="90%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Box display="flex" justifyContent="center" gap={1}>
+          <Skeleton width={60} height={36} />
+          <Skeleton width={60} height={36} />
+          <Skeleton width={110} height={36} />
+        </Box>
+      </StyledTableCell>
+    </StyledTableRow>
+  ));
+};
+
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setPage(0); // Reset page on search
@@ -644,42 +677,57 @@ const Groups = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+         
+
           <TableBody>
-          {filteredGroups
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((group,index) => (
-                <StyledTableRow key={group.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedGroups.includes(group.id)}
-                      onChange={() => handleSelectGroup(group.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{group.name}</StyledTableCell>
-                <StyledTableCell>{group.id}</StyledTableCell>
-                <StyledTableCell>{group.description}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined"  onClick={() => { setGroupToUpdate(group); setShowUpdateForm(true); }}>
-                      Update
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteGroup(group.id)}>
-                      Delete
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="info" // Using 'info' for a distinct color
-                      onClick={() => navigate(`/app/openstack/groups/members/${group.id}`)} // Updated navigation path
-                    >
-                      Manage Members
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading ? (
+    <TableRowSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredGroups
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((group, index) => (
+        <StyledTableRow key={group.id}>
+          <StyledTableCell padding="checkbox">
+            <input
+              type="checkbox"
+              checked={selectedGroups.includes(group.id)}
+              onChange={() => handleSelectGroup(group.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>{group.name}</StyledTableCell>
+          <StyledTableCell>{group.id}</StyledTableCell>
+          <StyledTableCell>{group.description}</StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => {
+                setGroupToUpdate(group);
+                setShowUpdateForm(true);
+              }}>
+                Update
+              </Button>
+              <Button variant="outlined" color="error" onClick={() => handleDeleteGroup(group.id)}>
+                Delete
+              </Button>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={() => navigate(`/app/openstack/groups/members/${group.id}`)}
+              >
+                Manage Members
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
 
       <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

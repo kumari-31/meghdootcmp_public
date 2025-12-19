@@ -23,6 +23,7 @@ import {
   TablePagination,
   Typography,
   Checkbox, // Import Checkbox for selection
+  Skeleton,   
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
 import { CircularProgress } from '@mui/material';
@@ -129,7 +130,10 @@ const Flavors = () => {
     }
   }, [initialFlavors]);
 
-  if (isLoading) {
+
+  const showInitialLoader = isLoading && flavors.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg
@@ -162,6 +166,21 @@ const Flavors = () => {
     );
   }
 
+
+  const TableSkeleton = ({ rows = 8, cols = 7 }) => (
+    <>
+      {Array.from({ length: rows }).map((_, rowIndex) => (
+        <TableRow key={rowIndex}>
+          {Array.from({ length: cols }).map((_, colIndex) => (
+            <TableCell key={colIndex}>
+              <Skeleton variant="rectangular" height={24} />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+  
   const filteredFlavors = flavors?.filter((flavor) =>
     Object.values(flavor).some(value =>
       typeof value === 'string' && value.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -487,33 +506,40 @@ const Flavors = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+         
+
           <TableBody>
-            {currentFlavors.map((flavor) => (
-              <StyledTableRow key={flavor.id}>
-                <StyledTableCell padding="checkbox">
-                  <Checkbox
-                    checked={selectedFlavorsToDelete.includes(flavor.id)}
-                    onChange={() => handleSelectFlavor(flavor.id)}
-                    inputProps={{ 'aria-label': `select flavor ${flavor.name}` }}
-                  />
-                </StyledTableCell>
-                <StyledTableCell>{flavor.id}</StyledTableCell>
-                <StyledTableCell>{flavor.name}</StyledTableCell>
-                <StyledTableCell>{flavor.ram}</StyledTableCell>
-                <StyledTableCell>{flavor.vcpus}</StyledTableCell>
-                <StyledTableCell>{flavor.disk}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    {/* Re-added Update button, as it was removed in previous iteration */}
-                   
-                    <Button variant="outlined" color="error" size="small" onClick={() => handleDeleteFlavor(flavor.id)}>
-                      Delete
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {isLoading ? (
+    <TableSkeleton rows={rowsPerPage} cols={7} />
+  ) : (
+    currentFlavors.map((flavor) => (
+      <StyledTableRow key={flavor.id}>
+        <StyledTableCell padding="checkbox">
+          <Checkbox
+            checked={selectedFlavorsToDelete.includes(flavor.id)}
+            onChange={() => handleSelectFlavor(flavor.id)}
+          />
+        </StyledTableCell>
+        <StyledTableCell>{flavor.id}</StyledTableCell>
+        <StyledTableCell>{flavor.name}</StyledTableCell>
+        <StyledTableCell>{flavor.ram}</StyledTableCell>
+        <StyledTableCell>{flavor.vcpus}</StyledTableCell>
+        <StyledTableCell>{flavor.disk}</StyledTableCell>
+        <StyledTableCell>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            onClick={() => handleDeleteFlavor(flavor.id)}
+          >
+            Delete
+          </Button>
+        </StyledTableCell>
+      </StyledTableRow>
+    ))
+  )}
+</TableBody>
+
         </Table>
 
          {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
