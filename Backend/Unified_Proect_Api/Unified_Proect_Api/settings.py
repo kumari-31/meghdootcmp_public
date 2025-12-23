@@ -45,9 +45,7 @@ INSTALLED_APPS = [
     "pinax.teams",
     "bootstrap4",
     # django-helpdesk
-    'helpdesk',
     'unifiedapiapp',
-    'unifiedapiapp.helpdesk_custom',
 ]
 
 SITE_ID = 1

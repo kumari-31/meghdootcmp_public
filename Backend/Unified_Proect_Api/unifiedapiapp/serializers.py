@@ -15,8 +15,8 @@ from rest_framework_simplejwt.serializers import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import VMInfo, Registration, Metric, Employee, VmRequest, CdacProject, ServiceRequest
-from helpdesk_custom.roles import get_user_role
-from helpdesk.models import Ticket, Queue
+# from helpdesk_custom.roles import get_user_role
+
 from .models import (
     VMInfo, 
     Registration, 
@@ -212,35 +212,35 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         return data
 
 
-class TicketSerializer(serializers.ModelSerializer):
-    employee_name = serializers.CharField(source="employee.name", read_only=True)
-    employee_email = serializers.EmailField(source="employee.email", read_only=True)
-    employee_id = serializers.CharField(source="employee.employee_id", read_only=True)
+# class TicketSerializer(serializers.ModelSerializer):
+#     employee_name = serializers.CharField(source="employee.name", read_only=True)
+#     employee_email = serializers.EmailField(source="employee.email", read_only=True)
+#     employee_id = serializers.CharField(source="employee.employee_id", read_only=True)
 
-    class Meta:
-        model = Ticket
-        fields = [
-            "id",
-            "employee_name",
-            "employee_email",
-            "employee_id",
-            "issue",
-            "description",
-            "attachment",
-            "solution",
-            "status",
-            "created_at",
-            "status_updated_at",
-            "closed_at",
-        ]
-        read_only_fields = [
-            "employee_name",
-            "employee_email",
-            "employee_id",
-            "created_at",
-            "status_updated_at",
-            "closed_at",
-        ]
+#     class Meta:
+#         model = Ticket
+#         fields = [
+#             "id",
+#             "employee_name",
+#             "employee_email",
+#             "employee_id",
+#             "issue",
+#             "description",
+#             "attachment",
+#             "solution",
+#             "status",
+#             "created_at",
+#             "status_updated_at",
+#             "closed_at",
+#         ]
+#         read_only_fields = [
+#             "employee_name",
+#             "employee_email",
+#             "employee_id",
+#             "created_at",
+#             "status_updated_at",
+#             "closed_at",
+#         ]
 
 
 import datetime

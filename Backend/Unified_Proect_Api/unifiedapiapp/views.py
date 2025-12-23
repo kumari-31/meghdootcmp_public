@@ -66,7 +66,7 @@ from .serializers import (CombinedDataSerializer, CombinedFormSerializer,
                           EmployeeUpdateSerializer, FlavorSerializer,
                           MetricSerializer, ProjectSerializer,
                           RegistrationSerializer, ServiceRequestSerializer,
-                          TicketSerializer, UserSerializer, VMInfoSerializer,
+                          UserSerializer, VMInfoSerializer,
                           VmRequestSerializer)
 from .table_imp import *
 
@@ -1937,9 +1937,32 @@ def list_hypervisors(request):
         {"hypervisors": [{"id": h.id, "name": h.name} for h in hypervisors]}
     )
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import VMInfo  # Make sure this is the correct model
+class HypervisorInstancesAPIView(APIView):
+    def get(self, request, hostname):
+        try:
+            vms = VMInfo.objects.filter(host_name=hostname)
+            print("DEBUG: Hostname =", hostname)
+            print("DEBUG: VMs found =", list(vms.values("instance_name", "volume_id")))
 
+            data = [
+                {"instance_name": vm.instance_name, "instance_id": vm.volume_id}
+                for vm in vms
+            ]
 
+            return Response(
+                {"status": "success", "count": len(data), "data": data},
+                status=status.HTTP_200_OK,
+            )
 
+        except Exception as e:
+            return Response(
+                {"status": "error", "message": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 # -----------------------------6 Dec 2024-------------------------------------------
 
 
@@ -5260,16 +5283,7 @@ class CookieTokenRefreshView(APIView):
 from django.shortcuts import redirect
 
 
-def helpdesk_redirect(request):
-    if not request.user.is_authenticated:
-        return redirect("/")
 
-    role = get_user_role(request.user)
-
-    if role == "admin":
-        return redirect("/helpdesk/dashboard/")
-    else:
-        return redirect("/helpdesk/tickets/submit/")
 
 
 # =========================================================

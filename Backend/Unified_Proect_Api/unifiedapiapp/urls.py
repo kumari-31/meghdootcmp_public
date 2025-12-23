@@ -1,8 +1,7 @@
 from django.urls import path, re_path
 from django.views.generic import TemplateView
 
-from unifiedapiapp.helpdesk_custom import admin_views
-from unifiedapiapp.views import helpdesk_redirect
+
 
 from . import views
 from .launchvm import vm_approve_request
@@ -130,6 +129,7 @@ urlpatterns = [
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/", HostAggregateAPIView.as_view(), name="host_aggregate_detail"),
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/actions/", HostAggregateActionsView.as_view(), name="host_aggregate_actions"),
     path("api/infrastructure/hypervisors/", AllHypervisorsView.as_view(), name="all_hypervisors"),
+    path("api/infrastructure/hypervisors/<str:hostname>/instances/",HypervisorInstancesAPIView.as_view(),),
     path("api/infrastructure/hosts/", ComputeHostAPIView.as_view(), name="compute_hosts"),
     path("api/infrastructure/resource-providers/", ResourceProviderAPIView.as_view(), name="resource_providers"),
     path("api/identity/application-credentials/", ApplicationCredentialAPIView.as_view(), name="app_cred_list"),
@@ -250,10 +250,7 @@ urlpatterns = [
     path("api/cdacprojects/", ProjectListAPIView.as_view(), name="project-list"),
     path("api/cdacprojects/create/", CreateCdacProjectAPIView.as_view(), name="create-project"),
     path("api/cdacprojects/delete/<int:project_id>/", DeleteCdacProjectAPIView.as_view(), name="delete-project"),
-    path("api/helpdesk/custom/dashboard/", admin_views.admin_dashboard, name="helpdesk_custom_dashboard"),
-    path("api/helpdesk/custom/ticket/<int:ticket_id>/", admin_views.ticket_detail, name="helpdesk_custom_ticket_detail"),
-    path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
-
+    
 
     # Catch-all fallback to index.html
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),
