@@ -2600,6 +2600,55 @@ class EmployeeCreateAPIView(APIView):
             # Return validation errors if any
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+import csv
+import io
+
+
+class EmployeeBulkUploadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        file = request.FILES.get("file")
+
+        if not file:
+            return Response(
+                {"error": "CSV file is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not file.name.endswith(".csv"):
+            return Response(
+                {"error": "Only CSV files are allowed"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        decoded_file = file.read().decode("utf-8")
+        io_string = io.StringIO(decoded_file)
+        reader = csv.DictReader(io_string)
+
+        created = []
+        errors = []
+
+        for index, row in enumerate(reader, start=1):
+            serializer = EmployeeSerializer(data=row)
+            if serializer.is_valid():
+                serializer.save()
+                created.append(serializer.data)
+            else:
+                errors.append({
+                    "row": index,
+                    "errors": serializer.errors
+                })
+
+        return Response(
+            {
+                "created_count": len(created),
+                "failed_count": len(errors),
+                "errors": errors
+            },
+            status=status.HTTP_201_CREATED if not errors else status.HTTP_207_MULTI_STATUS
+        )
+
 
 class AllRegistrationRequestsAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -2844,8 +2893,22 @@ class InstanceDetailsAPIView(APIView):
             servers = conn.compute.servers(details=True)
             instances = []
             # print("instance")
+            db_instances = VMInfo.objects.all()
+            db_instance_map = {
+                vm.vm_name: vm for vm in db_instances
+            }
+           
+
+            
+
             for server in servers:
                 print("server------->", server)
+
+                db_instance = db_instance_map.get(server.name)
+                instance_internal_name = (
+                    db_instance.instance_name if db_instance else "Unknown"
+                )
+                
                 # Get flavor details
                 flavor_id = server.flavor["id"] if server.flavor else None
                 # print("flavor_id",flavor_id)
@@ -2914,11 +2977,13 @@ class InstanceDetailsAPIView(APIView):
                 power_state_str = POWER_STATE_MAP.get(
                     power_state_num, str(power_state_num)
                 )
+              
                 # Construct instance details
                 instances.append(
                     {
                         "Instance ID": server.id if server.id else "Unknown",
-                        "Instance Name": server.name if server.name else "Unknown",
+                        "VM Name": server.name if server.name else "Unknown",
+                        "Instance Name": instance_internal_name,
                         "Image Name": image_name,  # Now handles cases where booted from volume
                         "Flavor Name": flavor.name if flavor else "-",
                         "RAM": f"{flavor.ram} MB" if flavor else "-",
@@ -2938,20 +3003,26 @@ class InstanceDetailsAPIView(APIView):
                     }
                 )
                 print(instances)
+            
             return Response(instances, status=200)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
     def calculate_age(self, created_at):
-        """Calculate the age of the instance."""
-        created_time = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(
-            tzinfo=timezone.utc
-        )
+        created_time = datetime.strptime(
+            created_at, "%Y-%m-%dT%H:%M:%SZ"
+        ).replace(tzinfo=timezone.utc)
+
         now = datetime.now(timezone.utc)
-        age = now - created_time
-        days = age.days
-        hours = age.seconds // 3600
-        return f"{days} days, {hours} hours"
+        delta = now - created_time
+
+        days = delta.days
+        hours = delta.seconds // 3600
+
+        if days > 0:
+            return f"{days} days, {hours} hour{'s' if hours != 1 else ''}"
+        else:
+            return f"{hours} hour{'s' if hours != 1 else ''}"
 
     # def calculate_age(self, created_at):
     #     """Calculate the age of the instance."""
@@ -5644,17 +5715,14 @@ class VmRequestUpdateAPIView(APIView):
             vm_request = VmRequest.objects.get(id=request_id)
 
             # Check if FLA status is already accepted
-            if vm_request.fla_status == "Accepted":
+            if vm_request.admin_status == "Accepted":
                 return Response(
-                    {"message": "Already approved by FLA, updates not allowed."},
+                    {"message": "Already approved by Admin, updates not allowed."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Check if Admin & FLA status are still Pending
-            if (
-                vm_request.admin_status == "Pending"
-                and vm_request.fla_status == "Pending"
-            ):
+            if vm_request.admin_status == "Pending":
+              
                 allowed_fields = [
                     "vm_name",
                     "purpose",
@@ -9804,15 +9872,16 @@ class HostAvailabilityAPIView(APIView):
         for h in hosts:
             interfaces = h.get("interfaces", [])
 
-            # Default values
+            # Defaults
             ip = "N/A"
             status = "Unknown"
 
             if interfaces:
-                iface = h["interfaces"][0] if h.get("interfaces") else {}
-                status = availability_map.get(
-                    int(iface.get("available", 0)), "Unknown"
-                )
+                iface = interfaces[0]
+                ip = iface.get("ip", "N/A")
+
+                available = str(iface.get("available", "0"))
+                status = availability_map.get(available, "Unknown")
 
             data.append(
                 {
@@ -9825,15 +9894,14 @@ class HostAvailabilityAPIView(APIView):
 
         return Response(data)
 
+
     
 class CPUUtilizationAPIView(APIView):
     def get(self, request, hostid):
-        data = get_item_history(
-            hostid,
-            {"name": "CPU utilization"},
+         return Response(
+            get_item_history(hostid, {"key_": "system.cpu.util"})
         )
 
-        return Response(data)
 
 class MemoryUtilizationAPIView(APIView):
     def get(self, request, hostid):
@@ -10037,40 +10105,120 @@ import os
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from django.http import HttpResponse
+from .zabbix_pdf_charts import draw_line_chart
 
 class HostHealthPDFAPIView(APIView):
     def get(self, request, hostid):
         response = HttpResponse(content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="host_{hostid}_health.pdf"'
+        response["Content-Disposition"] = (
+            f'attachment; filename="host_{hostid}_health.pdf"'
+        )
 
         c = canvas.Canvas(response, pagesize=A4)
         width, height = A4
 
         summary = HostHealthSummaryAPIView().get(request, hostid).data
+        cpu = get_item_history(hostid, {"key_": "system.cpu.util"})
+        memory = get_item_history(hostid, {"key_": "vm.memory.utilization"})
+        disk = get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"})
 
-        c.setFont("Helvetica-Bold", 16)
-        c.drawString(50, height - 50, "Host Health Report")
+        # ===== HEADER =====
+        logo_path = os.path.join(settings.BASE_DIR, "static", "logo191.png")
+        c.drawImage(logo_path, 40, height - 80, width=80, height=40)
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(140, height - 60, "Host Health Report")
 
-        c.setFont("Helvetica", 12)
-        y = height - 100
+        c.setStrokeColor(colors.grey)
+        c.line(40, height - 90, width - 40, height - 90)
 
-        for key, value in summary.items():
-            if key != "alerts":
-                c.drawString(50, y, f"{key.replace('_', ' ').title()}: {value}")
-                y -= 20
+        # ===== HEALTH SCORE =====
+        status_color = {
+            "Healthy": colors.green,
+            "Warning": colors.orange,
+            "Critical": colors.red,
+        }[summary["status"]]
 
-        c.drawString(50, y - 10, "Recent Alerts:")
-        y -= 30
+        c.setFont("Helvetica-Bold", 14)
+        c.setFillColor(status_color)
+        c.drawString(40, height - 120,
+                     f"Health Score: {summary['health_score']} ({summary['status']})")
+        c.setFillColor(colors.black)
+
+        # ===== METRICS =====
+        y = height - 150
+        c.setFont("Helvetica", 11)
+        for k in ["cpu", "memory", "disk", "load_per_core"]:
+            c.drawString(40, y, f"{k.replace('_',' ').title()}: {summary[k]}")
+            y -= 18
+
+        # ===== CHARTS =====
+        # ===== CHARTS =====
+        cpu_data = list(cpu.values())[0] if cpu else []
+        memory_data = list(memory.values())[0] if memory else []
+        disk_data = list(disk.values())[0] if disk else []
+
+        if cpu_data:
+            draw_line_chart(
+                c,
+                40,
+                y - 140,
+                230,
+                120,
+                cpu_data,
+                "CPU Utilization (%)",
+            )
+
+        if memory_data:
+            draw_line_chart(
+                c,
+                310,
+                y - 140,
+                230,
+                120,
+                memory_data,
+                "Memory Utilization (%)",
+            )
+
+        if disk_data:
+            draw_line_chart(
+                c,
+                40,
+                y - 300,
+                230,
+                120,
+                disk_data,
+                "Disk Utilization (%)",
+            )
+
+
+
+        # ===== ALERTS =====
+        ay = y - 340
+        c.setFont("Helvetica-Bold", 12)
+        c.drawString(40, ay, "Recent Alerts")
+        ay -= 16
 
         for a in summary["alerts"]:
-            c.drawString(60, y, f"- {a['name']}")
-            y -= 15
+            severity = int(a.get("severity", 0))
+            sev_color = colors.red if severity >= 3 else colors.orange
+            c.setFillColor(sev_color)
+            c.drawString(50, ay, f"- {a['name']}")
+            ay -= 14
+
+        # ===== FOOTER =====
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica", 9)
+        c.drawCentredString(width / 2, 20,
+                             "Generated by Cloud Management Platform")
 
         c.showPage()
         c.save()
-
         return response
+
 
 
 class HealthReportAPIView(APIView):
@@ -10113,6 +10261,7 @@ class HealthReportAPIView(APIView):
 
         doc.build(story)
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
 
 
 
@@ -13126,6 +13275,8 @@ class K8sRequestsByDateAPIView(APIView):
             "project_name",
             "admin_status",
             "fla_status",
+            "designation",
+            "deployment_status",    
             "request_timestamp",
         )
         print("Table Data:", list(table_data))
@@ -16588,6 +16739,55 @@ class AllHypervisorsView(APIView):
             )
 
 
+
+class HypervisorInstancesView(APIView):
+    """
+    Fetch all instances running on a given hypervisor hostname
+    """
+
+    def get(self, request, hostname):
+        try:
+            conn = get_openstack_connection()
+
+            # Call Nova API directly
+            response = conn.compute.get(
+                f"/servers/detail?all_tenants=1&host={hostname}"
+            )
+            data = response.json()
+
+            if "servers" not in data:
+                return Response(
+                    {"error": "No instances found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            instances = []
+            for server in data["servers"]:
+                instances.append(
+                    {
+                        "name": server.get("name"),
+                        "instance_name": server.get("OS-EXT-SRV-ATTR:instance_name"),
+                        "instance_id": server.get("id"),
+                    }
+                )
+
+            return Response(
+                {
+                    "status": "success",
+                    "hypervisor": hostname,
+                    "count": len(instances),
+                    "data": instances,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 # ---------------------------------------------------------------
 # 2️⃣ Compute Hosts API — compute/hosts/
 # ---------------------------------------------------------------
@@ -16606,7 +16806,7 @@ class ComputeHostAPIView(APIView):
                     data.append(
                         {
                             "host": s.host,
-                            "availability_zone": getattr(s, "zone", ""),
+                            "availability_zone": getattr(s, "availability_zone", ""),
                             "status": s.status,
                             "state": s.state,
                             "last_updated": getattr(s, "updated_at", ""),

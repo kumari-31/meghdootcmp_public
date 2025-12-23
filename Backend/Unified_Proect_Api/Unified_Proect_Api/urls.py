@@ -20,8 +20,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    # helpdesk web UI
-    path("", include("unifiedapiapp.urls")),  # Include app's URLs
+  
     
     # path('api/helpdesk/', include('unifiedapiapp.helpdesk_custom.urls', namespace='helpdesk_custom')),
     path('', include('unifiedapiapp.urls')),

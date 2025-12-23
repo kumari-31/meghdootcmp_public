@@ -1,12 +1,9 @@
 // src/Pages/Instance.jsx
-import React, { useEffect, useState } from "react";
+import  { useEffect, useState } from "react";
 import apiClient from "../../Axios";
 import "../style.css";
 
 import {
-  Box,
-  Grid,
-  Typography,
   TextField,
   Paper,
   Table,
@@ -330,6 +327,7 @@ const Instance = () => {
         >
           <TableHead>
             <TableRow>
+              <StyledTableCell>Vm Name</StyledTableCell>
               <StyledTableCell>Instance Name</StyledTableCell>
               <StyledTableCell>Flavor</StyledTableCell>
               <StyledTableCell>IP Address</StyledTableCell>
@@ -345,36 +343,30 @@ const Instance = () => {
 
           
           <TableBody>
-  {loading ? (
-    <InstanceTableSkeleton rows={rowsPerPage} />
-  ) : currentInstances.length === 0 ? (
-    <TableRow>
-      <TableCell colSpan={10} align="center">
-        No instances found
-      </TableCell>
-    </TableRow>
-  ) : (
-    currentInstances.map((item, index) => (
-      <StyledTableRow key={item["Instance ID"] || index}>
-        <StyledTableCell>
-          {item["Instance Name"].split("_").slice(1).join("_")}
-        </StyledTableCell>
-        <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
-        <StyledTableCell>
-          {item["IP Addresses"]
-            ? Object.values(item["IP Addresses"])[0]?.[0] || "N/A"
-            : "N/A"}
-        </StyledTableCell>
-        <StyledTableCell>{item["RAM"]}</StyledTableCell>
-        <StyledTableCell>{item["Disk"]}</StyledTableCell>
-        <StyledTableCell>
-          {item["Image Name"] && item["Image Name"] !== "N/A"
-            ? item["Image Name"]
-            : <span style={{ color: "gray" }}>N/A</span>}
-        </StyledTableCell>
-        <StyledTableCell>{item["status"]}</StyledTableCell>
-        <StyledTableCell>{item["power_state_str"]}</StyledTableCell>
-        <StyledTableCell>{formatAge(item["Age"])}</StyledTableCell>
+            {currentInstances.map((item, index) => (
+              <StyledTableRow key={item["Instance ID"] || index}>
+                <StyledTableCell>
+                  {item["VM Name"].split("_").slice(1).join("_")}
+                </StyledTableCell>
+                 <StyledTableCell>
+                  {item["Instance Name"]}
+                </StyledTableCell>
+                <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
+                <StyledTableCell>
+                  {item["IP Addresses"]
+                    ? Object.values(item["IP Addresses"])[0]?.[0] || "N/A"
+                    : "N/A"}
+                </StyledTableCell>
+                <StyledTableCell>{item["RAM"]}</StyledTableCell>
+                <StyledTableCell>{item["Disk"]}</StyledTableCell>
+                <StyledTableCell>
+                  {item["Image Name"] && item["Image Name"] !== "N/A"
+                    ? item["Image Name"]
+                    : <span style={{ color: "gray" }}>N/A</span>}
+                </StyledTableCell>
+                <StyledTableCell>{item["status"]}</StyledTableCell>
+                <StyledTableCell>{item["power_state_str"]}</StyledTableCell>
+                <StyledTableCell>{formatAge(item["Age"])}</StyledTableCell>
 
         <StyledTableCell>
           <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -400,8 +392,7 @@ const Instance = () => {
           </FormControl>
         </StyledTableCell>
       </StyledTableRow>
-    ))
-  )}
+    ))}
 </TableBody>
 
 

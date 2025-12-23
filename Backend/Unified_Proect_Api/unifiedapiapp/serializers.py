@@ -15,8 +15,6 @@ from rest_framework_simplejwt.serializers import (
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import VMInfo, Registration, Metric, Employee, VmRequest, CdacProject, ServiceRequest
-# from helpdesk_custom.roles import get_user_role
-
 from .models import (
     VMInfo, 
     Registration, 

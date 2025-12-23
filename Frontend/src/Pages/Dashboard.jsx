@@ -33,7 +33,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CloudIcon from "@mui/icons-material/Cloud";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+// import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import apiClient from "../Axios";
@@ -600,35 +600,7 @@ const handleDateChange = (newValue) => {
     })();
   }, []);
 
-  // Tickets
-  useEffect(() => {
-    (async () => {
-      try {
-        const response = await apiClient.get("/tickets/");
-        const data = response.data || [];
-        let open = 0,
-          inProgress = 0,
-          closed = 0,
-          today = 0;
-        data.forEach((t) => {
-          const s = (t.status || "").toLowerCase();
-          if (s === "open") open++;
-          if (s === "in progress") inProgress++;
-          if (s === "closed") closed++;
-          if (dayjs(t.created_at).isToday()) today++;
-        });
-        setTicketsSummary({
-          total: data.length,
-          open,
-          inProgress,
-          closed,
-          today,
-        });
-      } catch (err) {
-        console.error("tickets err", err);
-      }
-    })();
-  }, []);
+
 
   // quick composite health metric (example: weighted)
   const systemHealth = useMemo(() => {
@@ -1385,7 +1357,7 @@ const tableStyles = {
                 <TableCell>EMP ID</TableCell>
                 <TableCell>Project</TableCell>
                 <TableCell>Service</TableCell>
-                <TableCell>FLA</TableCell>
+                <TableCell>Designation</TableCell>
                 <TableCell>Admin</TableCell>
                 <TableCell>Deploy</TableCell>
               </TableRow>
@@ -1397,7 +1369,7 @@ const tableStyles = {
                   <TableCell>{r.employee_id}</TableCell>
                   <TableCell>{r.project_name}</TableCell>
                   <TableCell>{r.service_name}</TableCell>
-                  <TableCell>{r.fla_status}</TableCell>
+                  <TableCell>{r.designation}</TableCell>
                   <TableCell>{r.admin_status}</TableCell>
                   <TableCell>{r.deployment_status}</TableCell>
                 </TableRow>

@@ -1,8 +1,6 @@
 from django.urls import path, re_path
 from django.views.generic import TemplateView
 
-
-
 from . import views
 from .launchvm import vm_approve_request
 from .views import *
@@ -129,7 +127,7 @@ urlpatterns = [
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/", HostAggregateAPIView.as_view(), name="host_aggregate_detail"),
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/actions/", HostAggregateActionsView.as_view(), name="host_aggregate_actions"),
     path("api/infrastructure/hypervisors/", AllHypervisorsView.as_view(), name="all_hypervisors"),
-    path("api/infrastructure/hypervisors/<str:hostname>/instances/",HypervisorInstancesAPIView.as_view(),),
+    path("api/infrastructure/hypervisors/<str:hostname>/instances/", HypervisorInstancesView.as_view(), name="hypervisor_instances"),
     path("api/infrastructure/hosts/", ComputeHostAPIView.as_view(), name="compute_hosts"),
     path("api/infrastructure/resource-providers/", ResourceProviderAPIView.as_view(), name="resource_providers"),
     path("api/identity/application-credentials/", ApplicationCredentialAPIView.as_view(), name="app_cred_list"),
@@ -230,6 +228,9 @@ urlpatterns = [
     path("api/health-report/", HealthReportAPIView.as_view(), name="health-report"),
     path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view(), name="host-health-summary"),
     path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view(), name="zabbix-host-list"),
+   
+    
+
 
 
     # -------------------------------
@@ -241,6 +242,7 @@ urlpatterns = [
     path("api/metrics/", get_metrics, name="get_metrics"),
     path("api/employee-details/", get_employee_details, name="employee-details"),
     path("api/employees/", EmployeeCreateAPIView.as_view(), name="employee-create"),
+    path("api/employees/bulk-upload/", EmployeeBulkUploadAPIView.as_view(), name="bulk-employee-create"),
     path("api/employees/delete/<str:employee_id>/", EmployeeDeleteAPIView.as_view(), name="delete-employee"),
     path("api/employees/update/<str:employee_id>/", EmployeeUpdateAPIView.as_view(), name="update-employee"),
     path("api/send-email/", SendEmailView.as_view(), name="send-test-email"),
@@ -250,7 +252,8 @@ urlpatterns = [
     path("api/cdacprojects/", ProjectListAPIView.as_view(), name="project-list"),
     path("api/cdacprojects/create/", CreateCdacProjectAPIView.as_view(), name="create-project"),
     path("api/cdacprojects/delete/<int:project_id>/", DeleteCdacProjectAPIView.as_view(), name="delete-project"),
-    
+   
+
 
     # Catch-all fallback to index.html
     re_path(r"^(?:.*)/?$", TemplateView.as_view(template_name="index.html")),

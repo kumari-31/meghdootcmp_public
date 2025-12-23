@@ -39,16 +39,11 @@ INSTALLED_APPS = [
     "rest_framework.authtoken",
     "corsheaders",
     "django_extensions",
-    "django.contrib.sites",  # Required for pinax-teams
-    "account",  # Required by pinax-invitations
-    "pinax.invitations",
-    "pinax.teams",
-    "bootstrap4",
-    # django-helpdesk
     'unifiedapiapp',
+    
 ]
 
-SITE_ID = 1
+
 
 
 REST_FRAMEWORK = {
@@ -80,20 +75,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
 
-# django-helpdesk
-HELPDESK_ENABLE_PER_QUEUE_TEAMS = False
-HELPDESK_KB_ENABLED = False
-HELPDESK_ENABLE_HISTORY = True
-# HELPDESK_DEFAULT_SETTINGS = True
-# Optional: email notifications (already set your SMTP)
-HELPDESK_EMAIL_FROM_ADDRESS = "rakshanavg20@gmail.com"
-HELPDESK_EMAIL_TEMPLATE_DIR = os.path.join(BASE_DIR, "helpdesk/email_templates")
-HELPDESK_AUTHENTICATION = "Unified_Proect_Api.cookie_jwt_auth.CookieJWTAuthentication"
-HELPDESK_ANONYMOUS_ACCESS = False
-HELPDESK_DEFAULT_SETTINGS = {
-    "default_staff_status": True,
-    "default_activate_status": True,
-}
+
 
 
 ROOT_URLCONF = "Unified_Proect_Api.urls"
@@ -268,6 +250,8 @@ SERVER_EMAIL = "cloud-chn@cdac.in"
 ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
 ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
+
+
 
 
 # """

@@ -30,7 +30,12 @@ const AddEmployee = () => {
     message: "",
     severity: "success", // "success" or "error"
   });
-  
+  const [csvFile, setCsvFile] = useState(null);
+
+const handleFileChange = (e) => {
+  setCsvFile(e.target.files[0]);
+};
+
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -88,6 +93,42 @@ const AddEmployee = () => {
       console.error("Error adding employee:", error);
     }
   };
+
+  const handleBulkUpload = async () => {
+  if (!csvFile) {
+    setAlertDialog({
+      open: true,
+      message: "Please select a CSV file",
+      severity: "error",
+    });
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", csvFile);
+
+  try {
+    const response = await apiClient.post(
+      "/employees/bulk-upload/",
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+
+    setAlertDialog({
+      open: true,
+      message: `Employees created: ${response.data.created_count}
+Failed: ${response.data.failed_count}`,
+      severity: "success",
+    });
+  } catch (error) {
+    setAlertDialog({
+      open: true,
+      message: "Bulk upload failed",
+      severity: "error",
+    });
+  }
+};
+
   
   
 
@@ -160,7 +201,26 @@ const AddEmployee = () => {
     </Button>
   </DialogActions>
 </Dialog>
+<Paper elevation={3} sx={{ p: 3, mt: 4 }}>
+  <Typography variant="h6" gutterBottom>
+    Bulk Upload Employees (CSV)
+  </Typography>
 
+  <input
+    type="file"
+    accept=".csv"
+    onChange={handleFileChange}
+  />
+
+  <Button
+    sx={{ mt: 2 }}
+    variant="contained"
+    color="primary"
+    onClick={handleBulkUpload}
+  >
+    Upload CSV
+  </Button>
+</Paper>
 
     </Container>
   );
