@@ -28,6 +28,9 @@ import {
   Slide,
   TablePagination, // Import TablePagination
 } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
+
 import { styled } from '@mui/material/styles';
 import { useTheme } from "@mui/material/styles";
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -100,6 +103,9 @@ const Users = () => {
     role: '',
     enabled: false,
   });
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const [userToUpdate, setUserToUpdate] = useState(null);
   const [projects, setProjects] = useState([]);
   const [availableRoles, setAvailableRoles] = useState([]);
@@ -175,7 +181,9 @@ const Users = () => {
     fetchRoles();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && users.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -192,6 +200,7 @@ const Users = () => {
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -201,6 +210,53 @@ const Users = () => {
       </div>
     );
   }
+
+
+  const UserTableSkeleton = ({ rows = 5 }) => {
+    return (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell padding="checkbox">
+              <Skeleton variant="rectangular" width={18} height={18} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={160} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={40} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Skeleton variant="rectangular" width={70} height={30} />
+                <Skeleton variant="rectangular" width={70} height={30} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+  };
+  
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -363,6 +419,8 @@ const Users = () => {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+
+    if (creating) return; // ⛔ prevent double click
     // Username format validation
     if (!usernameRegex.test(newUser.username)) {
       showSnackbar(
@@ -418,6 +476,7 @@ const Users = () => {
     };
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/users/create/', payload);
       if (response.status === 201 || response.status === 200) {
         showSnackbar('User created successfully', 'success');
@@ -448,10 +507,14 @@ const Users = () => {
         showSnackbar('Error creating user. Please check the inputs and try again.', 'error');
       }
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!userToUpdate?.id) {
       showSnackbar('Please select a user to update.', 'warning');
       return;
@@ -482,6 +545,8 @@ const Users = () => {
     };
 
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.patch(`/update-users/${userToUpdate.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('User updated successfully', 'success');
@@ -501,6 +566,8 @@ const Users = () => {
         console.error('Error:', error.message);
         showSnackbar('An error occurred during the update.', 'error');
       }
+    }finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -606,7 +673,7 @@ const Users = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() =>setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () =>setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New User
@@ -681,8 +748,14 @@ const Users = () => {
               />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" 
+              variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={creating}>
+                {creating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Create"
+                  )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -692,7 +765,7 @@ const Users = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update User
@@ -755,8 +828,13 @@ const Users = () => {
               />
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }} disabled={updating}>
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel
@@ -814,63 +892,45 @@ const Users = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+         
           <TableBody>
-            {filteredUsers
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((user,index) => (
-                <StyledTableRow key={user.id}>
-                  <StyledTableCell padding="checkbox">
-                    <Checkbox
-                      color="primary"
-                      checked={selectedUsers.includes(user.id)}
-                      onChange={() => handleSelectUser(user.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell> {/* Sr. No. data is now after the checkbox data */}
-          
-                  <StyledTableCell>
-                    <Tooltip title={user.name}>
-                      <span>{user.name}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.id}>
-                      <span>{user.id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.enabled ? 'Yes' : 'No'}>
-                      <span>{user.enabled ? 'Yes' : 'No'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.domain_id}>
-                      <span>{user.domain_id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={user.default_project_id}>
-                      <span>{user.default_project_id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined"  onClick={() => handleOpenUpdateModal(user)}>
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => handleDeleteUser(user.id)}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-            {emptyRows > 0 && (
-              <TableRow style={{ height: 53 * emptyRows }}>
-                <TableCell colSpan={7} />
-              </TableRow>
-            )}
-          </TableBody>
+  {loading ? (
+    <UserTableSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredUsers
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((user, index) => (
+        <StyledTableRow key={user.id}>
+          <StyledTableCell padding="checkbox">
+            <Checkbox
+              checked={selectedUsers.includes(user.id)}
+              onChange={() => handleSelectUser(user.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>{user.name}</StyledTableCell>
+          <StyledTableCell>{user.id}</StyledTableCell>
+          <StyledTableCell>{user.enabled ? "Yes" : "No"}</StyledTableCell>
+          <StyledTableCell>{user.domain_id}</StyledTableCell>
+          <StyledTableCell>{user.default_project_id}</StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button onClick={() => handleOpenUpdateModal(user)}>Update</Button>
+              <Button color="error" onClick={() => handleDeleteUser(user.id)}>
+                Delete
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
         
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

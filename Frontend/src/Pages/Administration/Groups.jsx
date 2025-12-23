@@ -3,6 +3,8 @@ import apiClient from '../../Axios';
 import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
+import { CircularProgress } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
 import {
   Table,
   TableBody,
@@ -91,6 +93,9 @@ const Groups = () => {
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
 
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   // State for custom confirmation modal
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
@@ -169,7 +174,9 @@ const Groups = () => {
     fetchUsers();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && groups.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -195,6 +202,37 @@ const Groups = () => {
       </div>
     );
   }
+
+
+const TableRowSkeleton = ({ rows = 5 }) => {
+  return Array.from({ length: rows }).map((_, index) => (
+    <StyledTableRow key={`skeleton-${index}`}>
+      <StyledTableCell padding="checkbox">
+        <Skeleton variant="rectangular" width={16} height={16} />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width={30} />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="80%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="70%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Skeleton width="90%" />
+      </StyledTableCell>
+      <StyledTableCell>
+        <Box display="flex" justifyContent="center" gap={1}>
+          <Skeleton width={60} height={36} />
+          <Skeleton width={60} height={36} />
+          <Skeleton width={110} height={36} />
+        </Box>
+      </StyledTableCell>
+    </StyledTableRow>
+  ));
+};
+
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
     setPage(0); // Reset page on search
@@ -315,7 +353,7 @@ const Groups = () => {
   const handleCreateGroup = async (e) => {
     e.preventDefault();
 
-
+    if (creating) return; // ⛔ prevent double click
     if (!groupNameRegex.test(newGroup.name)) {
       showSnackbar("Group name can contain only letters, numbers, underscore (_) and hyphen (-). No spaces.", "error");
       return;
@@ -344,6 +382,7 @@ const Groups = () => {
     }
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-group-with-members/', payload);
       if (response.status === 201 || response.status === 200) {
         showSnackbar('Group created successfully', 'success');
@@ -356,13 +395,15 @@ const Groups = () => {
     } catch (error) {
       console.error('Error creating group:', error);
       showSnackbar('Error creating group. Please check the inputs and try again.', 'error');
+    } finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
   const handleUpdateGroup = async (e) => {
     e.preventDefault();
 
-
+    if (updating) return; // ⛔ prevent double submit
       if (!groupNameRegex.test(groupToUpdate.name)) {
         showSnackbar("Group name may contain only alphabets, numbers, underscore (_) and hyphen (-). No spaces.", "error");
         return;
@@ -383,6 +424,7 @@ const Groups = () => {
     };
 
     try {
+      setUpdating(true); // 🔄 START LOADER
       const response = await apiClient.put(`/update-group/${groupToUpdate.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('Group updated successfully', 'success');
@@ -395,6 +437,8 @@ const Groups = () => {
     } catch (error) {
       showSnackbar('Error updating group', 'error');
       console.error(error);
+    }  finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -492,7 +536,10 @@ const Groups = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal
+          open={showCreateForm}
+          onClose={creating ? undefined : () => setShowCreateForm(false)}
+        >
         <Box sx={modalStyle}>
           <h2>Create New Group</h2>
           <form onSubmit={handleCreateGroup}>
@@ -519,8 +566,12 @@ const Groups = () => {
               Add Member
             </Button>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -530,7 +581,10 @@ const Groups = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal
+          open={showUpdateForm}
+          onClose={updating ? undefined : () => setShowUpdateForm(false)}
+        >
         <Box sx={modalStyle}>
           <h2>Update Group</h2>
           <form onSubmit={handleUpdateGroup}>
@@ -544,9 +598,13 @@ const Groups = () => {
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              {updating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Update"
+                )}
               </Button>
-              <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
+              <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined" disabled={updating}>
                 Cancel
               </Button>
             </Box>
@@ -619,42 +677,57 @@ const Groups = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+         
+
           <TableBody>
-          {filteredGroups
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((group,index) => (
-                <StyledTableRow key={group.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedGroups.includes(group.id)}
-                      onChange={() => handleSelectGroup(group.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{group.name}</StyledTableCell>
-                <StyledTableCell>{group.id}</StyledTableCell>
-                <StyledTableCell>{group.description}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined"  onClick={() => { setGroupToUpdate(group); setShowUpdateForm(true); }}>
-                      Update
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteGroup(group.id)}>
-                      Delete
-                    </Button>
-                    <Button
-                      variant="outlined"
-                      color="info" // Using 'info' for a distinct color
-                      onClick={() => navigate(`/app/openstack/groups/members/${group.id}`)} // Updated navigation path
-                    >
-                      Manage Members
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading ? (
+    <TableRowSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredGroups
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((group, index) => (
+        <StyledTableRow key={group.id}>
+          <StyledTableCell padding="checkbox">
+            <input
+              type="checkbox"
+              checked={selectedGroups.includes(group.id)}
+              onChange={() => handleSelectGroup(group.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>{group.name}</StyledTableCell>
+          <StyledTableCell>{group.id}</StyledTableCell>
+          <StyledTableCell>{group.description}</StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => {
+                setGroupToUpdate(group);
+                setShowUpdateForm(true);
+              }}>
+                Update
+              </Button>
+              <Button variant="outlined" color="error" onClick={() => handleDeleteGroup(group.id)}>
+                Delete
+              </Button>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={() => navigate(`/app/openstack/groups/members/${group.id}`)}
+              >
+                Manage Members
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
 
       <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

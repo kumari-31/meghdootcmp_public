@@ -20,8 +20,10 @@ import {
   Alert,
   Slide,
   TablePagination,
+  Skeleton,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -83,6 +85,9 @@ const VolumeTypes = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const theme = useTheme();
 
   const [fieldErrors, setFieldErrors] = useState({
@@ -106,6 +111,7 @@ const VolumeTypes = () => {
   const maxDescriptionLength = 200;
   // Fetch volume types
   const fetchVolumeTypes = async () => {
+    setLoading(true);  
     setError(null);
     try {
       const response = await apiClient.get('/volume-types/');
@@ -122,8 +128,9 @@ const VolumeTypes = () => {
     fetchVolumeTypes();
   }, []);
 
-  
-    if (loading) {
+  const showInitialLoader = loading && volumeTypes.length === 0;
+
+    if (showInitialLoader) {
       return (
         <div className="cloud-container">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -149,6 +156,36 @@ const VolumeTypes = () => {
         </div>
       );
     }
+
+    const VolumeTypeTableSkeleton = ({ rows = 5 }) => (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell>
+              <Skeleton width={18} height={18} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={200} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Skeleton width={180} />
+            </StyledTableCell>
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center">
+                <Skeleton variant="rectangular" width={90} height={28} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+    
 
   // Pagination
   const currentVolumeTypes = volumeTypes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
@@ -240,7 +277,8 @@ const VolumeTypes = () => {
 
   const handleCreateVolumeType = async (e) => {
     e.preventDefault();
-  
+    if (creating) return; // ⛔ prevent double click
+
       // Check name
   if (!newVolumeType.name || !nameRegex.test(newVolumeType.name)) {
     showSnackbar(
@@ -256,6 +294,7 @@ const VolumeTypes = () => {
     return;
   }
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-volume-type/', newVolumeType);
   
       // 🔥 Handle duplicate
@@ -281,12 +320,16 @@ const VolumeTypes = () => {
         "error"
       );
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
   
 
   // Update volume type
   const handleUpdateVolumeType = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!volumeToUpdate) return;
      // Validate
   if (!volumeToUpdate.name || !nameRegex.test(volumeToUpdate.name)) {
@@ -302,6 +345,8 @@ const VolumeTypes = () => {
     return;
   }
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.put(`/update-volume-type/${volumeToUpdate.id}/`, volumeToUpdate);
       if (response.status === 200) {
         showSnackbar('Volume type updated successfully', 'success');
@@ -312,6 +357,9 @@ const VolumeTypes = () => {
     } catch (err) {
       console.error(err);
       showSnackbar('Error updating volume type', 'error');
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -392,7 +440,7 @@ const VolumeTypes = () => {
       </div>
 
       {/* Create Modal */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined : () => setShowCreateForm(false)}>
         <Box  sx={modalStyle}>
           <h2>Create Volume Type</h2>
           <form onSubmit={handleCreateVolumeType}>
@@ -419,7 +467,13 @@ const VolumeTypes = () => {
 
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Create</Button>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
+                </Button>
               <Button type="button" variant="outlined" onClick={() => setShowCreateForm(false)}>Cancel</Button>
             </Box>
           </form>
@@ -427,7 +481,7 @@ const VolumeTypes = () => {
       </Modal>
 
       {/* Update Modal */}
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
       <Box  sx={modalStyle}>
 
           <h2>Update Volume Type</h2>
@@ -454,7 +508,13 @@ const VolumeTypes = () => {
 
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>Update</Button>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
+                </Button>
               <Button type="button" variant="outlined" onClick={() => setShowUpdateForm(false)}>Cancel</Button>
             </Box>
           </form>
@@ -503,25 +563,51 @@ const VolumeTypes = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+          
           <TableBody>
-            {currentVolumeTypes.map((vt, index) => (
-              <StyledTableRow key={vt.id}>
-                <StyledTableCell>
-                  <input type="checkbox" checked={selectedVolumeTypes.includes(vt.id)} onChange={() => handleSelectVolume(vt.id)} />
-                </StyledTableCell>
-                <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{vt.name}</StyledTableCell>
-                <StyledTableCell>{vt.description}</StyledTableCell>
-                <StyledTableCell>{vt.id}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined" onClick={() => { setVolumeToUpdate(vt); setShowUpdateForm(true); }}>Update</Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteVolumeType(vt.id)}>Delete</Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading ? (
+    <VolumeTypeTableSkeleton rows={rowsPerPage} />
+  ) : (
+    currentVolumeTypes.map((vt, index) => (
+      <StyledTableRow key={vt.id}>
+        <StyledTableCell>
+          <input
+            type="checkbox"
+            checked={selectedVolumeTypes.includes(vt.id)}
+            onChange={() => handleSelectVolume(vt.id)}
+          />
+        </StyledTableCell>
+
+        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>{vt.name}</StyledTableCell>
+        <StyledTableCell>{vt.description}</StyledTableCell>
+        <StyledTableCell>{vt.id}</StyledTableCell>
+
+        <StyledTableCell>
+          <Box display="flex" justifyContent="center" gap={1}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setVolumeToUpdate(vt);
+                setShowUpdateForm(true);
+              }}
+            >
+              Update
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleDeleteVolumeType(vt.id)}
+            >
+              Delete
+            </Button>
+          </Box>
+        </StyledTableCell>
+      </StyledTableRow>
+    ))
+  )}
+</TableBody>
+
         </Table>
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

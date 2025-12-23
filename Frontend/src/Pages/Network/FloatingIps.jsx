@@ -24,6 +24,8 @@ import {
   TablePagination,
 } from '@mui/material';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
@@ -83,7 +85,7 @@ const FloatingIps = () => {
   const [projects, setProjects] = useState([]);
   const [networks, setNetworks] = useState([]);
   const [formErrors, setFormErrors] = useState({});
-
+  const [creating, setCreating] = useState(false);
   const theme = useTheme(); 
   const [associateData, setAssociateData] = useState({
     network_pool: 'External Network 10.184.53.0/24',
@@ -147,7 +149,10 @@ const FloatingIps = () => {
     fetchNetworks();
   }, []);
 
-  if (loading) {
+  // 🔹 Show cloud loader ONLY on first load
+const showInitialLoader = loading && floatingIps.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -173,6 +178,17 @@ const FloatingIps = () => {
       </div>
     );
   }
+
+  const FloatingIpSkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 7 }).map((_, index) => (
+        <StyledTableCell key={index}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -273,12 +289,14 @@ const FloatingIps = () => {
 
   const handleFloatingIpActions = async (e) => {
     e.preventDefault();
-  
+    if (creating) return; // ⛔ prevent double click
+
     if (!validateAssociateForm()) {
       return; // Stop submission if validation fails
     }
   
     try {
+      setCreating(true); // 🔄 START LOADER
       let floatingIp = associateData.floating_ip;
   
       if (!floatingIp) {
@@ -312,6 +330,7 @@ const FloatingIps = () => {
         network_name: '',
       });
       setShowAssociateForm(false);
+      setCreating(false); // ✅ STOP LOADER
     }
   };
   
@@ -403,7 +422,7 @@ const FloatingIps = () => {
         </div>
       </div>
 
-      <Modal open={showAssociateForm} onClose={() => setShowAssociateForm(false)}>
+      <Modal open={showAssociateForm} onClose={ creating ? undefined : () => setShowAssociateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Associate Floating IP
@@ -471,9 +490,13 @@ const FloatingIps = () => {
 
               </Select>
             </FormControl>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }} disabled={creating}>
               <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Associate/Create
+              {creating ? (
+              <CircularProgress size={22} sx={{ color: "#fff" }} />
+            ) : (
+              "Create"
+            )}
               </Button>
               <Button type="button" onClick={() => setShowAssociateForm(false)} variant="outlined">
                 Cancel
@@ -530,58 +553,73 @@ const FloatingIps = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredFloatingIps
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((floatingIp,index) => (
-                <StyledTableRow key={floatingIp.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedFloatingIps.includes(floatingIp.id)}
-                      onChange={() => handleSelectFloatingIps(floatingIp.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell> {/* Sr. No. data is now after the checkbox data */}
-          
-                  <StyledTableCell>
-                    <Tooltip title={floatingIp.floating_ip_address}>
-                      <span>{floatingIp.floating_ip_address}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  {/* <StyledTableCell>
-                    <Tooltip title={floatingIp.fixed_ip_address}>
-                      <span>{floatingIp.fixed_ip_address}</span>
-                    </Tooltip>
-                  </StyledTableCell> */}
-                  <StyledTableCell>
-                    <Tooltip title={floatingIp.id}>
-                      <span>{floatingIp.id}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Tooltip title={floatingIp.port_id || 'null'}>
-                      <span>{floatingIp.port_id || 'Null'}</span>
-                    </Tooltip>
-                  </StyledTableCell>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <FloatingIpSkeletonRow key={i} />
+      ))
+    : filteredFloatingIps
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+        .map((floatingIp, index) => (
+          <StyledTableRow key={floatingIp.id}>
+            <StyledTableCell padding="checkbox">
+              <input
+                type="checkbox"
+                checked={selectedFloatingIps.includes(floatingIp.id)}
+                onChange={() => handleSelectFloatingIps(floatingIp.id)}
+              />
+            </StyledTableCell>
 
-                  <StyledTableCell>
-                    <Tooltip title={floatingIp.status}>
-                      <span>{floatingIp.status}</span>
-                    </Tooltip>
-                  </StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined"  onClick={() => handleReleaseFloatingIp(floatingIp.floating_ip_address)}>
-                        Release
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => handleDeleteFloatingIps(floatingIp.id)}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-          </TableBody>
+            <StyledTableCell>
+              {page * rowsPerPage + index + 1}
+            </StyledTableCell>
+
+            <StyledTableCell>
+              <Tooltip title={floatingIp.floating_ip_address}>
+                <span>{floatingIp.floating_ip_address}</span>
+              </Tooltip>
+            </StyledTableCell>
+
+            <StyledTableCell>
+              <Tooltip title={floatingIp.id}>
+                <span>{floatingIp.id}</span>
+              </Tooltip>
+            </StyledTableCell>
+
+            <StyledTableCell>
+              <Tooltip title={floatingIp.port_id || 'null'}>
+                <span>{floatingIp.port_id || 'Null'}</span>
+              </Tooltip>
+            </StyledTableCell>
+
+            <StyledTableCell>
+              <Tooltip title={floatingIp.status}>
+                <span>{floatingIp.status}</span>
+              </Tooltip>
+            </StyledTableCell>
+
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Button
+                  variant="outlined"
+                  onClick={() =>
+                    handleReleaseFloatingIp(floatingIp.floating_ip_address)
+                  }
+                >
+                  Release
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => handleDeleteFloatingIps(floatingIp.id)}
+                >
+                  Delete
+                </Button>
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+</TableBody>
+
         </Table>
           {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

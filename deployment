@@ -1,0 +1,65 @@
+#!/bin/bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash 
+source ~/.bashrc
+nvm install 22.21.0
+nvm use 22.21.0
+node -v
+# Install project dependencies
+npm install
+# Install PM2 globally
+npm install -g pm2
+# Start the application with PM2
+pm2 start app.js --name "app_name"
+# Set up PM2 to start on system boot 
+pm2 startup
+pm2 save
+# Display the list of PM2 managed processes
+pm2 list       
+# To view logs for the application
+# pm2 logs app_name
+# To stop the application
+# pm2 stop app_name
+# To restart the application
+# pm2 restart app_name
+apt install python3.11-venv   
+sudo apt install build-essential python3-all-dev
+pip install -r requirements.txt
+reportlab,pillow>=9.0.0 (install manually if needed or add to requirements.txt)
+
+#install postgresql
+sudo apt install postgresql postgresql-contrib libpq-dev    
+systemctl start postgresql
+systemctl enable postgresql
+sudo -i -u postgres
+psql
+-- Create the User
+CREATE USER rootcmp WITH PASSWORD 'Root1234#$';
+
+-- Create the Database
+CREATE DATABASE meghdootcmp;
+
+-- Grant Permissions
+GRANT ALL PRIVILEGES ON DATABASE meghdootcmp TO rootcmp;
+
+-- Exit the prompt
+\q
+exit
+nano /etc/postgresql/11/main/pg_hba.conf
+# TYPE  DATABASE        USER            ADDRESS                 METHOD
+local   all             all                                     peer
+host    all             all             127.0.0.1/32            md5
+systemctl restart postgresql
+sudo -i -u postgres
+python manage.py migrate
+Fix the "Permission Denied for Schema Public" Error
+psql -d meghdootcmp -U rootcmp
+ALTER SCHEMA public OWNER TO rootcmp;
+\q
+exit
+
+
+Action,Command
+Start Dev Mode,"pm2 start npm --name ""meghdoot-frontend"" -- run dev"
+Check Status,pm2 status
+Check Logs,pm2 logs meghdoot-frontend
+Stop All,pm2 stop all

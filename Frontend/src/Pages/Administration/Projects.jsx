@@ -26,6 +26,9 @@ import {
   ListItemText, // Added for multi-select text
   OutlinedInput, // Added for multi-select input
 } from '@mui/material';
+import { CircularProgress } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
+
 import { useTheme } from "@mui/material/styles";
 import { Snackbar, Alert as MuiAlert } from '@mui/material';
 
@@ -112,6 +115,9 @@ const Projects = () => {
   const [selectedRole, setSelectedRole] = useState('member'); // Role for the selected user (default: member)
   const [selectedGroups, setSelectedGroups] = useState([]); // Currently selected groups for assignment
 
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   // States for custom modal dialogs (alerts, success messages, confirmations)
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
@@ -170,22 +176,24 @@ const Projects = () => {
 
 
   // Display loading animation while data is being fetched
-  if (loading) {
-    return (
-        <div className="cloud-container">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
-                <path
-                    d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-                    className="cloud-back"
-                />
-                <path
-                    d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-                    className="cloud-front"
-                />
-            </svg>
-            <div className="loading-message">Loading...</div>
-        </div>
-    );
+const showInitialLoader = loading && projects.length === 0;
+
+if (showInitialLoader) {
+  return (
+    <div className="cloud-container">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <path
+          d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-back"
+        />
+        <path
+          d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+          className="cloud-front"
+        />
+      </svg>
+      <div className="loading-message">Loading...</div>
+    </div>
+  );
 }
 
 // Display error message if an error occurred during data fetching
@@ -197,6 +205,47 @@ if (error) {
         </div>
     );
 }
+
+const ProjectTableSkeleton = ({ rows = 5 }) => {
+  return (
+    <>
+      {[...Array(rows)].map((_, index) => (
+        <StyledTableRow key={index}>
+          <StyledTableCell padding="checkbox">
+            <Skeleton variant="rectangular" width={18} height={18} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={30} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={140} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={180} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={200} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Skeleton width={60} />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Skeleton variant="rectangular" width={70} height={30} />
+              <Skeleton variant="rectangular" width={70} height={30} />
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))}
+    </>
+  );
+};
 
 // Handles changes in the search input field
 const handleSearchChange = (e) => {
@@ -315,6 +364,8 @@ const handleGroupSelectChange = (event) => {
   const handleCreateProject = async (e) => {
     e.preventDefault();
 
+    if (creating) return; // ⛔ prevent double click
+
     if (!projectNameRegex.test(newProject.name)) {
       setShowAlertModal(true);
       setAlertMessage("Project name can contain only alphabets, underscore (_) and hyphen (-). No spaces or numbers.");
@@ -347,6 +398,7 @@ const handleGroupSelectChange = (event) => {
     };
 
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/projects/create/', payload);
       if (response.status === 201 || response.status === 200) {
         setShowSuccessModal(true);
@@ -375,11 +427,15 @@ const handleGroupSelectChange = (event) => {
       setShowAlertModal(true);
       setAlertMessage('Error creating project. Please check the inputs and try again.');
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
 
   // Handles the update of an existing project
   const handleUpdateProject = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
 
     if (!projectNameRegex.test(projectToUpdate.name)) {
       setShowAlertModal(true);
@@ -401,6 +457,7 @@ const handleGroupSelectChange = (event) => {
 
     // Validate for duplicate project name during update
     try {
+      setUpdating(true); // 🔄 START LOADER
       const projectsResponse = await apiClient.get('/openstack/projects/');
       const isDuplicate = projectsResponse.data.some(
         (project) =>
@@ -442,6 +499,8 @@ const handleGroupSelectChange = (event) => {
       setShowAlertModal(true);
       setAlertMessage('Error updating project');
       console.error(error);
+    }finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -552,7 +611,7 @@ const handleGroupSelectChange = (event) => {
       </div>
 
       {/* Create New Project Modal */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New Project
@@ -662,8 +721,13 @@ const handleGroupSelectChange = (event) => {
             </FormControl>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={creating}>
+                 {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -674,7 +738,7 @@ const handleGroupSelectChange = (event) => {
       </Modal>
 
       {/* Update Project Modal */}
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={ updating ? undefined : () => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update Project
@@ -717,8 +781,13 @@ const handleGroupSelectChange = (event) => {
               </Select>
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" 
+              sx={{ mr: 1 }}  disabled={updating}>
+            {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}      
               </Button>
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel
@@ -777,53 +846,67 @@ const handleGroupSelectChange = (event) => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
-          <TableBody>
-          {filteredProjects
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((project,index) => (
-                <StyledTableRow key={project.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedProjects.includes(project.id)}
-                      onChange={() => handleSelectProject(project.id)}
-                    />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
           
-                <StyledTableCell>
-                  <Tooltip title={project.name}>
-                    <span>{project.name}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.description}>
-                    <span>{project.description}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.id}>
-                    <span>{project.id}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Tooltip title={project.enabled ? 'Yes' : 'No'}>
-                    <span>{project.enabled ? 'Yes' : 'No'}</span>
-                  </Tooltip>
-                </StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button variant="outlined"  onClick={() => { setProjectToUpdate(project); setShowUpdateForm(true); }}>
-                      Update
-                    </Button>
-                    <Button variant="outlined" color="error" onClick={() => handleDeleteProject(project.id)}>
-                      Delete
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+          <TableBody>
+  {loading ? (
+    <ProjectTableSkeleton rows={rowsPerPage} />
+  ) : (
+    filteredProjects
+      .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+      .map((project, index) => (
+        <StyledTableRow key={project.id}>
+          <StyledTableCell padding="checkbox">
+            <input
+              type="checkbox"
+              checked={selectedProjects.includes(project.id)}
+              onChange={() => handleSelectProject(project.id)}
+            />
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {page * rowsPerPage + index + 1}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.name}>
+              <span>{project.name}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.description}>
+              <span>{project.description}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Tooltip title={project.id}>
+              <span>{project.id}</span>
+            </Tooltip>
+          </StyledTableCell>
+
+          <StyledTableCell>
+            {project.enabled ? "Yes" : "No"}
+          </StyledTableCell>
+
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => {
+                setProjectToUpdate(project);
+                setShowUpdateForm(true);
+              }}>
+                Update
+              </Button>
+              <Button variant="outlined" color="error" onClick={() => handleDeleteProject(project.id)}>
+                Delete
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))
+  )}
+</TableBody>
+
         </Table>
         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

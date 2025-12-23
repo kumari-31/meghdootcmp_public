@@ -16,6 +16,7 @@ import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  XAxis,
   Tooltip as ReTooltip,
   RadialBarChart,
   RadialBar,
@@ -32,7 +33,7 @@ import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import CloudIcon from "@mui/icons-material/Cloud";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
-import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+// import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import apiClient from "../Axios";
@@ -40,7 +41,76 @@ import dayjs from "dayjs";
 import isToday from "dayjs/plugin/isToday";
 dayjs.extend(isToday);
 import "./Dashboard.css";
+
+import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
+
+dayjs.extend(isSameOrBefore);
 /* ------------------ Small helpers & styles ------------------ */
+
+const getLast7DaysPendingTrend = (requests = []) => {
+  const result = [];
+  const today = new Date();
+
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(today);
+    day.setDate(today.getDate() - i);
+    day.setHours(23, 59, 59, 999);
+
+    let count = 0;
+
+    requests.forEach((req) => {
+      if (!req.request_timestamp) return;
+
+      const created = new Date(req.request_timestamp);
+      const approved = req.admin_approved_timestamp
+        ? new Date(req.admin_approved_timestamp)
+        : null;
+
+      const existed = created <= day;
+      const stillPending = !approved || approved > day;
+
+      if (existed && stillPending) {
+        count++;
+      }
+    });
+
+    result.push({
+      date: day.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+      }),
+      value: count,
+    });
+  }
+
+  return result;
+};
+
+
+const getLast7DaysFinalStatusTrend = (data = [], status) => {
+  const today = dayjs().startOf("day");
+  const days = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const day = today.subtract(i, "day");
+
+    const count = data.filter((req) => {
+      if (req.admin_status !== status) return false;
+      if (!req.admin_approved_timestamp) return false;
+
+      return dayjs(req.admin_approved_timestamp).isSame(day, "day");
+    }).length;
+
+    days.push({
+      date: day.format("DD MMM"),
+      value: count,
+    });
+  }
+
+  return days;
+};
+
+
 
 const GlassCard = ({ children, sx = {}, ...rest }) => (
   <Card
@@ -61,16 +131,7 @@ const GlassCard = ({ children, sx = {}, ...rest }) => (
     {children}
   </Card>
 );
-
 const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
-  // Prepare sparkData for Recharts (array of {value})
-  const chartData = sparkData.length
-    ? sparkData.map((v, i) => ({ x: i, value: v }))
-    : Array.from({ length: 12 }).map((_, i) => ({
-        x: i,
-        value: Math.round(Math.random() * (value || 10)),
-      }));
-
   return (
     <GlassCard sx={{ p: 1.5, height: "100%" }}>
       <Stack spacing={1}>
@@ -78,6 +139,7 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
           <Avatar sx={{ bgcolor: color || "#eee", width: 44, height: 44 }}>
             {icon}
           </Avatar>
+
           <Box sx={{ flex: 1 }}>
             <Typography variant="caption" color="text.secondary">
               {title}
@@ -86,6 +148,7 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
               {value}
             </Typography>
           </Box>
+
           {delta && (
             <Typography
               variant="body2"
@@ -102,32 +165,91 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
         {/* Sparkline */}
         <Box sx={{ width: "100%", height: 44 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData}>
-              <ReTooltip
-                contentStyle={{
-                  background: "rgba(255,255,255,0.9)",
-                  border: "none",
-                  boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-                }}
-                cursor={false}
-              />
-              <Area
-                dataKey="value"
-                type="monotone"
-                stroke="rgba(124,77,255,0.95)"
-                strokeWidth={2}
-                fill="rgba(124,77,255,0.12)"
-                dot={false}
-                isAnimationActive={true}
-                animationDuration={800}
-              />
-            </AreaChart>
+          <AreaChart data={sparkData}>
+          <XAxis dataKey="date" hide />
+          <ReTooltip />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="rgba(124,77,255,0.95)"
+            fill="rgba(124,77,255,0.12)"
+            dot={false}
+          />
+        </AreaChart>
+
           </ResponsiveContainer>
         </Box>
       </Stack>
     </GlassCard>
   );
 };
+
+
+  // Prepare sparkData for Recharts (array of {value})
+//   const chartData = sparkData.length
+//     ? sparkData.map((v, i) => ({ x: i, value: v }))
+//     : Array.from({ length: 12 }).map((_, i) => ({
+//         x: i,
+//         value: Math.round(Math.random() * (value || 10)),
+//       }));
+
+//   return (
+//     <GlassCard sx={{ p: 1.5, height: "100%" }}>
+//       <Stack spacing={1}>
+//         <Stack direction="row" spacing={1.5} alignItems="center">
+//           <Avatar sx={{ bgcolor: color || "#eee", width: 44, height: 44 }}>
+//             {icon}
+//           </Avatar>
+//           <Box sx={{ flex: 1 }}>
+//             <Typography variant="caption" color="text.secondary">
+//               {title}
+//             </Typography>
+//             <Typography variant="h5" sx={{ fontWeight: 800 }}>
+//               {value}
+//             </Typography>
+//           </Box>
+//           {delta && (
+//             <Typography
+//               variant="body2"
+//               sx={{
+//                 color: delta.startsWith("+") ? "success.main" : "error.main",
+//                 fontWeight: 700,
+//               }}
+//             >
+//               {delta}
+//             </Typography>
+//           )}
+//         </Stack>
+
+//         {/* Sparkline */}
+//         <Box sx={{ width: "100%", height: 44 }}>
+//           <ResponsiveContainer width="100%" height="100%">
+//             <AreaChart data={chartData}>
+//               <ReTooltip
+//                 contentStyle={{
+//                   background: "rgba(255,255,255,0.9)",
+//                   border: "none",
+//                   boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+//                 }}
+//                 cursor={false}
+//               />
+//               <Area
+//                 dataKey="value"
+//                 type="monotone"
+//                 stroke="rgba(124,77,255,0.95)"
+//                 strokeWidth={2}
+//                 fill="rgba(124,77,255,0.12)"
+//                 dot={false}
+//                 isAnimationActive={true}
+//                 animationDuration={800}
+//               />
+//             </AreaChart>
+//           </ResponsiveContainer>
+//         </Box>
+//       </Stack>
+//     </GlassCard>
+//   );
+// };
 
 /* ------------------ Segmented Radial Gauge (choice 3) ------------------ */
 /* Draws N segments in an arc from startAngle -> endAngle and fills proportionally.
@@ -418,25 +540,30 @@ const handleDateChange = (newValue) => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await apiClient.get("/vmdetails/overview/?page=1&size=500");
-        const data = res.data;
-
+        // If no date selected, fetch overall
+        const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
+  
+        // Fetch data from API
+        const data = await fetchVmRequests({ date: dateString });
+  
+        // Optional: calculate today count only when no date filter
         const todayCount =
-          data.data?.filter((vm) => dayjs(vm.created_at).isToday()).length || 0;
-
+          !dateString && data.raw.length
+            ? data.raw.filter(vm => dayjs(vm.request_timestamp).isToday()).length
+            : 0;
+  
+        // Update state
         setOpenstackReq({
-          total: data.total_records || 0,
-          pending: data.status_counts?.pending || 0,
-          accepted: data.status_counts?.accepted || 0,
-          rejected: data.status_counts?.rejected || 0,
+          ...data,
           today: todayCount,
-          raw: data.data || [],
         });
       } catch (err) {
-        console.error("OS Overview Error:", err);
+        console.error("OpenStack Requests Error:", err);
       }
     })();
-  }, []);
+  }, [date]); // <--- Important: re-run whenever 'date' changes
+  
+  
 
   // K8s service requests
   // Kubernetes Service Requests (Pending etc.)
@@ -473,35 +600,7 @@ const handleDateChange = (newValue) => {
     })();
   }, []);
 
-  // Tickets
-  useEffect(() => {
-    (async () => {
-      try {
-        const response = await apiClient.get("/tickets/");
-        const data = response.data || [];
-        let open = 0,
-          inProgress = 0,
-          closed = 0,
-          today = 0;
-        data.forEach((t) => {
-          const s = (t.status || "").toLowerCase();
-          if (s === "open") open++;
-          if (s === "in progress") inProgress++;
-          if (s === "closed") closed++;
-          if (dayjs(t.created_at).isToday()) today++;
-        });
-        setTicketsSummary({
-          total: data.length,
-          open,
-          inProgress,
-          closed,
-          today,
-        });
-      } catch (err) {
-        console.error("tickets err", err);
-      }
-    })();
-  }, []);
+
 
   // quick composite health metric (example: weighted)
   const systemHealth = useMemo(() => {
@@ -543,8 +642,49 @@ const handleDateChange = (newValue) => {
     return counts;
   };
 
-  const openstackPendingTrend = getDailyPendingTrend(openstackReq.raw);
-  const k8sPendingTrend = getDailyPendingTrend(k8sReq.raw);
+  // Last 7 days snapshot trend for all statuses
+  // OpenStack
+// Pending (dynamic, day-wise)
+const openstackTrendPending =
+  useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
+
+const k8sTrendPending =
+  useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
+
+const openstackTrendAccepted =
+  useMemo(() => getLast7DaysFinalStatusTrend(openstackReq.raw, "Accepted"), [openstackReq.raw]);
+
+const openstackTrendRejected =
+  useMemo(() => getLast7DaysFinalStatusTrend(openstackReq.raw, "Rejected"), [openstackReq.raw]);
+
+
+// const openstackTrendPending =
+//   getLast7DaysPendingTrend(openstackReq.raw);
+
+// const k8sTrendPending =
+//   getLast7DaysPendingTrend(k8sReq.raw);
+
+// Accepted (finalized per day)
+
+
+const k8sTrendAccepted =
+  getLast7DaysFinalStatusTrend(k8sReq.raw, "Accepted");
+
+// Rejected (finalized per day)
+
+
+const k8sTrendRejected =
+  getLast7DaysFinalStatusTrend(k8sReq.raw, "Rejected");
+
+  
+
+
+  const openstackPendingTrend =
+  getLast7DaysPendingTrend(openstackReq.raw);
+
+const k8sPendingTrend =
+  getLast7DaysPendingTrend(k8sReq.raw);
+
 
   const getDailyTrend = (data = [], status) => {
     const days = 7;
@@ -665,29 +805,26 @@ const tableStyles = {
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion}>
-            <StatTile
-              icon={<HourglassEmptyIcon />}
-              title="OpenStack Request Pending"
-              value={osCounts.pending}
-              sparkData={openstackPendingTrend}
-              delta={osCounts.pending > 0 ? "+2%" : "-"}
-              color="var(--openstack-color)"
-              badge="OPENSTACK"
-            />
+          <StatTile
+            title="OpenStack Request Pending"
+            value={osCounts.pending}          // ✅ today only
+            sparkData={openstackTrendPending} // ✅ historical snapshot
+            color="var(--openstack-color)"
+          />
+
+
           </motion.div>
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.05 }}>
-            <StatTile
-              icon={<CloudIcon />} // choose icon of Kubernetes style
-              title="Kubernetes Request Pending"
-              value={k8sCounts.pending}
-              sparkData={k8sPendingTrend}
-              delta={k8sCounts.pending > 0 ? "+1%" : "-"}
-              color="var(--k8s-color)" // e.g. Blue
-              badge="KUBERNETES"
-            />
+          <StatTile
+            title="Kubernetes Request Pending"
+            value={k8sCounts.pending}     // ✅ stays SAME
+            sparkData={k8sTrendPending}   // ✅ FIXED
+            color="var(--k8s-color)"
+          />
+
           </motion.div>
         </Grid>
 
@@ -733,16 +870,69 @@ const tableStyles = {
 
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.15 }}>
-            <StatTile
-              icon={<TrendingUpIcon />}
-              title="Tickets Open"
-              value={ticketsSummary.open}
-              // sparkData={exampleSpark(ticketsSummary.open)}
-              delta={`${ticketsSummary.today} today`}
-              color="#D1C4E9"
-            />
+            <GlassCard sx={{ p: 2, height: "100%", }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 600 }}
+              >
+                Total Requests
+              </Typography>
+
+              <Stack
+              direction="row"
+              justifyContent="space-around"
+              spacing={5}   // 👈 reduce/increase this number
+              sx={{ mt: 1.2 ,mb: 1.5 }}
+            >
+              {/* OpenStack */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: "var(--openstack-color)",
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <CloudIcon fontSize="small" />
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    OpenStack
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    {openstackReq.raw?.length || 0}
+                  </Typography>
+                </Box>
+              </Stack>
+
+              {/* Kubernetes */}
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar
+                  sx={{
+                    bgcolor: "var(--k8s-color)",
+                    width: 32,
+                    height: 32,
+                  }}
+                >
+                  <CloudIcon fontSize="small" />
+                </Avatar>
+                <Box>
+                  <Typography variant="body2" color="text.secondary">
+                    Kubernetes
+                  </Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                    {k8sReq.raw?.length || 0}
+                  </Typography>
+                </Box>
+              </Stack>
+            </Stack>
+
+            </GlassCard>
           </motion.div>
         </Grid>
+
+
       </Grid>
 
       {/* Middle row: Segmented Gauge + Activity list + Compact Calendar */}
@@ -1002,15 +1192,15 @@ const tableStyles = {
         {/* OpenStack Accepted */}
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion}>
-            <StatTile
-              icon={<CheckCircleIcon />}
-              title="OpenStack Accepted Request"
-              value={osCounts.accepted}
-              sparkData={getDailyTrend(openstackReq.raw, "Accepted")}
-              delta={openstackReq.accepted > 0 ? "+3%" : "-"}
-              color="var(--openstack-color)"
-              badge="OPENSTACK"
-            />
+            
+        <StatTile
+          icon={<CheckCircleIcon />}
+          title="OpenStack Accepted Request"
+          value={osCounts.accepted} 
+          sparkData={openstackTrendAccepted} 
+          delta={osCounts.accepted > 0 ? "+3%" : "-"}
+          color="var(--openstack-color)"
+        />
           </motion.div>
         </Grid>
 
@@ -1167,7 +1357,7 @@ const tableStyles = {
                 <TableCell>EMP ID</TableCell>
                 <TableCell>Project</TableCell>
                 <TableCell>Service</TableCell>
-                <TableCell>FLA</TableCell>
+                <TableCell>Designation</TableCell>
                 <TableCell>Admin</TableCell>
                 <TableCell>Deploy</TableCell>
               </TableRow>
@@ -1179,7 +1369,7 @@ const tableStyles = {
                   <TableCell>{r.employee_id}</TableCell>
                   <TableCell>{r.project_name}</TableCell>
                   <TableCell>{r.service_name}</TableCell>
-                  <TableCell>{r.fla_status}</TableCell>
+                  <TableCell>{r.designation}</TableCell>
                   <TableCell>{r.admin_status}</TableCell>
                   <TableCell>{r.deployment_status}</TableCell>
                 </TableRow>
@@ -1228,7 +1418,6 @@ const tableStyles = {
     </Box>
   );
 }
-
 // import React, { useEffect, useState } from "react";
 // // import Cardone from "../Components/Cardone";
 // import { RadialBarChart, RadialBar, PolarAngleAxis } from "recharts";

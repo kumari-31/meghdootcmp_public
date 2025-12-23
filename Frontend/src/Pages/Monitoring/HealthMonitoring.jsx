@@ -10,6 +10,8 @@ import {
 } from "recharts";
 
 /* -------------------- MAIN COMPONENT -------------------- */
+const hostDataCache = {};
+
 const HealthMonitoring = () => {
   const [hosts, setHosts] = useState([]);
   const [selectedHost, setSelectedHost] = useState("");
@@ -21,34 +23,81 @@ const HealthMonitoring = () => {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
 
-
   /* -------------------- LOAD HOSTS -------------------- */
   useEffect(() => {
-    apiClient.get("/hosts/").then((res) => setHosts(res.data));
+    apiClient.get("/hosts/").then((res) => {
+      const hostList = res.data || [];
+      setHosts(hostList);
+
+      const savedHost = localStorage.getItem("selectedHost");
+
+      // ✅ ensure saved host exists
+      const validSavedHost = hostList.find((h) => h.hostid === savedHost);
+
+      if (validSavedHost) {
+        setSelectedHost(savedHost);
+      } else if (hostList.length > 0) {
+        setSelectedHost(hostList[0].hostid);
+        localStorage.setItem("selectedHost", hostList[0].hostid);
+      }
+    });
   }, []);
 
   /* -------------------- LOAD DATA -------------------- */
   useEffect(() => {
-    if (!selectedHost) return;
-    setLoading(true);
+  if (!selectedHost) return;
 
-    Promise.all([
-      apiClient.get(`/cpu/${selectedHost}/`),
-      apiClient.get(`/memory/${selectedHost}/`),
-      apiClient.get(`/disk/${selectedHost}/`),
-      apiClient.get(`/system-metrics/${selectedHost}/`),
-      apiClient.get(`/host-health/${selectedHost}/`),
-    ])
-      .then(([cpuRes, memRes, diskRes, sysRes, summaryRes]) => {
-        setCPU(cpuRes.data);
-        setMemory(memRes.data);
-        setDisk(diskRes.data);
-        setLoadAverage(sysRes.data.load_average || {});
-        setSummary(summaryRes.data);
-        setAlerts(summaryRes.data.alerts || []);
-      })
-      .finally(() => setLoading(false));
-  }, [selectedHost]);
+  // 🔥 Load from cache first
+  const cached =
+    hostDataCache[selectedHost] ||
+    JSON.parse(sessionStorage.getItem(`host-cache-${selectedHost}`));
+
+  if (cached) {
+    hostDataCache[selectedHost] = cached;
+    setCPU(cached.cpu);
+    setMemory(cached.memory);
+    setDisk(cached.disk);
+    setLoadAverage(cached.loadAverage);
+    setSummary(cached.summary);
+    setAlerts(cached.alerts);
+    return;
+  }
+
+  setLoading(true);
+
+  Promise.all([
+    apiClient.get(`/cpu/${selectedHost}/`),
+    apiClient.get(`/memory/${selectedHost}/`),
+    apiClient.get(`/disk/${selectedHost}/`),
+    apiClient.get(`/system-metrics/${selectedHost}/`),
+    apiClient.get(`/host-health/${selectedHost}/`),
+  ])
+    .then(([cpuRes, memRes, diskRes, sysRes, summaryRes]) => {
+      const payload = {
+        cpu: cpuRes.data,
+        memory: memRes.data,
+        disk: diskRes.data,
+        loadAverage: sysRes.data.load_average || {},
+        summary: summaryRes.data,
+        alerts: summaryRes.data.alerts || [],
+      };
+
+      // ✅ cache properly
+      hostDataCache[selectedHost] = payload;
+      sessionStorage.setItem(
+        `host-cache-${selectedHost}`,
+        JSON.stringify(payload)
+      );
+
+      setCPU(payload.cpu);
+      setMemory(payload.memory);
+      setDisk(payload.disk);
+      setLoadAverage(payload.loadAverage);
+      setSummary(payload.summary);
+      setAlerts(payload.alerts);
+    })
+    .finally(() => setLoading(false));
+}, [selectedHost]);
 
   /* -------------------- HELPERS -------------------- */
   const formatData = (data) =>
@@ -73,7 +122,11 @@ const HealthMonitoring = () => {
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
         <select
           value={selectedHost}
-          onChange={(e) => setSelectedHost(e.target.value)}
+          onChange={(e) => {
+            const host = e.target.value;
+            setSelectedHost(host);
+            localStorage.setItem("selectedHost", host);
+          }}
           style={{ padding: 8, width: 300 }}
         >
           <option value="">Select Host</option>

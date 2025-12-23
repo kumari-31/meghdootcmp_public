@@ -17,9 +17,12 @@ import {
   InfoOutlined,
   WarningOutlined
 } from '@mui/icons-material';
+import Skeleton from "@mui/material/Skeleton";
+
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { GoAlert } from 'react-icons/go';
 import '../style.css';
+import { CircularProgress } from '@mui/material';
 
 // ---------- Styled Components ----------
 // Styled Table Components
@@ -87,6 +90,8 @@ const ApplicationCredentials = () => {
     roles: [],
     unrestricted: false,
   });
+  const [creating, setCreating] = useState(false);
+
 
   // Snackbar
    const theme = useTheme();
@@ -113,6 +118,7 @@ const ApplicationCredentials = () => {
 
   // ---------- Fetch Data ----------
   const fetchApplicationCredentials = async () => {
+    setLoading(true); 
     setError(null);
     try {
       const res = await apiClient.get('/identity/application-credentials/');
@@ -214,8 +220,10 @@ const ApplicationCredentials = () => {
   // ---------- Create Credential ----------
   const handleCreateCredential = async (e) => {
     e.preventDefault();
+    if (creating) return; 
     const payload = { ...newCredential };
     try {
+      setCreating(true); 
       const res = await apiClient.post('/identity/application-credentials/', payload);
       if ([200, 201].includes(res.status)) {
         showSnackbar('Credential created successfully', 'success');
@@ -236,6 +244,9 @@ const ApplicationCredentials = () => {
     } catch (err) {
       console.error('Error creating credential:', err);
       showSnackbar(err.response?.data?.detail || 'Failed to create credential', 'error');
+    }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
@@ -275,7 +286,9 @@ const ApplicationCredentials = () => {
   };
 
   // ---------- Loading / Error ----------
-  if (loading) {
+  const showInitialLoader = loading && credentials.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -292,6 +305,7 @@ const ApplicationCredentials = () => {
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -302,6 +316,49 @@ const ApplicationCredentials = () => {
     );
   }
 
+  const CredentialTableSkeleton = ({ rows = 5 }) => (
+    <>
+      {[...Array(rows)].map((_, index) => (
+        <StyledTableRow key={index}>
+          <StyledTableCell>
+            <Skeleton variant="rectangular" width={18} height={18} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={30} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={140} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={180} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={120} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={160} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Skeleton width={180} />
+          </StyledTableCell>
+  
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center">
+              <Skeleton variant="rectangular" width={70} height={30} />
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))}
+    </>
+  );
+
+  
   // ---------- Modal Styles ----------
   const modalStyle = {
     position: 'absolute',
@@ -362,7 +419,11 @@ const ApplicationCredentials = () => {
       </div>
 
       {/* ---------- Create Modal ---------- */}
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal
+          open={showCreateForm}
+          onClose={creating ? undefined : () => setShowCreateForm(false)}
+        >
+
         <Box sx={modalStyle}>
           <h2>Create Application Credential</h2>
           <form onSubmit={handleCreateCredential}>
@@ -434,9 +495,20 @@ const ApplicationCredentials = () => {
             </FormControl>
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
-              </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              sx={{ mr: 1 }}
+              disabled={creating}
+            >
+              {creating ? (
+                <CircularProgress size={22} sx={{ color: '#fff' }} />
+              ) : (
+                'Create'
+              )}
+            </Button>
+
               <Button
                   type="button"
                   onClick={() => {
@@ -508,35 +580,44 @@ const ApplicationCredentials = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+          
+
           <TableBody>
-            {currentCredentials.map((cred, index) => (
-              <StyledTableRow key={cred.id}>
-                <StyledTableCell>
-                  <Checkbox
-                    checked={selectedCredentials.includes(cred.id)}
-                    onChange={() => handleSelectCredential(cred.id)}
-                  />
-                </StyledTableCell>
-                <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                <StyledTableCell>{cred.name}</StyledTableCell>
-                <StyledTableCell>{cred.description || '-'}</StyledTableCell>
-                <StyledTableCell>{cred.expires_at || cred.expiration || '-'}</StyledTableCell>
-                <StyledTableCell>{cred.roles?.join(', ') || 'N/A'}</StyledTableCell>
-                <StyledTableCell>{cred.id}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                    <Button
-                      variant="outlined"
-                      color="error"
-                      onClick={() => handleDeleteCredential(cred.id)}
-                    >
-                      Delete
-                    </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
+  {loading ? (
+    <CredentialTableSkeleton rows={rowsPerPage} />
+  ) : (
+    currentCredentials.map((cred, index) => (
+      <StyledTableRow key={cred.id}>
+        <StyledTableCell>
+          <Checkbox
+            checked={selectedCredentials.includes(cred.id)}
+            onChange={() => handleSelectCredential(cred.id)}
+          />
+        </StyledTableCell>
+
+        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>{cred.name}</StyledTableCell>
+        <StyledTableCell>{cred.description || '-'}</StyledTableCell>
+        <StyledTableCell>{cred.expires_at || cred.expiration || '-'}</StyledTableCell>
+        <StyledTableCell>{cred.roles?.join(', ') || 'N/A'}</StyledTableCell>
+        <StyledTableCell>{cred.id}</StyledTableCell>
+
+        <StyledTableCell>
+          <Box display="flex" justifyContent="center">
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleDeleteCredential(cred.id)}
+            >
+              Delete
+            </Button>
+          </Box>
+        </StyledTableCell>
+      </StyledTableRow>
+    ))
+  )}
+</TableBody>
+
         </Table>
 
          {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

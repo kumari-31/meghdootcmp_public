@@ -66,7 +66,7 @@ from .serializers import (CombinedDataSerializer, CombinedFormSerializer,
                           EmployeeUpdateSerializer, FlavorSerializer,
                           MetricSerializer, ProjectSerializer,
                           RegistrationSerializer, ServiceRequestSerializer,
-                          TicketSerializer, UserSerializer, VMInfoSerializer,
+                          UserSerializer, VMInfoSerializer,
                           VmRequestSerializer)
 from .table_imp import *
 
@@ -1936,6 +1936,8 @@ def list_hypervisors(request):
     return Response(
         {"hypervisors": [{"id": h.id, "name": h.name} for h in hypervisors]}
     )
+
+
 
 
 # -----------------------------6 Dec 2024-------------------------------------------
@@ -5329,16 +5331,7 @@ class CookieTokenRefreshView(APIView):
 from django.shortcuts import redirect
 
 
-def helpdesk_redirect(request):
-    if not request.user.is_authenticated:
-        return redirect("/")
 
-    role = get_user_role(request.user)
-
-    if role == "admin":
-        return redirect("/helpdesk/dashboard/")
-    else:
-        return redirect("/helpdesk/tickets/submit/")
 
 
 # =========================================================
@@ -13259,6 +13252,8 @@ class K8sRequestsByDateAPIView(APIView):
             "project_name",
             "admin_status",
             "fla_status",
+            "designation",
+            "deployment_status",    
             "request_timestamp",
         )
         print("Table Data:", list(table_data))
@@ -16721,6 +16716,55 @@ class AllHypervisorsView(APIView):
             )
 
 
+
+class HypervisorInstancesView(APIView):
+    """
+    Fetch all instances running on a given hypervisor hostname
+    """
+
+    def get(self, request, hostname):
+        try:
+            conn = get_openstack_connection()
+
+            # Call Nova API directly
+            response = conn.compute.get(
+                f"/servers/detail?all_tenants=1&host={hostname}"
+            )
+            data = response.json()
+
+            if "servers" not in data:
+                return Response(
+                    {"error": "No instances found"},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            instances = []
+            for server in data["servers"]:
+                instances.append(
+                    {
+                        "name": server.get("name"),
+                        "instance_name": server.get("OS-EXT-SRV-ATTR:instance_name"),
+                        "instance_id": server.get("id"),
+                    }
+                )
+
+            return Response(
+                {
+                    "status": "success",
+                    "hypervisor": hostname,
+                    "count": len(instances),
+                    "data": instances,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 # ---------------------------------------------------------------
 # 2️⃣ Compute Hosts API — compute/hosts/
 # ---------------------------------------------------------------
@@ -16739,7 +16783,7 @@ class ComputeHostAPIView(APIView):
                     data.append(
                         {
                             "host": s.host,
-                            "availability_zone": getattr(s, "zone", ""),
+                            "availability_zone": getattr(s, "availability_zone", ""),
                             "status": s.status,
                             "state": s.state,
                             "last_updated": getattr(s, "updated_at", ""),
@@ -19118,3 +19162,91 @@ class K8sOverviewAPIView(APIView):
             "nodes": node_list,
             "services": service_list
         }, status=status.HTTP_200_OK)
+
+
+
+class ServiceRequestBulkAdminApproveAPIView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUserPermission]
+
+    def post(self, request):
+        role = request.auth.get("role")
+
+        if role != "ADMIN":
+            return Response(
+                {"error": "Only ADMIN can perform bulk approval"},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        request_ids = request.data.get("service_request_ids")
+
+        if not isinstance(request_ids, list) or not request_ids:
+            return Response(
+                {"error": "service_request_ids must be a non-empty list"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        results = []
+
+        for req_id in request_ids:
+            try:
+                service_request = ServiceRequest.objects.get(id=req_id)
+
+                # ---- Eligibility Checks ----
+                if service_request.fla_status != "Accepted":
+                    results.append({
+                        "id": req_id,
+                        "status": "Skipped",
+                        "reason": "FLA not approved",
+                    })
+                    continue
+
+                if service_request.admin_status == "Accepted":
+                    results.append({
+                        "id": req_id,
+                        "status": "Skipped",
+                        "reason": "Already approved",
+                    })
+                    continue
+
+                # ---- Mark Admin Approved ----
+                service_request.admin_status = "Accepted"
+                service_request.admin_action_timestamp = timezone.now()
+                service_request.admin_approved_timestamp = timezone.now()
+                service_request.save()
+
+                # ---- Deploy Service ----
+                deploy_result = deploy_service_request(service_request)
+
+                if deploy_result["success"]:
+                    results.append({
+                        "id": req_id,
+                        "status": "Accepted",
+                        "node_port": deploy_result.get("node_port"),
+                    })
+                else:
+                    results.append({
+                        "id": req_id,
+                        "status": "Failed",
+                        "error": deploy_result.get("error"),
+                    })
+
+            except ServiceRequest.DoesNotExist:
+                results.append({
+                    "id": req_id,
+                    "status": "Failed",
+                    "error": "Service request not found",
+                })
+            except Exception as e:
+                results.append({
+                    "id": req_id,
+                    "status": "Failed",
+                    "error": str(e),
+                })
+
+        return Response(
+            {
+                "message": "Bulk admin approval completed",
+                "results": results,
+            },
+            status=status.HTTP_200_OK,
+        )

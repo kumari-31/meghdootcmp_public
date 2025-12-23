@@ -4,6 +4,8 @@ import { GoAlert } from 'react-icons/go';
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import '../style.css';
 import { useTheme } from "@mui/material/styles";
+import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
 
 import {
   Table,
@@ -93,6 +95,9 @@ const RBACpolicies = () => {
   const theme = useTheme(); 
   const [formErrors, setFormErrors] = useState({});
 
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   // Snackbar states and handlers
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -202,8 +207,10 @@ const RBACpolicies = () => {
     fetchProjects(); 
   }, []);
 
+// 🔹 Show cloud loader only on first load
+const showInitialLoader = loading && rbacPolicies.length === 0;
 
-  if (loading) {
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -230,6 +237,17 @@ const RBACpolicies = () => {
     );
   }
 
+
+  const RbacPolicySkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 8 }).map((_, index) => (
+        <StyledTableCell key={index}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
@@ -275,6 +293,7 @@ const RBACpolicies = () => {
   
   const createRbacPolicy = async (e) => {
     e.preventDefault();
+    if (creating) return; // ⛔ prevent double click
      // 🔥 ADD HERE (validation check)
     if (!validateCreateForm()) {
       showSnackbar("Please fix the form errors.", "error");
@@ -286,6 +305,7 @@ const RBACpolicies = () => {
       network_id: network,
     };
     try {
+      setCreating(true); // 🔄 START LOADER
       const response = await apiClient.post('/create-rbac-policy/', payload);
 
       if (response.status === 200 || response.status === 201) {
@@ -318,11 +338,14 @@ const RBACpolicies = () => {
       } else {
         showSnackbar('Network error. Please check your connection.', 'error');
       }
+    } finally {
+      setCreating(false); // ✅ STOP LOADER
     }
   };
 
   const updateRbacPolicy = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!editingPolicy) return; // Should not happen if button is disabled, but good to check
 
     const payload = {
@@ -332,6 +355,8 @@ const RBACpolicies = () => {
       // If you intend to update them, add them to the update form and payload.
     };
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       const response = await apiClient.patch(`/update-rbac-policy/${editingPolicy.id}/`, payload);
       if (response.status === 200) {
         showSnackbar('RBAC Policy updated successfully!', 'success');
@@ -349,6 +374,9 @@ const RBACpolicies = () => {
       } else {
         showSnackbar('Failed to update RBAC Policy. Please try again.', 'error');
       }
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -473,7 +501,7 @@ const RBACpolicies = () => {
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={ creating ? undefined :  () => setShowCreateForm(false)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Create New RBAC Policy
@@ -552,8 +580,12 @@ const RBACpolicies = () => {
             
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating} >
+              {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
@@ -563,7 +595,7 @@ const RBACpolicies = () => {
         </Box>
       </Modal>
 
-      <Modal open={editingPolicy !== null} onClose={() => setEditingPolicy(null)}>
+      <Modal open={editingPolicy !== null} onClose={updating ? undefined : () => setEditingPolicy(null)}>
         <Box sx={modalStyle}>
           <Typography variant="h6" component="h2" gutterBottom>
             Update RBAC Policy
@@ -590,8 +622,12 @@ const RBACpolicies = () => {
 
             {/* If you add other fields for update, they would go here */}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}  disabled={updating} >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
               </Button>
               <Button type="button" onClick={() => setEditingPolicy(null)} variant="outlined">
                 Cancel
@@ -642,33 +678,57 @@ const RBACpolicies = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
+          
           <TableBody>
-            {filteredPolicies
-              .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-              .map((policy, index) => (
-                <StyledTableRow key={policy.id}>
-                  <StyledTableCell padding="checkbox">
-                    <input type="checkbox" checked={selectedPolicies.includes(policy.id)} onChange={() => handleSelectPolicy(policy.id)} />
-                  </StyledTableCell>
-                  <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-                  <StyledTableCell>{policy.id}</StyledTableCell>
-                  <StyledTableCell>{policy.object_type}</StyledTableCell>
-                  <StyledTableCell>{policy.target_project_id}</StyledTableCell>
-                  <StyledTableCell>{policy.action}</StyledTableCell>
-                  <StyledTableCell>{policy.object_id}</StyledTableCell>
-                  <StyledTableCell>
-                    <Box display="flex" justifyContent="center" gap={1}>
-                      <Button variant="outlined"  onClick={() => handleEditClick(policy)}>
-                        Update
-                      </Button>
-                      <Button variant="outlined" color="error" onClick={() => deleteRbacPolicy(policy.id)}>
-                        Delete
-                      </Button>
-                    </Box>
-                  </StyledTableCell>
-                </StyledTableRow>
-              ))}
-          </TableBody>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <RbacPolicySkeletonRow key={i} />
+      ))
+    : filteredPolicies
+        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+        .map((policy, index) => (
+          <StyledTableRow key={policy.id}>
+            <StyledTableCell padding="checkbox">
+              <input
+                type="checkbox"
+                checked={selectedPolicies.includes(policy.id)}
+                onChange={() => handleSelectPolicy(policy.id)}
+              />
+            </StyledTableCell>
+
+            <StyledTableCell>
+              {page * rowsPerPage + index + 1}
+            </StyledTableCell>
+
+            <StyledTableCell>{policy.id}</StyledTableCell>
+
+            <StyledTableCell>{policy.object_type}</StyledTableCell>
+
+            <StyledTableCell>{policy.target_project_id}</StyledTableCell>
+
+            <StyledTableCell>{policy.action}</StyledTableCell>
+
+            <StyledTableCell>{policy.object_id}</StyledTableCell>
+
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Button variant="outlined" onClick={() => handleEditClick(policy)}>
+                  Update
+                </Button>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  onClick={() => deleteRbacPolicy(policy.id)}
+                >
+                  Delete
+                </Button>
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+</TableBody>
+
+
         </Table>
            {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
                 <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

@@ -1,9 +1,6 @@
 from django.urls import path, re_path
 from django.views.generic import TemplateView
 
-from unifiedapiapp.helpdesk_custom import admin_views
-from unifiedapiapp.views import helpdesk_redirect
-
 from . import views
 from .launchvm import vm_approve_request
 from .views import *
@@ -130,6 +127,7 @@ urlpatterns = [
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/", HostAggregateAPIView.as_view(), name="host_aggregate_detail"),
     path("api/infrastructure/host-aggregates/<str:aggregate_id>/actions/", HostAggregateActionsView.as_view(), name="host_aggregate_actions"),
     path("api/infrastructure/hypervisors/", AllHypervisorsView.as_view(), name="all_hypervisors"),
+    path("api/infrastructure/hypervisors/<str:hostname>/instances/", HypervisorInstancesView.as_view(), name="hypervisor_instances"),
     path("api/infrastructure/hosts/", ComputeHostAPIView.as_view(), name="compute_hosts"),
     path("api/infrastructure/resource-providers/", ResourceProviderAPIView.as_view(), name="resource_providers"),
     path("api/identity/application-credentials/", ApplicationCredentialAPIView.as_view(), name="app_cred_list"),
@@ -211,6 +209,7 @@ urlpatterns = [
     path("api/service-requests/create/", ServiceRequestCreateAPIView.as_view(), name="service-requests"),
     path("api/fla/service-requests/", FlaServiceRequestAPIView.as_view(), name="fla-service-requests"),
     path("api/admin/pending-service-requests/", ServiceRequestPendingAdminAPIView.as_view(), name="admin-pending-service-requests"),
+    path("api/admin/service-requests/bulk-approve/",ServiceRequestBulkAdminApproveAPIView.as_view(),name="admin-bulk-approve-service-requests",),
     path("api/fla/employees/", FLAEmployeesListAPIView.as_view(), name="fla-employees-list"),
     path("api/service-request/reject/", ServiceRequestRejectionAPIView.as_view(), name="reject-service-request"),
     path("api/services/deployed/", EmployeeDeployedServicesAPIView.as_view(), name="deployed-services"),
@@ -253,9 +252,7 @@ urlpatterns = [
     path("api/cdacprojects/", ProjectListAPIView.as_view(), name="project-list"),
     path("api/cdacprojects/create/", CreateCdacProjectAPIView.as_view(), name="create-project"),
     path("api/cdacprojects/delete/<int:project_id>/", DeleteCdacProjectAPIView.as_view(), name="delete-project"),
-    path("api/helpdesk/custom/dashboard/", admin_views.admin_dashboard, name="helpdesk_custom_dashboard"),
-    path("api/helpdesk/custom/ticket/<int:ticket_id>/", admin_views.ticket_detail, name="helpdesk_custom_ticket_detail"),
-    path("api/support/", helpdesk_redirect, name="helpdesk_redirect"),
+   
 
 
     # Catch-all fallback to index.html

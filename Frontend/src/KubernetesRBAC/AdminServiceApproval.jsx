@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Checkbox,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
@@ -77,6 +78,9 @@ const AdminServiceApproval = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const theme = useTheme();
+  const [selectedRequests, setSelectedRequests] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+
   const [counts, setCounts] = useState({
     pending: 0,
     accepted: 0,
@@ -203,6 +207,47 @@ const { triggerNotificationRefresh } = useNotificationRefresh();
     }
   };
 
+
+  // ----------------------------------------------------
+  // ✅ Approve Selected
+  // ----------------------------------------------------
+
+  const handleBulkApprove = async () => {
+    try {
+      setBulkLoading(true);
+  
+      const response = await apiClient.post(
+        "/admin/service-requests/bulk-approve/",
+        {
+          service_request_ids: selectedRequests,
+        }
+      );
+  
+      if (response.status === 200) {
+        await fetchRequests(); // refresh table
+        triggerNotificationRefresh();
+  
+        setAlertDialog({
+          open: true,
+          severity: "success",
+          message: "Selected service requests approved successfully.",
+        });
+  
+        setSelectedRequests([]);
+      }
+    } catch (error) {
+      console.error("Bulk approve error:", error);
+  
+      setAlertDialog({
+        open: true,
+        severity: "error",
+        message: "Bulk approval failed. Please try again.",
+      });
+    } finally {
+      setBulkLoading(false);
+    }
+  };
+  
   const handleChangePage = (_, newPage) => setPage(newPage);
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
@@ -309,6 +354,23 @@ const { triggerNotificationRefresh } = useNotificationRefresh();
           Pending Service Requests for Approval
         </Typography>
 
+        <Stack
+            direction="row"
+            justifyContent="flex-end"
+            sx={{ mb: 2 }}
+          >
+            <Button
+              variant="contained"
+              color="success"
+              disabled={selectedRequests.length === 0 || bulkLoading}
+              onClick={handleBulkApprove}
+            >
+              {bulkLoading
+                ? "Approving..."
+                : `Approve Selected (${selectedRequests.length})`}
+            </Button>
+          </Stack>
+
         <TableContainer component={Paper} sx={{ maxHeight: 380 }}>
           <Table 
           sx={{
@@ -322,6 +384,26 @@ const { triggerNotificationRefresh } = useNotificationRefresh();
           }}>
             <TableHead>
               <TableRow>
+                 <StyledTableCell>
+                  <Checkbox
+                    checked={
+                      pendingList.length > 0 &&
+                      selectedRequests.length === pendingList.length
+                    }
+                    indeterminate={
+                      selectedRequests.length > 0 &&
+                      selectedRequests.length < pendingList.length
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedRequests(pendingList.map((r) => r.id));
+                      } else {
+                        setSelectedRequests([]);
+                      }
+                    }}
+                  />
+                </StyledTableCell>
+
                 <StyledTableCell>Sr. No.</StyledTableCell>
                 <StyledTableCell>Name</StyledTableCell>
                 <StyledTableCell>Service</StyledTableCell>
@@ -339,6 +421,19 @@ const { triggerNotificationRefresh } = useNotificationRefresh();
                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                 .map((request, index) => (
                   <StyledTableRow key={request.id}>
+                    <StyledTableCell>
+                        <Checkbox
+                          checked={selectedRequests.includes(request.id)}
+                          onChange={() =>
+                            setSelectedRequests((prev) =>
+                              prev.includes(request.id)
+                                ? prev.filter((id) => id !== request.id)
+                                : [...prev, request.id]
+                            )
+                          }
+                        />
+                      </StyledTableCell>
+
                     <StyledTableCell>
                       {page * rowsPerPage + index + 1}
                     </StyledTableCell>

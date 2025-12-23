@@ -21,10 +21,13 @@ import {
   Slide,
   TablePagination, // Import TablePagination
 } from '@mui/material';
+import Skeleton from "@mui/material/Skeleton";
+
 import { useTheme } from "@mui/material/styles";
 import { styled } from '@mui/material/styles';
 import { tableCellClasses } from '@mui/material/TableCell';
 import { CheckCircleOutline, ErrorOutline, InfoOutlined, WarningOutlined } from '@mui/icons-material';
+import { CircularProgress } from '@mui/material';
 
 // Styled Table Components
 // Styled Table Components
@@ -87,6 +90,9 @@ const Roles = () => {
     name: '',
   });
 
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [snackbarSeverity, setSnackbarSeverity] = useState('success');
@@ -123,7 +129,9 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
     fetchRoles();
   }, []);
 
-  if (loading) {
+  const showInitialLoader = loading && roles.length === 0;
+
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -140,6 +148,7 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
       </div>
     );
   }
+  
 
   if (error) {
     return (
@@ -161,6 +170,40 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
     setRoles(filtered);
     setPage(0); // Reset page on search
   };
+
+  const RoleTableSkeleton = ({ rows = 5 }) => {
+    return (
+      <>
+        {[...Array(rows)].map((_, index) => (
+          <StyledTableRow key={index}>
+            <StyledTableCell>
+              <Skeleton variant="rectangular" width={18} height={18} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={30} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={120} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Skeleton width={80} />
+            </StyledTableCell>
+  
+            <StyledTableCell>
+              <Box display="flex" justifyContent="center" gap={1}>
+                <Skeleton variant="rectangular" width={70} height={30} />
+                <Skeleton variant="rectangular" width={70} height={30} />
+              </Box>
+            </StyledTableCell>
+          </StyledTableRow>
+        ))}
+      </>
+    );
+  };
+  
 
   const handleChangePage = (_, newPage) => {
     setPage(newPage);
@@ -209,22 +252,29 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
 
   const handleCreateRole = async (e) => {
     e.preventDefault();
-
-     // Validate name
-  if (!isValidRoleName(newRole.name)) {
-    showSnackbar("Role name can contain only alphabets and underscore (_).", "error");
-    return;
-  }
-    const existingRole = roles.find((role) => role.name === newRole.name);
-
-    
-    if (existingRole) {
-      showSnackbar('A role with the same name already exists. Please choose a different name.', 'error');
+  
+    if (creating) return; // ⛔ prevent double click
+  
+    // Validate name
+    if (!isValidRoleName(newRole.name)) {
+      showSnackbar("Role name can contain only alphabets and underscore (_).", "error");
       return;
     }
-
+  
+    const existingRole = roles.find((role) => role.name === newRole.name);
+    if (existingRole) {
+      showSnackbar(
+        'A role with the same name already exists. Please choose a different name.',
+        'error'
+      );
+      return;
+    }
+  
     try {
+      setCreating(true); // 🔄 START LOADER
+  
       const response = await apiClient.post('/create-roles/', newRole);
+  
       if (response.status === 201 || response.status === 200) {
         showSnackbar('Role created successfully', 'success');
         setShowCreateForm(false);
@@ -235,38 +285,55 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
       }
     } catch (error) {
       console.error('Error creating role:', error);
-      showSnackbar('Error creating role. Please check the inputs and try again.', 'error');
+      showSnackbar(
+        'Error creating role. Please check the inputs and try again.',
+        'error'
+      );
+    } finally {
+      setCreating(false); // ✅ STOP LOADER (success or error)
     }
   };
-
+  
   const handleUpdateRole = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!roleToUpdate) {
-      showSnackbar('No role selected for update.', 'error');
-      return;
-    }
-     // Validate name
+  if (updating) return; // ⛔ prevent multiple clicks
+
+  if (!roleToUpdate) {
+    showSnackbar('No role selected for update.', 'error');
+    return;
+  }
+
+  // Validate name
   if (!isValidRoleName(roleToUpdate.name)) {
     showSnackbar("Role name can contain only alphabets and underscore (_).", "error");
     return;
   }
 
-    try {
-      const response = await apiClient.put(`/edit-roles/${roleToUpdate.id}/`, roleToUpdate);
-      if (response.status === 200) {
-        showSnackbar('Role updated successfully', 'success');
-        setShowUpdateForm(false);
-        setRoleToUpdate(null);
-        fetchRoles();
-      } else {
-        showSnackbar('Unexpected response. Please try again.', 'error');
-      }
-    } catch (error) {
-      showSnackbar('Error updating role', 'error');
-      console.error(error);
+  try {
+    setUpdating(true); // 🔄 START LOADER
+
+    const response = await apiClient.put(
+      `/edit-roles/${roleToUpdate.id}/`,
+      roleToUpdate
+    );
+
+    if (response.status === 200) {
+      showSnackbar('Role updated successfully', 'success');
+      setShowUpdateForm(false);
+      setRoleToUpdate(null);
+      fetchRoles();
+    } else {
+      showSnackbar('Unexpected response. Please try again.', 'error');
     }
-  };
+  } catch (error) {
+    console.error(error);
+    showSnackbar('Error updating role', 'error');
+  } finally {
+    setUpdating(false); // ✅ STOP LOADER
+  }
+};
+
 
   const handleDeleteSelectedRoles = async () => {
     if (selectedRoles.length === 0) {
@@ -377,7 +444,8 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
         </div>
       </div>
 
-      <Modal open={showCreateForm} onClose={() => setShowCreateForm(false)}>
+      <Modal open={showCreateForm} onClose={creating ? undefined : () => setShowCreateForm(false)}>
+
         <Box sx={modalStyle}>
           <h2>Create New Role</h2>
           <form onSubmit={handleCreateRole}>
@@ -395,9 +463,20 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
 
             </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Create
+            <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{ mr: 1 }}
+                disabled={creating}
+              >
+                {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
               </Button>
+
               <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
                 Cancel
               </Button>
@@ -406,7 +485,10 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
+      <Modal
+          open={showUpdateForm}
+          onClose={updating ? undefined : () => setShowUpdateForm(false)}
+        >
         <Box sx={modalStyle}>
           <h2>Update Role</h2>
           <form onSubmit={handleUpdateRole}>
@@ -423,9 +505,20 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
 
               </FormControl>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
-                Update
-              </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              sx={{ mr: 1 }}
+              disabled={updating}
+            >
+              {updating ? (
+                <CircularProgress size={22} sx={{ color: "#fff" }} />
+              ) : (
+                "Update"
+              )}
+            </Button>
+
               <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
                 Cancel
               </Button>
@@ -481,7 +574,10 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
   </TableHead>
 
   <TableBody>
-    {currentRoles.map((role, index) => (
+  {loading ? (
+    <RoleTableSkeleton rows={rowsPerPage} />
+  ) : (
+    currentRoles.map((role, index) => (
       <StyledTableRow key={role.id}>
         <StyledTableCell>
           <input
@@ -491,7 +587,10 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
           />
         </StyledTableCell>
 
-        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
+        <StyledTableCell>
+          {page * rowsPerPage + index + 1}
+        </StyledTableCell>
+
         <StyledTableCell>{role.name}</StyledTableCell>
         <StyledTableCell>{role.id}</StyledTableCell>
 
@@ -506,14 +605,20 @@ const isValidRoleName = (name) => /^[A-Za-z_ ]+$/.test(name);
             >
               Update
             </Button>
-            <Button variant="outlined" color="error" onClick={() => handleDeleteRole(role.id)}>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => handleDeleteRole(role.id)}
+            >
               Delete
             </Button>
           </Box>
         </StyledTableCell>
       </StyledTableRow>
-    ))}
-  </TableBody>
+    ))
+  )}
+</TableBody>
+
 </Table>
 
 {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}

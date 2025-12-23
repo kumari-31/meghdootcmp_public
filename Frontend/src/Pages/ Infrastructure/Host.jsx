@@ -20,6 +20,9 @@ import {
   TablePagination,
 
 } from "@mui/material";
+import { CircularProgress } from '@mui/material';
+import { Skeleton } from "@mui/material";
+
 import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
 import { styled } from "@mui/material/styles";
 
@@ -79,6 +82,9 @@ const HostAggregates = () => {
 
   const [newAgg, setNewAgg] = useState({ name: "", availability_zone: "", metadata: {} });
   const [aggToUpdate, setAggToUpdate] = useState(null);
+
+  const [creating, setCreating] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
@@ -155,7 +161,8 @@ const HostAggregates = () => {
 
 
   // ⭐⭐⭐⭐⭐ ADD LOADING UI HERE ⭐⭐⭐⭐⭐
-  if (loading) {
+  const showInitialLoader = loading && aggregates.length === 0;
+  if (showInitialLoader) {
     return (
       <div className="cloud-container">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
@@ -183,6 +190,16 @@ const HostAggregates = () => {
     );
   }
 
+  const HostAggregateSkeletonRow = () => (
+    <StyledTableRow>
+      {Array.from({ length: 7 }).map((_, i) => (
+        <StyledTableCell key={i}>
+          <Skeleton variant="text" width="80%" />
+        </StyledTableCell>
+      ))}
+    </StyledTableRow>
+  );
+  
 
   const validateAggregate = (agg) => {
     let newErrors = { name: "", availability_zone: "" };
@@ -223,6 +240,7 @@ const HostAggregates = () => {
   const handleCreate = async (e) => {
     e.preventDefault();
   
+    if (creating) return; // ⛔ prevent double click
 
     if (!validateAggregate(newAgg)) {
       return; // Stop if validation fails
@@ -241,6 +259,7 @@ const HostAggregates = () => {
     }
   
     try {
+      setCreating(true); // 🔄 START LOADER
       const payload = {
         ...newAgg,
         metadata: newAgg.metadata ? JSON.parse(JSON.stringify(newAgg.metadata)) : {},
@@ -260,11 +279,15 @@ const HostAggregates = () => {
       console.error("Error creating aggregate:", error);
       showSnackbar("Error creating host aggregate. Please try again.", "error");
     }
+    finally {
+      setCreating(false); // ✅ STOP LOADER
+    }
   };
   
 
   const handleUpdate = async (e) => {
     e.preventDefault();
+    if (updating) return; // ⛔ prevent double submit
     if (!aggToUpdate) return;
 
       if (!validateAggregate(aggToUpdate)) {
@@ -272,12 +295,17 @@ const HostAggregates = () => {
       }
 
     try {
+      setUpdating(true); // 🔄 START LOADER
+
       await apiClient.put(`infrastructure/host-aggregates/${aggToUpdate.id}/`, aggToUpdate);
       showSnackbar("Updated successfully", "success");
       setShowUpdate(false);
       fetchAggregates();
     } catch {
       showSnackbar("Update failed", "error");
+    }
+    finally {
+      setUpdating(false); // ✅ STOP LOADER
     }
   };
 
@@ -364,7 +392,7 @@ const HostAggregates = () => {
       </Box>
 
      {/* CREATE MODAL */}
-           <Modal open={showCreate} onClose={() => setShowCreate(false)}>
+           <Modal open={showCreate} onClose={ creating ? undefined : () => setShowCreate(false)}>
              <Box sx={modalStyle}>
                <h3>Create Host Aggregate</h3>
                <form onSubmit={handleCreate}>
@@ -394,13 +422,19 @@ const HostAggregates = () => {
                      setNewAgg({ ...newAgg, metadata: JSON.parse(e.target.value || "{}") })
                    } /> */}
      
-                 <Button type="submit" variant="contained" sx={{ mt: 2 }}>Create</Button>
+                 <Button type="submit" variant="contained" sx={{ mt: 2 }} disabled={creating}>
+                 {creating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Create"
+                  )}
+                  </Button>
                </form>
              </Box>
            </Modal>
      
            {/* UPDATE MODAL */}
-           <Modal open={showUpdate} onClose={() => setShowUpdate(false)}>
+           <Modal open={showUpdate} onClose={ updating ? undefined : () => setShowUpdate(false)}>
              <Box sx={modalStyle}>
                <h3>Update Host Aggregate</h3>
                <form onSubmit={handleUpdate}>
@@ -429,7 +463,13 @@ const HostAggregates = () => {
                      setAggToUpdate({ ...aggToUpdate, metadata: JSON.parse(e.target.value || "{}") })
                    }/>
      
-                 <Button type="submit" variant="contained" sx={{ mt: 2 }}>Update</Button>
+                 <Button type="submit" variant="contained" sx={{ mt: 2 }}  disabled={updating}> 
+                 {updating ? (
+                    <CircularProgress size={22} sx={{ color: "#fff" }} />
+                  ) : (
+                    "Update"
+                  )}
+                  </Button>
                </form>
              </Box>
            </Modal>
@@ -482,32 +522,36 @@ const HostAggregates = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {current.map((ag, i) => (
-              <StyledTableRow key={ag.id}>
-                <StyledTableCell>
-                  <input
-                    type="checkbox"
-                    checked={selectedAggs.includes(ag.id)}
-                    onChange={() => toggleSelectAgg(ag.id)}
-                  />
-                </StyledTableCell>
+  {loading
+    ? Array.from({ length: rowsPerPage }).map((_, i) => (
+        <HostAggregateSkeletonRow key={i} />
+      ))
+    : current.map((ag, i) => (
+        <StyledTableRow key={ag.id}>
+          <StyledTableCell>
+            <input
+              type="checkbox"
+              checked={selectedAggs.includes(ag.id)}
+              onChange={() => toggleSelectAgg(ag.id)}
+            />
+          </StyledTableCell>
+          <StyledTableCell>{page * rowsPerPage + i + 1}</StyledTableCell>
+          <StyledTableCell>{ag.name}</StyledTableCell>
+          <StyledTableCell>{ag.availability_zone || "-"}</StyledTableCell>
+          <StyledTableCell>{ag.hosts?.join(", ") || "-"}</StyledTableCell>
+          <StyledTableCell>{JSON.stringify(ag.metadata || {})}</StyledTableCell>
+          <StyledTableCell>
+            <Box display="flex" justifyContent="center" gap={1}>
+              <Button variant="outlined" onClick={() => { setAggToUpdate(ag); setShowUpdate(true); }}>Update</Button>
+              <Button variant="outlined" color="error" onClick={() => deleteAggregate(ag.id)}>
+                Delete <RiDeleteBin6Line />
+              </Button>
+            </Box>
+          </StyledTableCell>
+        </StyledTableRow>
+      ))}
+</TableBody>
 
-                <StyledTableCell>{page * rowsPerPage + i + 1}</StyledTableCell>
-                <StyledTableCell>{ag.name}</StyledTableCell>
-                <StyledTableCell>{ag.availability_zone || "-"}</StyledTableCell>
-                <StyledTableCell>{ag.hosts?.join(", ") || "-"}</StyledTableCell>
-                <StyledTableCell>{JSON.stringify(ag.metadata || {})}</StyledTableCell>
-                <StyledTableCell>
-                  <Box display="flex" justifyContent="center" gap={1}>
-                  <Button variant="outlined" onClick={() => { setAggToUpdate(ag); setShowUpdate(true); }}>Update</Button>
-                  <Button variant="outlined" color="error" onClick={() => deleteAggregate(ag.id)}>
-                    Delete <RiDeleteBin6Line />
-                  </Button>
-                  </Box>
-                </StyledTableCell>
-              </StyledTableRow>
-            ))}
-          </TableBody>
         </Table>
         <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
                   <TablePagination
