@@ -39,6 +39,7 @@ const VmRequest = () => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [flavors, setFlavors] = useState([]);
+  const [networks, setNetworks] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
   const [formData, setFormData] = useState({
     employee_id: user.employee_id || "",
@@ -53,6 +54,7 @@ const VmRequest = () => {
     vdi_required: true,
     image: "",
     flavor: "",
+    network_id: "",
     login_enable_date: "",
     login_disable_date: "",
     login_enable_time: "",
@@ -167,6 +169,25 @@ const VmRequest = () => {
     };
 
     fetchProjects();
+  }, []);
+
+  useEffect(() => {
+    const fetchNetworks = async () => {
+      try {
+        const response = await apiClient.get("/networks/");
+
+        // ✅ SHOW ONLY INTERNAL NETWORKS
+        const internalNetworks = response.data.filter(
+          (net) => net.external === false
+        );
+
+        setNetworks(internalNetworks);
+      } catch (error) {
+        console.error("Error fetching networks:", error);
+      }
+    };
+
+    fetchNetworks();
   }, []);
 
   useEffect(() => {
@@ -344,6 +365,7 @@ const VmRequest = () => {
                         onChange={(e) => setVmName(e.target.value)}
                         helperText={message}
                         error={isAvailable === false}
+                        required
                       />
                     </div>
                   </Grid2>
@@ -376,7 +398,7 @@ const VmRequest = () => {
                         });
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} label="Project Name" fullWidth />
+                        <TextField {...params} label="Project Name" fullWidth required/>
                       )}
                     />
                   </Grid2>
@@ -425,7 +447,7 @@ const VmRequest = () => {
                         });
                       }}
                       renderInput={(params) => (
-                        <TextField {...params} label="Image" fullWidth />
+                        <TextField {...params} label="Image" fullWidth required />
                       )}
                     />
                   </Grid2>
@@ -446,9 +468,10 @@ const VmRequest = () => {
                           });
                         }}
                         renderInput={(params) => (
-                          <TextField {...params} label="Flavor" fullWidth />
+                          <TextField {...params} label="Flavor" fullWidth required/>
                         )}
                         fullWidth
+                      
                       />
 
                       {/* Info Icon */}
@@ -497,6 +520,47 @@ const VmRequest = () => {
                       </Popover>
                     </Box>
                   </Grid2>
+                  <Grid2 size={6}>
+                    <Autocomplete
+                      options={networks}
+                      getOptionLabel={(option) => option.network_name}
+                      value={
+                        networks.find(
+                          (net) => net.id === formData.network_id
+                        ) || null
+                      }
+                      onChange={(event, newValue) => {
+                        setFormData({
+                          ...formData,
+                          network_id: newValue ? newValue.id : "",
+                        });
+                      }}
+                      renderOption={(props, option) => (
+                        <li {...props} key={option.id}>
+                          <Box>
+                            <Typography variant="body1">
+                              {option.network_name}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              CIDR: {option.subnets?.[0]?.cidr || "N/A"}
+                            </Typography>
+                          </Box>
+                        </li>
+                      )}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Network"
+                          fullWidth
+                          required
+                        />
+                      )}
+                    />
+                  </Grid2>
+
                   <Grid2 size={6}>
                     <TextField
                       label="Login Enable Date"

@@ -140,3 +140,14 @@
     color: #2575fc;
     text-decoration: none;
 }
+
+.error-text {
+  color: #d32f2f;              /* strong red */
+  font-weight: 600;
+  margin: 10px 0;
+  text-align: center;
+  background: rgba(211, 47, 47, 0.08);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(211, 47, 47, 0.3);
+}
