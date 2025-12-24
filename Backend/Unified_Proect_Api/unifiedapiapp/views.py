@@ -4440,143 +4440,142 @@ class CreateNetworkAPIView(APIView):
 #             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+
 class CreateNetworkAPIViewUpdated(APIView):
     """
-    API to create a network with a subnet in OpenStack with advanced admin options.
+    API to create a network with a subnet in OpenStack including advanced admin options.
     """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        conn = get_openstack_connection()
-        if not conn:
-            return Response(
-                {"error": "Failed to connect to OpenStack"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
         try:
-            # Parse basic input data
-            network_name = request.data.get("name")
-            project_id = request.data.get("project_id")
+            conn = get_openstack_connection()
+            if not conn:
+                return Response(
+                    {"error": "Failed to connect to OpenStack"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
-            # Provider network options
-            provider_network_type = request.data.get(
-                "provider_network_type"
-            )  # local, flat, vxlan, vlan
+            # ----- Parse input data -----
+            network_name = request.data.get("name", "").strip()
+            project_id = request.data.get("project_id")
+            provider_network_type = request.data.get("provider_network_type")  # flat, vxlan, vlan, etc.
             physical_network = request.data.get("physical_network")
             segmentation_id = request.data.get("segmentation_id")
-
-            # Network status and attributes
             admin_state_up = request.data.get("admin_state_up", True)
             shared = request.data.get("shared", False)
             external = request.data.get("external", False)
+            availability_zone_hints = request.data.get("availability_zone_hints", [])
+            mtu = request.data.get("mtu")
 
-            # Subnet options
             create_subnet = request.data.get("create_subnet", True)
-            subnet_name = request.data.get("subnet_name")
-            network_address = request.data.get("network_address")
+            subnet_name = request.data.get("subnet_name", "").strip()
+            network_address = request.data.get("network_address", "").strip()
             gateway_ip = request.data.get("gateway_ip")
             disable_gateway = request.data.get("disable_gateway", False)
             ip_version = request.data.get("ip_version", 4)
             enable_dhcp = request.data.get("enable_dhcp", True)
+            dns_nameservers = request.data.get("dns_nameservers", [])
 
-            # Validate input data
+            # ----- Backend Validations -----
+
+            # ---- Network Name ----
             if not network_name:
-                return Response(
-                    {"error": "Network name is required."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": "Network name is required."}, status=400)
+            if len(network_name) > 255:
+                return Response({"error": "Network name must be under 255 characters."}, status=400)
+            if not re.match(r'^[\w\s\-]+$', network_name):
+                return Response({"error": "Network name contains invalid characters."}, status=400)
+            if any(net.name == network_name for net in conn.network.networks()):
+                return Response({"error": "Network name already exists."}, status=409)
 
-            # Check if the network already exists
-            existing_networks = list(conn.network.networks())
-            for network in existing_networks:
-                if network.name == network_name:
-                    return Response(
-                        {"error": "Network name already exists."},
-                        status=status.HTTP_409_CONFLICT,
-                    )
+            # ---- Project ID ----
+            if project_id and not isinstance(project_id, str):
+                return Response({"error": "Project ID must be a string."}, status=400)
 
-            # Validate provider network options
+            # ---- Provider Network Type ----
             if provider_network_type:
+                if provider_network_type not in ["flat", "vxlan", "vlan", "local"]:
+                    return Response({"error": "Invalid provider network type."}, status=400)
                 if provider_network_type == "flat" and not physical_network:
-                    return Response(
-                        {
-                            "error": "Physical network is required for flat provider network type."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                elif provider_network_type == "vxlan" and not segmentation_id:
-                    return Response(
-                        {
-                            "error": "Segmentation ID is required for VXLAN provider network type."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                elif provider_network_type == "vlan" and (
-                    not physical_network or not segmentation_id
-                ):
-                    return Response(
-                        {
-                            "error": "Both physical network and segmentation ID are required for VLAN provider network type."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                    return Response({"error": "Physical network is required for flat type."}, status=400)
+                if provider_network_type in ["vxlan", "vlan"]:
+                    if not segmentation_id:
+                        return Response({"error": f"Segmentation ID required for {provider_network_type}."}, status=400)
+                if provider_network_type == "vlan" and not physical_network:
+                    return Response({"error": "Physical network required for VLAN type."}, status=400)
 
-            # Validate subnet data if subnet creation is requested
+            # ---- Admin / Shared / External ----
+            for field_name, field_value in [("admin_state_up", admin_state_up),
+                                            ("shared", shared),
+                                            ("external", external)]:
+                if not isinstance(field_value, bool):
+                    return Response({"error": f"{field_name} must be boolean."}, status=400)
+
+            # ---- MTU ----
+            if mtu is not None:
+                try:
+                    mtu = int(mtu)
+                    if mtu < 68 or mtu > 9000:
+                        return Response({"error": "MTU must be between 68 and 9000."}, status=400)
+                except ValueError:
+                    return Response({"error": "MTU must be an integer."}, status=400)
+
+            # ---- Subnet Validation ----
             if create_subnet:
-                if not all([subnet_name, network_address]):
-                    return Response(
-                        {
-                            "error": "Subnet name and network address are required when creating a subnet."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-                if not disable_gateway and not gateway_ip:
-                    return Response(
-                        {
-                            "error": "Gateway IP is required when gateway is not disabled."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                if not subnet_name:
+                    return Response({"error": "Subnet name is required."}, status=400)
+                if len(subnet_name) > 255:
+                    return Response({"error": "Subnet name must be under 255 characters."}, status=400)
+                if not network_address:
+                    return Response({"error": "Network address (CIDR) is required."}, status=400)
+                if not re.match(r'^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$', network_address):
+                    return Response({"error": "Invalid CIDR format. Example: 192.168.1.0/24"}, status=400)
 
-            # Prepare network create arguments
+                if ip_version not in [4, 6]:
+                    return Response({"error": "IP version must be 4 or 6."}, status=400)
+
+                if not disable_gateway:
+                    if not gateway_ip:
+                        return Response({"error": "Gateway IP is required if gateway is enabled."}, status=400)
+                    # Simple IP validation
+                    ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
+                    if ip_version == 4 and not re.match(ip_pattern, gateway_ip):
+                        return Response({"error": "Invalid IPv4 gateway IP address."}, status=400)
+                    # TODO: Add IPv6 validation if ip_version == 6
+
+                if not isinstance(enable_dhcp, bool):
+                    return Response({"error": "Enable DHCP must be boolean."}, status=400)
+
+                if dns_nameservers and not all(isinstance(ip, str) for ip in dns_nameservers):
+                    return Response({"error": "DNS nameservers must be a list of strings."}, status=400)
+
+            # ----- Prepare network args -----
             network_args = {
                 "name": network_name,
                 "admin_state_up": admin_state_up,
                 "shared": shared,
                 "is_router_external": external,
+                "availability_zone_hints": availability_zone_hints,
             }
-
             if project_id:
                 network_args["project_id"] = project_id
-
+            if mtu:
+                network_args["mtu"] = mtu
             if provider_network_type:
-                provider_args = {"network_type": provider_network_type}
+                network_args["provider:network_type"] = provider_network_type
                 if physical_network:
-                    provider_args["physical_network"] = physical_network
+                    network_args["provider:physical_network"] = physical_network
                 if segmentation_id:
-                    provider_args["segmentation_id"] = segmentation_id
+                    network_args["provider:segmentation_id"] = segmentation_id
 
-                network_args["provider:network_type"] = provider_args["network_type"]
-                if "physical_network" in provider_args:
-                    network_args["provider:physical_network"] = provider_args[
-                        "physical_network"
-                    ]
-                if "segmentation_id" in provider_args:
-                    network_args["provider:segmentation_id"] = provider_args[
-                        "segmentation_id"
-                    ]
-
-            # Create network
+            # ----- Create Network -----
             network = conn.network.create_network(**network_args)
             if not network:
-                return Response(
-                    {"error": "Failed to create network."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+                return Response({"error": "Failed to create network."}, status=500)
+
             subnet = None
-            # Create subnet if requested
             if create_subnet:
                 subnet_args = {
                     "name": subnet_name,
@@ -4584,37 +4583,31 @@ class CreateNetworkAPIViewUpdated(APIView):
                     "cidr": network_address,
                     "ip_version": ip_version,
                     "enable_dhcp": enable_dhcp,
+                    "dns_nameservers": dns_nameservers,
                 }
                 if not disable_gateway:
                     subnet_args["gateway_ip"] = gateway_ip
 
                 subnet = conn.network.create_subnet(**subnet_args)
-                # print(vars(subnet))
-
                 if not subnet:
                     conn.network.delete_network(network.id)
-                    return Response(
-                        {
-                            "error": "Failed to create subnet. Network creation rolled back."
-                        },
-                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    )
+                    return Response({"error": "Failed to create subnet. Network creation rolled back."}, status=500)
 
-            # Prepare response
+            # ----- Response -----
             response_data = {
                 "message": "Network created successfully.",
                 "network": {
                     "id": network.id,
                     "name": network.name,
-                    "provider_network_type": (
-                        provider_network_type if provider_network_type else "local"
-                    ),
+                    "project_id": network.project_id,
+                    "provider_network_type": provider_network_type or "local",
                     "physical_network": physical_network,
                     "segmentation_id": segmentation_id,
                     "admin_state_up": admin_state_up,
                     "shared": shared,
                     "external": external,
-                    "project_id": network.project_id,
+                    "availability_zone_hints": availability_zone_hints,
+                    "mtu": mtu,
                 },
             }
 
@@ -4626,20 +4619,16 @@ class CreateNetworkAPIViewUpdated(APIView):
                     "network_address": subnet.cidr,
                     "gateway_ip": subnet.gateway_ip if not disable_gateway else None,
                     "ip_version": subnet.ip_version,
-                    "enable_dhcp": (
-                        subnet.is_dhcp_enabled
-                        if hasattr(subnet, "is_dhcp_enabled")
-                        else enable_dhcp
-                    ),
+                    "enable_dhcp": subnet.is_dhcp_enabled if hasattr(subnet, "is_dhcp_enabled") else enable_dhcp,
+                    "dns_nameservers": dns_nameservers,
                 }
 
-            return Response(response_data, status=status.HTTP_201_CREATED)
+            return Response(response_data, status=201)
 
+        except SDKException as sdk_err:
+            return Response({"error": f"OpenStack SDK Error: {str(sdk_err)}"}, status=500)
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            return Response({"error": f"Unexpected error: {str(e)}"}, status=500)
 
 # --------------------------10 Dec 2024---------------------------------
 
@@ -4860,7 +4849,8 @@ class DeleteNetworkAPIView(APIView):
 #             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 class EditNetworkAndSubnetAPIView(APIView):
     """
-    API to edit a network and its subnet in OpenStack.
+    API to edit a network in OpenStack.
+    Only allowed fields: name, admin_state_up, shared, external
     """
 
     permission_classes = [IsAuthenticated]
@@ -4874,106 +4864,94 @@ class EditNetworkAndSubnetAPIView(APIView):
             )
 
         try:
-            # Get data from the request
-            network_name = request.data.get("network_name")
-            is_shared = request.data.get("is_shared", None)  # Optional update
-            subnet_name = request.data.get("subnet_name")
-            gateway_ip = request.data.get("gateway_ip")
-            cidr = request.data.get("cidr")
+            # Get data from request
+            network_name = request.data.get("name")
+            admin_state_up = request.data.get("admin_state_up")
+            shared = request.data.get("shared")
+            external = request.data.get("external")
+
+            # Backend validation
+            if network_name is not None:
+                if not isinstance(network_name, str) or not network_name.strip():
+                    return Response(
+                        {"error": "Network name must be a non-empty string."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if not all(c.isalpha() or c == "_" or c.isspace() for c in network_name):
+                    return Response(
+                        {
+                            "error": "Network name can only contain letters, spaces, and underscores (_)."
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+            if admin_state_up is not None and not isinstance(admin_state_up, bool):
+                return Response(
+                    {"error": "admin_state_up must be a boolean."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if shared is not None and not isinstance(shared, bool):
+                return Response(
+                    {"error": "shared must be a boolean."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if external is not None and not isinstance(external, bool):
+                return Response(
+                    {"error": "external must be a boolean."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Fetch the network to be updated
             network = conn.network.find_network(network_id)
             if not network:
                 return Response(
-                    {"error": "Network not found"}, status=status.HTTP_404_NOT_FOUND
+                    {"error": "Network not found"},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Handle is_shared update
-            if is_shared is not None and is_shared != network.is_shared:
-                # Check if the network is being used by multiple tenants
+            update_payload = {}
+
+            if network_name and network_name != network.name:
+                update_payload["name"] = network_name
+
+            if admin_state_up is not None and admin_state_up != network.is_admin_state_up:
+                update_payload["admin_state_up"] = admin_state_up
+
+            if shared is not None and shared != network.is_shared:
+                # Optional: check restrictions for shared networks
                 if network.is_shared:
                     return Response(
                         {
-                            "error": f"Network '{network.name}' is shared by multiple tenants and cannot be updated."
+                            "error": f"Network '{network.name}' is already shared and cannot be changed."
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
-                elif is_shared:
-                    return Response(
-                        {
-                            "error": f"Changing the sharing state to shared is restricted for network '{network.name}'."
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                update_payload["shared"] = shared
 
-            # Update network details
-            updated_network = conn.network.update_network(
-                network,
-                name=network_name,
-            )
+            if external is not None and external != network.is_router_external:
+                update_payload["router:external"] = external
 
-            # Fetch existing subnets for the network
-            subnets = list(conn.network.subnets(network_id=network.id))
-
-            if subnets:
-                # Handle existing subnet
-                subnet = subnets[0]
-
-                # Check if the subnet is shared with other networks
-                # if subnet.shared:
-                #     return Response(
-                #         {"error": f"Subnet '{subnet.name}' is shared with other networks and cannot be updated."},
-                #         status=status.HTTP_400_BAD_REQUEST
-                #     )
-
-                # Check if the subnet CIDR is different, and recreate the subnet if necessary
-                if subnet.cidr != cidr:
-                    # Delete the existing subnet
-                    conn.network.delete_subnet(subnet)
-
-                    # Create a new subnet with the updated CIDR
-                    new_subnet = conn.network.create_subnet(
-                        network_id=network.id,
-                        name=subnet_name,
-                        cidr=cidr,
-                        gateway_ip=gateway_ip,
-                        ip_version=4,
-                    )
-                    subnet_message = "Subnet CIDR updated, new subnet created."
-                else:
-                    # Update the subnet attributes that are allowed to be modified (like gateway_ip)
-                    updated_subnet = conn.network.update_subnet(
-                        subnet, name=subnet_name, gateway_ip=gateway_ip
-                    )
-                    subnet_message = "Existing subnet updated successfully"
-            else:
-                # Create a new subnet if no subnet exists for the network
-                if not cidr or not gateway_ip:
-                    return Response(
-                        {
-                            "error": "CIDR and Gateway IP are required to create a new subnet"
-                        },
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
-
-                new_subnet = conn.network.create_subnet(
-                    network_id=network.id,
-                    name=subnet_name,
-                    cidr=cidr,
-                    gateway_ip=gateway_ip,
-                    ip_version=4,
+            if not update_payload:
+                return Response(
+                    {"message": "No changes detected to update."},
+                    status=status.HTTP_200_OK,
                 )
-                subnet_message = "New subnet created successfully"
+
+            # Update network
+            updated_network = conn.network.update_network(network, **update_payload)
 
             return Response(
                 {
-                    "message": "Network and subnet updated successfully",
+                    "message": "Network updated successfully",
                     "network": {
                         "id": updated_network.id,
                         "name": updated_network.name,
-                        "is_shared": updated_network.is_shared,
+                        "admin_state_up": updated_network.is_admin_state_up,
+                        "shared": updated_network.is_shared,
+                        "external": updated_network.is_router_external,
                     },
-                    "subnet_message": subnet_message,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -4982,7 +4960,6 @@ class EditNetworkAndSubnetAPIView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 # --------------------Login-------------------------
 
@@ -5160,7 +5137,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     {"error": "No active session found. Please login again."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
             otp, secret = self.generate_otp()
 
             user = authenticate(username=username, password=stored_data["password"])
@@ -7628,12 +7604,7 @@ class UpdateRBACPolicyAPIView(APIView):
 
 # =================================22 jan 2025 ============================
 
-
 class ListRBACPoliciesAPIView(APIView):
-    """
-    API to list all RBAC policies in OpenStack.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -7642,33 +7613,37 @@ class ListRBACPoliciesAPIView(APIView):
             return Response({"error": "Failed to connect to OpenStack"}, status=500)
 
         try:
-            # Fetch all RBAC policies
-            rbac_policies = conn.network.rbac_policies()
+            policies_data = []
 
-            # Serialize RBAC policies
-            policies_data = [
-                {
+            for policy in conn.network.rbac_policies():
+
+                # -------- Owner Project (real project that owns the network) --------
+                try:
+                    network = conn.network.get_network(policy.object_id)
+                    owner_project = conn.identity.get_project(network.project_id)
+                    owner_project_name = owner_project.name
+                except Exception:
+                    owner_project_name = "Unknown"
+
+                # -------- Target Project (DO NOT RESOLVE) --------
+                # Must return '*' exactly as OpenStack
+                target_project = policy.target_project_id
+
+                policies_data.append({
                     "id": policy.id,
+                    "owner_project": owner_project_name,   # ✔ correct project
                     "object_type": policy.object_type,
                     "object_id": policy.object_id,
-                    "target_project_id": policy.target_project_id,
+                    "target_project": target_project,       # ✔ returns '*'
                     "action": policy.action,
-                    # "created_at": policy.created_at,
-                    # "updated_at": policy.updated_at,
-                }
-                for policy in rbac_policies
-            ]
+                })
 
             return Response({"rbac_policies": policies_data}, status=200)
 
-        except SDKException as sdk_error:
-            return Response(
-                {"error": f"OpenStack SDK Error: {str(sdk_error)}"}, status=500
-            )
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 
-
+     
 class DeleteRBACPolicyAPIView(APIView):
     """
     API to delete an RBAC policy in OpenStack.
@@ -7799,6 +7774,7 @@ class DeleteRBACPolicyAPIView(APIView):
 # -----------------------7 Jan 2025-----------------------------
 
 
+
 class CreateGroupWithMembersAPIView(APIView):
     """
     API to create a group and map multiple members to it in OpenStack.
@@ -7809,31 +7785,57 @@ class CreateGroupWithMembersAPIView(APIView):
     def post(self, request, *args, **kwargs):
         try:
             # Parse the request data
-            group_name = request.data.get("group_name")
-            description = request.data.get("description")
+            group_name = request.data.get("group_name", "").strip()
+            description = request.data.get("description", "").strip()
             member_ids = request.data.get("member_ids", [])
 
+            # ✅ Validate group name
             if not group_name:
                 return Response(
                     {"error": "Group name is required."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-            if not isinstance(member_ids, list) or len(member_ids) == 0:
+            if len(group_name) > 255:
                 return Response(
-                    {"error": "A list of member IDs is required."},
+                    {"error": "Group name must be under 255 characters."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if not re.match(r'^[\w\s\-]+$', group_name):
+                return Response(
+                    {"error": "Group name contains invalid characters."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Establish OpenStack connection
+            # ✅ Validate member IDs
+            if not isinstance(member_ids, list) or len(member_ids) == 0:
+                return Response(
+                    {"error": "A non-empty list of member IDs is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Connect to OpenStack
             conn = get_openstack_connection()
+            if not conn:
+                return Response(
+                    {"error": "Failed to connect to OpenStack."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            # Check if group already exists
+            existing_groups = list(conn.identity.groups())
+            for grp in existing_groups:
+                if grp.name.lower() == group_name.lower():
+                    return Response(
+                        {"error": "Group with this name already exists."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
 
             # Create the group
-            group = conn.identity.create_group(name=group_name, description=description)
-
-            if not group:
+            try:
+                group = conn.identity.create_group(name=group_name, description=description)
+            except SDKException as sdk_err:
                 return Response(
-                    {"error": "Failed to create group."},
+                    {"error": f"Failed to create group: {str(sdk_err)}"},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
@@ -7850,16 +7852,16 @@ class CreateGroupWithMembersAPIView(APIView):
 
                     conn.identity.add_user_to_group(group=group, user=user)
                     assigned_members.append(member_id)
+                except SDKException as sdk_err:
+                    errors.append(f"Failed to add user '{member_id}': {str(sdk_err)}")
                 except Exception as e:
-                    errors.append(
-                        f"Failed to add user with ID '{member_id}' to group: {str(e)}"
-                    )
+                    errors.append(f"Unexpected error for user '{member_id}': {str(e)}")
 
             # Build the response
             response_data = {
                 "group_id": group.id,
-                "description": group.description,
                 "group_name": group.name,
+                "description": group.description,
                 "assigned_members": assigned_members,
                 "errors": errors,
             }
@@ -7868,9 +7870,9 @@ class CreateGroupWithMembersAPIView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 # ---------------------------17 Mar 2025--------------------------
 class ListRolesAPIView(APIView):
@@ -7926,8 +7928,6 @@ class DeleteRoleAPIView(APIView):
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 class CreateRoleAPIView(APIView):
     """
     API to create a role in OpenStack.
@@ -7938,25 +7938,59 @@ class CreateRoleAPIView(APIView):
     def post(self, request):
         try:
             conn = get_openstack_connection()
+            if not conn:
+                return Response(
+                    {"error": "Failed to connect to OpenStack"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
-            role_name = request.data.get("name")
+            role_name = request.data.get("name", "").strip()
+
+            # ✅ Backend Validation
             if not role_name:
                 return Response(
                     {"error": "Role name is required"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            if len(role_name) > 255:
+                return Response(
+                    {"error": "Role name must be under 255 characters"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Check for invalid characters (optional)
+            import re
+            if not re.match(r'^[\w\s\-]+$', role_name):
+                return Response(
+                    {"error": "Role name contains invalid characters"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             # Check if the role already exists
-            existing_roles = list(conn.identity.roles())
+            try:
+                existing_roles = list(conn.identity.roles())
+            except SDKException as sdk_err:
+                return Response(
+                    {"error": f"OpenStack SDK error: {str(sdk_err)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             for role in existing_roles:
-                if role.name == role_name:
+                if role.name.lower() == role_name.lower():  # case-insensitive check
                     return Response(
                         {"error": "Role already exists"},
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
-            # Create role if it doesn't exist
-            new_role = conn.identity.create_role(name=role_name)
+            # Create role
+            try:
+                new_role = conn.identity.create_role(name=role_name)
+            except SDKException as sdk_err:
+                return Response(
+                    {"error": f"Failed to create role: {str(sdk_err)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
             return Response(
                 {
@@ -7969,10 +8003,9 @@ class CreateRoleAPIView(APIView):
 
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-
 # ---------------------------18 March 2025-----------------------------
 
 
@@ -7986,41 +8019,76 @@ class EditRoleAPIView(APIView):
     def put(self, request, role_id):
         try:
             conn = get_openstack_connection()
-            new_name = request.data.get("name")
+            if not conn:
+                return Response(
+                    {"error": "Failed to connect to OpenStack"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
+            new_name = request.data.get("name", "").strip()
+
+            # ✅ Validation: Required
             if not new_name:
                 return Response(
                     {"error": "New role name is required"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            # ✅ Validation: Length
+            if len(new_name) > 255:
+                return Response(
+                    {"error": "Role name must be under 255 characters"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # ✅ Validation: Allowed characters
+            if not re.match(r'^[\w\s\-]+$', new_name):
+                return Response(
+                    {"error": "Role name contains invalid characters"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             # Check if role exists
-            role = conn.identity.find_role(role_id)
+            try:
+                role = conn.identity.find_role(role_id)
+            except SDKException as sdk_err:
+                return Response(
+                    {"error": f"OpenStack SDK error: {str(sdk_err)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             if not role:
                 return Response(
                     {"error": "Role not found"}, status=status.HTTP_404_NOT_FOUND
                 )
 
-            # Check if new name already exists
+            # Check if new name already exists (case-insensitive)
             existing_roles = list(conn.identity.roles())
             for existing_role in existing_roles:
-                if existing_role.name == new_name and existing_role.id != role_id:
+                if existing_role.name.lower() == new_name.lower() and existing_role.id != role_id:
                     return Response(
                         {"error": "Role name already exists"},
                         status=status.HTTP_409_CONFLICT,
                     )
 
-            # Update role
-            conn.identity.update_role(role, name=new_name)
+            # Update role safely
+            try:
+                conn.identity.update_role(role, name=new_name)
+            except SDKException as sdk_err:
+                return Response(
+                    {"error": f"Failed to update role: {str(sdk_err)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+
             return Response(
                 {"message": "Role updated successfully"}, status=status.HTTP_200_OK
             )
 
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 class ServiceMonitorView(APIView):
     """
@@ -8116,32 +8184,64 @@ class ListGroupsAPIView(APIView):
 
 class UpdateGroupAPIView(APIView):
     """
-    API to update an OpenStack group name.
+    API to update an OpenStack group name and description.
     """
 
     permission_classes = [IsAuthenticated]
 
     def put(self, request, group_id):
-        new_name = request.data.get("name")
-        new_description = request.data.get("description")
+        new_name = request.data.get("name", "").strip()
+        new_description = request.data.get("description", "").strip()
+
+        # ✅ Validate group name
         if not new_name:
             return Response(
                 {"error": "New group name is required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if len(new_name) > 255:
+            return Response(
+                {"error": "Group name must be under 255 characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not re.match(r'^[\w\s\-]+$', new_name):
+            return Response(
+                {"error": "Group name contains invalid characters."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             conn = get_openstack_connection()
-            group = conn.identity.find_group(group_id)
+            if not conn:
+                return Response(
+                    {"error": "Failed to connect to OpenStack."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
+            # Check if the group exists
+            group = conn.identity.find_group(group_id)
             if not group:
                 return Response(
                     {"error": "Group not found."}, status=status.HTTP_404_NOT_FOUND
                 )
 
+            # Check for duplicate group name
+            existing_groups = list(conn.identity.groups())
+            for existing_group in existing_groups:
+                if (
+                    existing_group.name.lower() == new_name.lower()
+                    and existing_group.id != group_id
+                ):
+                    return Response(
+                        {"error": "Another group with this name already exists."},
+                        status=status.HTTP_409_CONFLICT,
+                    )
+
+            # Update group
             updated_group = conn.identity.update_group(
                 group, name=new_name, description=new_description
             )
+
             return Response(
                 {
                     "message": "Group updated successfully.",
@@ -8150,14 +8250,20 @@ class UpdateGroupAPIView(APIView):
                         "name": updated_group.name,
                         "description": updated_group.description,
                     },
-                }
+                },
+                status=status.HTTP_200_OK,
             )
 
+        except SDKException as sdk_err:
+            return Response(
+                {"error": f"OpenStack SDK Error: {str(sdk_err)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 class DeleteGroupAPIView(APIView):
     """
@@ -9323,61 +9429,40 @@ class OpenStackImageDownloadView(APIView):
 
 # ---------------------------------10 Feb 2025 ---------------------
 
-
 class FloatingIPView(APIView):
-    """
-    API to manage OpenStack Floating IPs.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """List all floating IPs"""
         conn = get_openstack_connection()
         floating_ips = []
 
         for ip in conn.network.ips():
-            floating_ips.append(
-                {
-                    "id": ip.id,
-                    "floating_ip_address": ip.floating_ip_address,
-                    "fixed_ip_address": ip.fixed_ip_address,
-                    "port_id": ip.port_id,
-                    "status": ip.status,
-                }
-            )
+            # Resolve Project
+            try:
+                project = conn.identity.get_project(ip.project_id)
+                project_name = project.name or "-"
+            except Exception:
+                project_name = "-"
+
+            # Resolve Pool / Floating Network
+            try:
+                network = conn.network.get_network(ip.floating_network_id)
+                pool_name = network.name or "-"
+            except Exception:
+                pool_name = "-"
+
+            floating_ips.append({
+                "id": ip.id or "-",
+                "floating_ip_address": ip.floating_ip_address or "-",
+                "fixed_ip_address": ip.fixed_ip_address or "-",
+                "port_id": ip.port_id or "-",
+                "status": ip.status or "-",
+                "description": getattr(ip, "description", "-") or "-",
+                "pool": pool_name,
+                "project_name": project_name,
+            })
 
         return Response({"floating_ips": floating_ips}, status=status.HTTP_200_OK)
-
-    def post(self, request):
-        """
-        Create a new floating IP in OpenStack.
-        Request Payload:
-        {
-            "network_id": "network-uuid"
-        }
-        """
-        conn = get_openstack_connection()
-        network_id = request.data.get("network_id")
-
-        if not network_id:
-            return Response(
-                {"error": "network_id is required"}, status=status.HTTP_400_BAD_REQUEST
-            )
-
-        try:
-            floating_ip = conn.network.create_ip(floating_network_id=network_id)
-            return Response(
-                {
-                    "id": floating_ip.id,
-                    "floating_ip_address": floating_ip.floating_ip_address,
-                    "status": floating_ip.status,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 
 # ------------------------------26 Feb 2025 ----------------------------
 

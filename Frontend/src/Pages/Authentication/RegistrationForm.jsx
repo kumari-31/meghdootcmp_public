@@ -49,7 +49,7 @@ function RegistrationForm() {
             setError('');
 
             const response = await fetch(
-                `http://10.184.40.131:8002/api/employee-details/?employee_id=${employeeId}`
+                `http://10.184.40.216:8002/api/employee-details/?employee_id=${employeeId}`
             );
             const data = await response.json();
 
@@ -178,7 +178,7 @@ function RegistrationForm() {
         try {
           setLoading(true);
           const response = await fetch(
-            `http://10.184.39.33:8002/employee/register/${employeeId}/`,
+            `http://10.184.40.216:8002/employee/register/${employeeId}/`,
             {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
