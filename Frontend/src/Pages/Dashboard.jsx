@@ -1288,8 +1288,10 @@ const tableStyles = {
                 <TableCell>VM</TableCell>
                 <TableCell>Project</TableCell>
                 <TableCell>Req Date</TableCell>
-                <TableCell>FLA</TableCell>
+                <TableCell>Designation</TableCell>
                 <TableCell>Admin</TableCell>
+                <TableCell>creation status</TableCell>
+
               </TableRow>
             </TableHead>
 
@@ -1300,8 +1302,9 @@ const tableStyles = {
                   <TableCell>{r.vm_name.split("_").slice(1).join("_")}</TableCell>
                   <TableCell>{r.project_name}</TableCell>
                   <TableCell>{dayjs(r.request_timestamp).format("DD MMM")}</TableCell>
-                  <TableCell>{r.fla_status}</TableCell>
+                  <TableCell>{r.designation}</TableCell>
                   <TableCell>{r.admin_status}</TableCell>
+                  <TableCell>{r.creation_status}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

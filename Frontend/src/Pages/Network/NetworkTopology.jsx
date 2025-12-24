@@ -51,6 +51,14 @@ const CustomNetworkNode = ({ data }) => (
   </Paper>
 );
 
+const getStatusColor = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'active': return '#2e7d32'; // Green
+    case 'error': return '#d32f2f';  // Red
+    default: return '#757575';       // Gray
+  }
+};
+
 const CustomDeviceNode = ({ data }) => (
   <Tooltip title={data.details || ""} arrow>
     <Paper
@@ -60,7 +68,7 @@ const CustomDeviceNode = ({ data }) => (
         minWidth: 140,
         textAlign: "center",
         borderRadius: 4,
-        border: data.type === "router" ? "1px solid #ed6c02" : "1px solid #9c27b0",
+        border: `2px solid ${getStatusColor(data.details.status)}`,
         bgcolor: "#fff"
       }}
     >
@@ -118,6 +126,7 @@ const getLayoutedElements = (nodes, edges, direction = "TB") => {
 export default function NetworkTopology() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -146,6 +155,7 @@ export default function NetworkTopology() {
             position: { x: 0, y: 0 } // Layout handles this later
           });
         });
+
 
         // 2. Process Routers
         rawRouters.forEach((router) => {
@@ -238,6 +248,7 @@ export default function NetworkTopology() {
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeClick={(event, node) => setSelectedNode(node)}
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-right"

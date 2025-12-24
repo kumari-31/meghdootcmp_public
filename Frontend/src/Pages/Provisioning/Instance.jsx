@@ -1,5 +1,5 @@
 // src/Pages/Instance.jsx
-import  { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import apiClient from "../../Axios";
 import "../style.css";
 
@@ -17,7 +17,7 @@ import {
   MenuItem,
   InputLabel,
   TablePagination,
-  Skeleton,   // ✅ ADD THIS
+  Skeleton, // ✅ ADD THIS
 } from "@mui/material";
 
 import { styled } from "@mui/material/styles";
@@ -75,10 +75,6 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
 const Instance = () => {
   const theme = useTheme();
 
-  // Projects
-  const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState("");
-
   // Instances
   const [instances, setInstances] = useState([]);
   const [filteredInstances, setFilteredInstances] = useState([]);
@@ -94,32 +90,16 @@ const Instance = () => {
   /* ------------------------------------------
                 Fetch Projects & Instances
   ------------------------------------------- */
-
   useEffect(() => {
-    const fetchProjects = async () => {
-      setError(null);
-      try {
-        const response = await apiClient.get("/openstack/projects/");
-        setProjects(response.data);
-
-        const savedProjectId = localStorage.getItem("selectedProject");
-
-        if (savedProjectId && response.data.some((p) => p.id === savedProjectId)) {
-          setSelectedProject(savedProjectId);
-        } else if (response.data.length > 0) {
-          setSelectedProject(response.data[0].id);
-        }
-      } catch (error) {
-        console.error("Error fetching projects:", error);
-      }
-    };
-
     const fetchInstances = async () => {
       setError(null);
       try {
         const response = await apiClient.get("/instances/");
-        setInstances(response.data);
-        setFilteredInstances(response.data);
+        const cleanData = Array.isArray(response.data)
+        ? response.data.filter(Boolean)
+        : [];
+        setInstances(cleanData);
+        setFilteredInstances(cleanData);
       } catch (error) {
         console.error("Error fetching instances:", error);
       } finally {
@@ -127,40 +107,40 @@ const Instance = () => {
       }
     };
 
-    fetchProjects();
     fetchInstances();
   }, []);
-
 
   /* ------------------------------------------
                  Format Age
   ------------------------------------------- */
   const formatAge = (isoDate) => {
     if (!isoDate) return "N/A";
-  
+
     const created = new Date(isoDate);
     const now = new Date();
-  
+
     let diffMs = now - created;
     if (diffMs < 0) return "Just now";
-  
+
     const minutes = Math.floor(diffMs / (1000 * 60));
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
     if (days > 0) {
       const remainingHours = hours % 24;
-      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${remainingHours !== 1 ? "s" : ""}`;
+      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${
+        remainingHours !== 1 ? "s" : ""
+      }`;
     }
-  
+
     if (hours > 0) {
       const remainingMinutes = minutes % 60;
       return `${hours} hour${hours > 1 ? "s" : ""}, ${remainingMinutes} min`;
     }
-  
+
     return `${minutes} min`;
   };
-  
+
   /* ------------------------------------------
                  Search Filter
   ------------------------------------------- */
@@ -168,13 +148,16 @@ const Instance = () => {
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
 
-    const filtered = instances.filter((instance) =>
-      Object.values(instance).some(
+    const filtered = instances.filter((instance) => {
+      if (!instance || typeof instance !== "object") return false;
+
+      return Object.values(instance).some(
         (value) =>
-          value &&
+          value !== null &&
+          value !== undefined &&
           value.toString().toLowerCase().includes(e.target.value.toLowerCase())
-      )
-    );
+      );
+    });
 
     setFilteredInstances(filtered);
     setPage(0);
@@ -267,7 +250,6 @@ const Instance = () => {
     );
   }
 
-
   const InstanceTableSkeleton = ({ rows = 5 }) => (
     <>
       {Array.from({ length: rows }).map((_, index) => (
@@ -285,9 +267,24 @@ const Instance = () => {
       ))}
     </>
   );
-  
+
+const getIPAddress = (ipData) => {
+  if (!ipData || typeof ipData !== "object") return "N/A";
+
+  const networks = Object.values(ipData);
+  if (!networks.length || !Array.isArray(networks[0])) return "N/A";
+
+  return networks[0][0] || "N/A";
+};
+
+const getVMName = (name) => {
+  if (!name || typeof name !== "string") return "N/A";
+  return name.split("_").slice(1).join("_") || name;
+};
+
+
   /* ------------------------------------------
-                      UI
+                   UI
   ------------------------------------------- */
 
   return (
@@ -304,7 +301,6 @@ const Instance = () => {
           />
         </div>
       </div>
-  
 
       {/* Table */}
       <TableContainer
@@ -341,61 +337,60 @@ const Instance = () => {
             </TableRow>
           </TableHead>
 
-          
           <TableBody>
             {currentInstances.map((item, index) => (
               <StyledTableRow key={item["Instance ID"] || index}>
                 <StyledTableCell>
-                  {item["VM Name"].split("_").slice(1).join("_")}
+                 {getVMName(item["VM Name"])}
                 </StyledTableCell>
-                 <StyledTableCell>
-                  {item["Instance Name"]}
-                </StyledTableCell>
+                <StyledTableCell>{item["Instance Name"]}</StyledTableCell>
                 <StyledTableCell>{item["Flavor Name"]}</StyledTableCell>
                 <StyledTableCell>
-                  {item["IP Addresses"]
-                    ? Object.values(item["IP Addresses"])[0]?.[0] || "N/A"
-                    : "N/A"}
+                    {getIPAddress(item["IP Addresses"])}
                 </StyledTableCell>
                 <StyledTableCell>{item["RAM"]}</StyledTableCell>
                 <StyledTableCell>{item["Disk"]}</StyledTableCell>
                 <StyledTableCell>
-                  {item["Image Name"] && item["Image Name"] !== "N/A"
-                    ? item["Image Name"]
-                    : <span style={{ color: "gray" }}>N/A</span>}
+                  {item["Image Name"] && item["Image Name"] !== "N/A" ? (
+                    item["Image Name"]
+                  ) : (
+                    <span style={{ color: "gray" }}>N/A</span>
+                  )}
                 </StyledTableCell>
                 <StyledTableCell>{item["status"]}</StyledTableCell>
                 <StyledTableCell>{item["power_state_str"]}</StyledTableCell>
                 <StyledTableCell>{formatAge(item["Age"])}</StyledTableCell>
 
-        <StyledTableCell>
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Action</InputLabel>
-            <Select
-              value=""
-              label="Action"
-              disabled={loading}   // ✅ lock during action
-              onChange={(e) =>
-                handleActionChange(e, item["Instance ID"])
-              }
-            >
-              <MenuItem value="">
-                <em>Select Action</em>
-              </MenuItem>
-              <MenuItem value="pause">Pause</MenuItem>
-              <MenuItem value="suspend">Suspend</MenuItem>
-              <MenuItem value="soft_reboot">Soft Reboot</MenuItem>
-              <MenuItem value="hard_reboot">Hard Reboot</MenuItem>
-              <MenuItem value="shutoff">Shutoff</MenuItem>
-              <MenuItem value="delete">Delete</MenuItem>
-            </Select>
-          </FormControl>
-        </StyledTableCell>
-      </StyledTableRow>
-    ))}
-</TableBody>
-
-
+                <StyledTableCell>
+                  <FormControl size="small" sx={{ minWidth: 120 }}>
+                    <InputLabel>Action</InputLabel>
+                    <Select
+                      value=""
+                      label="Action"
+                      disabled={loading} // ✅ lock during action
+                      onChange={(e) => {
+                      if (!item?.["Instance ID"]) {
+                        alert("Invalid Instance ID");
+                        return;
+                      }
+                      handleActionChange(e, item["Instance ID"]);
+                    }}
+                    >
+                      <MenuItem value="">
+                        <em>Select Action</em>
+                      </MenuItem>
+                      <MenuItem value="pause">Pause</MenuItem>
+                      <MenuItem value="suspend">Suspend</MenuItem>
+                      <MenuItem value="soft_reboot">Soft Reboot</MenuItem>
+                      <MenuItem value="hard_reboot">Hard Reboot</MenuItem>
+                      <MenuItem value="shutoff">Shutoff</MenuItem>
+                      <MenuItem value="delete">Delete</MenuItem>
+                    </Select>
+                  </FormControl>
+                </StyledTableCell>
+              </StyledTableRow>
+            ))}
+          </TableBody>
         </Table>
 
         {/* Pagination */}
@@ -413,15 +408,22 @@ const Instance = () => {
   );
 };
 
-
-const volumesContainerStyle = { padding: '20px', fontFamily: 'sans-serif' };
+const volumesContainerStyle = { padding: "20px", fontFamily: "sans-serif" };
 const headerContainerVolumesStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '20px',
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
 };
-const searchContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
-const volumesTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
+const searchContainerStyle = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+};
+const volumesTableStyle = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: "20px",
+};
 
 export default Instance;

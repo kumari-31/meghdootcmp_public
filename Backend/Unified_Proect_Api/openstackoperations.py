@@ -4,6 +4,7 @@ import subprocess
 import time
 import token
 
+from async_timeout import timeout
 import requests
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
@@ -56,32 +57,68 @@ def detach_volume(conn, server_id, volume_id):
     except Exception as e:
         print(f"Error detaching volume '{volume_id}' from VM '{server_id}': {e}")
 
+FINAL_ERROR_STATES = ["error", "error_extending"]
+WAIT_STATES = ["creating", "downloading"]
 
 def wait_for_volume_status(
-    conn, volume_id, target_status="available", retries=300, delay=5
+    conn,
+    volume_id,
+    target_status="available",
+    timeout=3600,
+    delay=5
 ):
-    """
-    Wait for the volume to reach the target status.
+    elapsed = 0
 
-    Parameters:
-    - conn: OpenStack connection object.
-    - volume_id: The ID of the volume.
-    - target_status: The desired status (default is 'available').
-    - retries: Number of retries before giving up (default is 10).
-    - delay: Delay in seconds between retries (default is 5).
-    """
-    for attempt in range(retries):
+    while elapsed < timeout:
         volume = conn.block_store.get_volume(volume_id)
-        if volume.status == target_status:
-            print(f"Volume '{volume_id}' is now in '{target_status}' state.")
-            return True
-        else:
-            print(f"Volume '{volume_id}' is in '{volume.status}' state. Waiting...")
+        status = volume.status
+
+        print(f"Volume '{volume_id}' status: {status}")
+
+        if status == target_status:
+            return True, volume
+
+        if status in FINAL_ERROR_STATES:
+            error_msg = extract_volume_error(volume)
+            raise Exception(f"Volume failed: {error_msg}")
+
+        if status in WAIT_STATES:
             time.sleep(delay)
-    print(
-        f"Volume '{volume_id}' did not reach '{target_status}' status after {retries} attempts."
+            elapsed += delay
+            continue
+
+        # Unknown state
+        raise Exception(f"Volume in unexpected state: {status}")
+
+    raise TimeoutError(
+        f"Volume '{volume_id}' did not reach '{target_status}' within {timeout} seconds"
     )
-    return False
+
+# def wait_for_volume_status(
+#     conn, volume_id, target_status="available", retries=3600, delay=5
+# ):
+#     """
+#     Wait for the volume to reach the target status.
+
+#     Parameters:
+#     - conn: OpenStack connection object.
+#     - volume_id: The ID of the volume.
+#     - target_status: The desired status (default is 'available').
+#     - retries: Number of retries before giving up (default is 10).f
+#     - delay: Delay in seconds between retries (default is 5).
+#     """
+#     for attempt in range(retries):
+#         volume = conn.block_store.get_volume(volume_id)
+#         if volume.status == target_status:
+#             print(f"Volume '{volume_id}' is now in '{target_status}' state.")
+#             return True
+#         else:
+#             print(f"Volume '{volume_id}' is in '{volume.status}' state. Waiting...")
+#             time.sleep(delay)
+#     print(
+#         f"Volume '{volume_id}' did not reach '{target_status}' status after {retries} attempts."
+#     )
+#     return False
 
 
 def delete_volume(conn, volume_id):
@@ -135,8 +172,6 @@ def create_vm1(
         )
 
         print(f"VM in create_vm1 '{name}' created successfully")
-
-        # Wait for the VM to be active
         # Wait for the VM to be active
         conn.compute.wait_for_server(server, status="ACTIVE", wait=timeout)
         print(name, " is in the Active state")
@@ -278,14 +313,14 @@ def create_data_volume(size, volume_name, data_volume_type):
     return volume.id
 
 
-def attach_volume_to_vm(instance_name, volume_id, retries=10, delay=5):
+def attach_volume_to_vm(instance_name, volume_id, retries=100, delay=5):
     try:
         # Find the server (VM) by instance name
         server = conn.compute.find_server(instance_name)
         if not server:
             print(f"Server with instance name '{instance_name}' not found.")
             return ""
-
+        
         # Wait for the server to be in the ACTIVE state
         if not wait_for_server_status(server, "ACTIVE"):
             print(
@@ -321,25 +356,48 @@ def attach_volume_to_vm(instance_name, volume_id, retries=10, delay=5):
         print(f"An error occurred attaching data volume: {e}")
     return ""
 
+WAIT_SERVER_STATES = ["BUILD", "HARD_REBOOT", "REBOOT"]
 
-def wait_for_server_status(server, target_status="ACTIVE", retries=300, delay=5):
-    """Wait for the server to reach the target status."""
-    for attempt in range(retries):
-        print("before status check=====")
+def wait_for_server_status(server, target_status="ACTIVE", retries=1800, delay=5):
+    elapsed = 0
+
+    while elapsed < timeout:
         server = conn.compute.get_server(server.id)
-        print(server.status, "===> server status")
-        if server.status == target_status:
-            print(f"Server {server.name} is now {target_status}.")
+        status = server.status
+
+        print(f"Server {server.name} status: {status}")
+
+        if status == target_status:
             return True
-        else:
-            print(
-                f"Server {server.name} is in {server.status} state. Waiting...: attempt: {attempt}"
-            )
+
+        if status == "ERROR":
+            raise Exception("Server entered ERROR state")
+
+        if status in WAIT_SERVER_STATES:
             time.sleep(delay)
-    print(
-        f"Server {server.name} did not reach {target_status} status after {retries} attempts."
-    )
-    return False
+            elapsed += delay
+            continue
+
+        raise Exception(f"Server in unexpected state: {status}")
+
+    raise TimeoutError("Server build timeout")
+    # """Wait for the server to reach the target status."""
+    # for attempt in range(retries):
+    #     print("before status check=====")
+    #     server = conn.compute.get_server(server.id)
+    #     print(server.status, "===> server status")
+    #     if server.status == target_status:
+    #         print(f"Server {server.name} is now {target_status}.")
+    #         return True
+    #     else:
+    #         print(
+    #             f"Server {server.name} is in {server.status} state. Waiting...: attempt: {attempt}"
+    #         )
+    #         time.sleep(delay)
+    # print(
+    #     f"Server {server.name} did not reach {target_status} status after {retries} attempts."
+    # )
+    # return False
 
 
 def get_guac_user(username, token):
@@ -704,10 +762,10 @@ def create_user(username, password, authToken, vmvalidity):
         "attributes": {
             "disabled": "",
             "expired": "",
-            "access-window-start": vmvalidity["vm_access_from_time"],
-            "access-window-end": vmvalidity["vm_access_to_time"],
-            "valid-from": vmvalidity["vm_access_from_date"],
-            "valid-until": vmvalidity["vm_access_to_date"],
+            # "access-window-start": vmvalidity["vm_access_from_time"],
+            # "access-window-end": vmvalidity["vm_access_to_time"],
+            # "valid-from": vmvalidity["vm_access_from_date"],
+            # "valid-until": vmvalidity["vm_access_to_date"],
             "timezone": "Asia/Kolkata",
             "guac-full-name": "",
             "guac-organization": "",

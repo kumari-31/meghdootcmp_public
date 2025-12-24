@@ -378,6 +378,10 @@ const Images = () => {
             >
             </h4>
               <div className="info">
+                 <p>
+                  <strong>Name:</strong>
+                  {getStatusIcon(image.name)} {image.name}
+                </p>
                 <p>
                   <strong>Status:</strong>
                   {getStatusIcon(image.status)} {image.status}

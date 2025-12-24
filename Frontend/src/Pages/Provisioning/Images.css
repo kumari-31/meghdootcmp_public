@@ -131,7 +131,7 @@
 .card {
   background: linear-gradient(135deg, #ffffff, #f5f5f5);
   width: 550px;
-  height: 200px;
+  height: 220px;
   margin: 10px;
   border-radius: 10px;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
@@ -164,14 +164,14 @@
   padding: 10px;
   text-align: left;
   width: 100%;
-  margin-left: 20px;
+  margin-left: 40px;
 }
 .card-right {
   display: flex;
   flex-direction: column;
   padding: 10px;
   text-align: left;
-  width: 100%;
+  width: 70%;
 }
 
 .image-title {

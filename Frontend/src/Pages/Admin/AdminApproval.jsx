@@ -251,16 +251,17 @@ const AdminApproval = () => {
   const rows = overview.data || [];
   const counts = {
     ...overview.status_counts,
-    failed: overview.data.filter((r) => r.creation_status === "Failed").length,
+    failed: overview.data.filter((r) => r.creation_status === "Failed"&&
+      r.admin_status !== "Rejected").length,
   };
 
   const failedRows = overview.data.filter(
-    (r) => r.creation_status === "Failed"
+    (r) => r.creation_status === "Failed" &&
+    r.admin_status !== "Rejected"
   );
   const pendingRows = overview.data.filter(
     (r) =>
-      (r.admin_status === "Pending" && r.fla_status === "Accepted") ||
-      r.creation_status === "Failed"
+      (r.admin_status === "Pending" && r.fla_status === "Accepted") 
   );
 
   const paginatedPendingRows = pendingRows.slice(
@@ -594,6 +595,7 @@ const AdminApproval = () => {
                   <StyledTableCell>Email</StyledTableCell>
                   <StyledTableCell>VM Name</StyledTableCell>
                   <StyledTableCell>Project</StyledTableCell>
+                  <StyledTableCell>designation</StyledTableCell>
                   <StyledTableCell>Status</StyledTableCell>
                 </StyledTableRow>
               </TableHead>
@@ -606,7 +608,8 @@ const AdminApproval = () => {
                       {r.vm_name.split("_").slice(1).join("_")}
                     </StyledTableCell>
                     <StyledTableCell>{r.project_name}</StyledTableCell>
-                    <StyledTableCell>{r.fla_status}</StyledTableCell>
+                    <StyledTableCell>{r.designation}</StyledTableCell>
+                    <StyledTableCell>{r.admin_status}</StyledTableCell>
                   </StyledTableRow>
                 ))}
               </TableBody>

@@ -2865,7 +2865,6 @@ class InstanceDetailsAPIView(APIView):
             }
             # Initialize the OpenStack connection
             conn = get_openstack_connection()
-            # print("conn---->",conn)
             # Fetch all server (instance) details
             servers = conn.compute.servers(details=True)
             instances = []
@@ -2885,12 +2884,20 @@ class InstanceDetailsAPIView(APIView):
                 instance_internal_name = (
                     db_instance.instance_name if db_instance else "Unknown"
                 )
-                
-                # Get flavor details
-                flavor_id = server.flavor["id"] if server.flavor else None
-                # print("flavor_id",flavor_id)
-                flavor = conn.compute.find_flavor(flavor_id) if flavor_id else None
-                # print("flavor",flavor)
+
+                # ---------- FLAVOR (SAFE) ----------
+                flavor = None
+                flavor_id = (
+                    server.flavor.get("id")
+                    if isinstance(server.flavor, dict)
+                    else None
+                )
+                if flavor_id:
+                    try:
+                        flavor = conn.compute.find_flavor(flavor_id)
+                    except Exception:
+                        flavor = None
+
                 # Get image details
 
                 image_name = "N/A"
@@ -2907,61 +2914,111 @@ class InstanceDetailsAPIView(APIView):
                         if image:
                             image_name = image.name or "N/A"
                     except Exception:
-                        image_name = "N/A"
+                        pass
 
                 # Case 2: Instance booted from volume
                 # --- Case 2: Booted from volume ---
                 if image_name == "N/A":
-                    attached_vols = getattr(server, "attached_volumes", [])
-
-                    if attached_vols:
+                    attached_vols = getattr(server, "attached_volumes", None) or []
+                    if isinstance(attached_vols, list) and attached_vols:
                         volume_id = attached_vols[0].get("id")
-
                         if volume_id:
-                            volume = conn.block_storage.get_volume(volume_id)
-
-                            if volume:
-                                meta = (
-                                    getattr(volume, "volume_image_metadata", {}) or {}
+                            try:
+                                volume = conn.block_storage.get_volume(volume_id)
+                                meta = getattr(
+                                    volume, "volume_image_metadata", {}
+                                ) or {}
+                                image_name = (
+                                    meta.get("image_name")
+                                    or f"Volume ({volume_id})"
                                 )
+                            except Exception:
+                                image_name = f"Volume ({volume_id})"
+                # if image_name == "N/A":
+                #     attached_vols = getattr(server, "attached_volumes", None) or []
 
-                                if "image_name" in meta:
-                                    image_name = meta["image_name"]
+                #     if attached_vols:
+                #         volume_id = attached_vols[0].get("id")
 
-                                elif "image_id" in meta:
-                                    try:
-                                        img = conn.compute.get_image(meta["image_id"])
-                                        image_name = img.name or "N/A"
-                                    except:
-                                        image_name = f"Volume ({volume_id})"
-                                else:
-                                    image_name = f"Volume ({volume_id})"
+                #         if volume_id:
+                #             volume = conn.block_storage.get_volume(volume_id)
+
+                #             if volume:
+                #                 meta = (
+                #                     getattr(volume, "volume_image_metadata", {}) or {}
+                #                 )
+
+                #                 if "image_name" in meta:
+                #                     image_name = meta["image_name"]
+
+                #                 elif "image_id" in meta:
+                #                     try:
+                #                         img = conn.compute.get_image(meta["image_id"])
+                #                         image_name = img.name or "N/A"
+                #                     except:
+                #                         image_name = f"Volume ({volume_id})"
+                #                 else:
+                #                     image_name = f"Volume ({volume_id})"
 
                 # print("image_name",image_name)
                 # Get security groups
-                security_groups = (
-                    [sg["name"] for sg in server.security_groups]
-                    if hasattr(server, "security_groups")
-                    else []
-                )
+                security_groups = []
+                sgs = getattr(server, "security_groups", None)
+                if isinstance(sgs, list):
+                    security_groups = [
+                        sg.get("name")
+                        for sg in sgs
+                        if isinstance(sg, dict)
+                    ]
+                # security_groups = (
+                #     [sg["name"] for sg in server.security_groups]
+                #     if hasattr(server, "security_groups")
+                #     else []
+                # )
 
                 # Get IP addresses
                 ip_addresses = {}
-                if server.addresses:
-                    for network, address_list in server.addresses.items():
-                        ip_addresses[network] = [addr["addr"] for addr in address_list]
+                addresses = getattr(server, "addresses", {}) or {}
+                if isinstance(addresses, dict):
+                    for network, addr_list in addresses.items():
+                        if isinstance(addr_list, list):
+                            ip_addresses[network] = [
+                                addr.get("addr")
+                                for addr in addr_list
+                                if isinstance(addr, dict) and addr.get("addr")
+                            ]
+
+                            # ---------- POWER STATE ----------
                 power_state_num = getattr(server, "power_state", None)
                 power_state_str = POWER_STATE_MAP.get(
-                    power_state_num, str(power_state_num)
+                    power_state_num, "Unknown"
                 )
+
+                # ---------- VOLUMES (SAFE) ----------
+                volumes = []
+                attached_vols = getattr(server, "attached_volumes", None)
+                if isinstance(attached_vols, list):
+                    volumes = [
+                        v.get("id")
+                        for v in attached_vols
+                        if isinstance(v, dict)
+                    ]
+                # ip_addresses = {}
+                # if server.addresses:
+                #     for network, address_list in server.addresses.items():
+                #         ip_addresses[network] = [addr["addr"] for addr in address_list]
+                # power_state_num = getattr(server, "power_state", None)
+                # power_state_str = POWER_STATE_MAP.get(
+                #     power_state_num, str(power_state_num)
+                # )
               
                 # Construct instance details
                 instances.append(
                     {
-                        "Instance ID": server.id if server.id else "Unknown",
-                        "VM Name": server.name if server.name else "Unknown",
+                        "Instance ID": server.id or "Unknown",
+                        "VM Name": server.name or "Unknown",
                         "Instance Name": instance_internal_name,
-                        "Image Name": image_name,  # Now handles cases where booted from volume
+                        "Image Name": image_name,
                         "Flavor Name": flavor.name if flavor else "-",
                         "RAM": f"{flavor.ram} MB" if flavor else "-",
                         "VCPUs": flavor.vcpus if flavor else "-",
@@ -2969,22 +3026,23 @@ class InstanceDetailsAPIView(APIView):
                         "IP Addresses": ip_addresses,
                         "status": server.status,
                         "Age": server.created_at,
-                        "power_state": getattr(server, "power_state", None),
+                        "power_state": power_state_num,
                         "power_state_str": power_state_str,
                         "Security Groups": security_groups,
-                        "Volumes Attached": (
-                            [vol["id"] for vol in server.attached_volumes]
-                            if hasattr(server, "attached_volumes")
-                            else []
-                        ),
+                        "Volumes Attached": volumes,
                     }
                 )
                 print(instances)
             
             return Response(instances, status=200)
         except Exception as e:
-            return Response({"error": str(e)}, status=500)
-
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": str(e)},
+                status=500
+            )
+        
     def calculate_age(self, created_at):
         created_time = datetime.strptime(
             created_at, "%Y-%m-%dT%H:%M:%SZ"
@@ -13199,6 +13257,8 @@ class OpenStackRequestsByDateAPIView(APIView):
             "admin_status",
             "fla_status",
             "request_timestamp",
+            "creation_status",
+            "designation",
         )
         print("Table Data:", list(table_data))
         return Response({
