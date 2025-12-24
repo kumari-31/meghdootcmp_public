@@ -46,45 +46,86 @@ import isSameOrBefore from "dayjs/plugin/isSameOrBefore";
 
 dayjs.extend(isSameOrBefore);
 /* ------------------ Small helpers & styles ------------------ */
-
-const getLast7DaysPendingTrend = (requests = []) => {
+const getLast7DaysDailySentRequests = (requests = []) => {
   const result = [];
-  const today = new Date();
+  const today = dayjs().startOf("day");
 
   for (let i = 6; i >= 0; i--) {
-    const day = new Date(today);
-    day.setDate(today.getDate() - i);
-    day.setHours(23, 59, 59, 999);
+    const dayStart = today.subtract(i, "day").startOf("day");
+    const dayEnd = dayStart.endOf("day");
 
-    let count = 0;
+    const count = requests.filter((req) => {
+      if (!req.request_timestamp) return false;
 
-    requests.forEach((req) => {
-      if (!req.request_timestamp) return;
-
-      const created = new Date(req.request_timestamp);
-      const approved = req.admin_approved_timestamp
-        ? new Date(req.admin_approved_timestamp)
+      const createdAt = dayjs(req.request_timestamp);
+      const approvedAt = req.approved_at
+        ? dayjs(req.approved_at)
         : null;
 
-      const existed = created <= day;
-      const stillPending = !approved || approved > day;
-
-      if (existed && stillPending) {
-        count++;
+      // ✅ created on this calendar day
+      if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) {
+        return false;
       }
-    });
+
+      // ✅ exclude ONLY if approved before this day
+      // same-day approval is allowed
+      if (approvedAt && approvedAt.isBefore(dayStart)) {
+        return false;
+      }
+
+      return true;
+    }).length;
 
     result.push({
-      date: day.toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-      }),
+      date: dayStart.format("DD MMM"),
       value: count,
     });
   }
 
   return result;
 };
+
+
+
+
+// const getLast7DaysPendingTrend = (requests = []) => {
+//   const result = [];
+//   const today = new Date();
+
+//   for (let i = 6; i >= 0; i--) {
+//     const day = new Date(today);
+//     day.setDate(today.getDate() - i);
+//     day.setHours(23, 59, 59, 999);
+
+//     let count = 0;
+
+//     requests.forEach((req) => {
+//       if (!req.request_timestamp) return;
+
+//       const created = new Date(req.request_timestamp);
+//       const approved = req.admin_approved_timestamp
+//         ? new Date(req.admin_approved_timestamp)
+//         : null;
+
+//       const existed = created <= day;
+//       const stillPending = !approved || approved > day;
+
+//       if (existed && stillPending) {
+//         count++;
+//       }
+//     });
+
+//     result.push({
+//       date: day.toLocaleDateString("en-IN", {
+//         day: "2-digit",
+//         month: "short",
+//       }),
+//       value: count,
+//     });
+//   }
+
+//   return result;
+// };
 
 
 const getLast7DaysFinalStatusTrend = (data = [], status) => {
@@ -645,11 +686,32 @@ const handleDateChange = (newValue) => {
   // Last 7 days snapshot trend for all statuses
   // OpenStack
 // Pending (dynamic, day-wise)
-const openstackTrendPending =
-  useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
+// const openstackTrendPending =
+//   useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
 
-const k8sTrendPending =
-  useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
+
+const openstackTrendPending =  useMemo(
+  () => getLast7DaysDailySentRequests(openstackReq.raw),
+  [openstackReq.raw]
+);
+
+const k8sTrendPending = useMemo(
+  () => getLast7DaysDailySentRequests(k8sReq.raw),
+  [k8sReq.raw]
+);
+
+// const openstackTrendPending = useMemo(
+//   () => getLast7DaysDailyPendingSnapshot(openstackReq.raw),
+//   [openstackReq.raw]
+// );
+
+// const k8sTrendPending = useMemo(
+//   () => getLast7DaysDailyPendingSnapshot(k8sReq.raw),
+//   [k8sReq.raw]
+// );
+
+// const k8sTrendPending =
+//   useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
 
 const openstackTrendAccepted =
   useMemo(() => getLast7DaysFinalStatusTrend(openstackReq.raw, "Accepted"), [openstackReq.raw]);
@@ -679,11 +741,11 @@ const k8sTrendRejected =
   
 
 
-  const openstackPendingTrend =
-  getLast7DaysPendingTrend(openstackReq.raw);
+  // const openstackPendingTrend =
+  // getLast7DaysPendingTrend(openstackReq.raw);
 
-const k8sPendingTrend =
-  getLast7DaysPendingTrend(k8sReq.raw);
+// const k8sPendingTrend =
+//   getLast7DaysPendingTrend(k8sReq.raw);
 
 
   const getDailyTrend = (data = [], status) => {
