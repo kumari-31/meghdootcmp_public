@@ -14,9 +14,16 @@ class CdVerifierAndNonce(models.Model):
 
 
 # OIDC Integration
-
+from django.contrib.auth.models import User
 
 class Employee(models.Model):
+    user = models.OneToOneField(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employee_profile"
+    )
     name = models.CharField(max_length=100)
     employee_id = models.CharField(max_length=10, unique=True)
     email = models.EmailField(unique=True)
@@ -25,8 +32,9 @@ class Employee(models.Model):
     fla_employee_id = models.CharField(max_length=10)
     fla_email = models.EmailField(null=True, blank=True)
     phone_number = models.CharField(blank=True, null=True, max_length=15)
-    password = models.CharField(blank=True, null=True, max_length=255)
-    confirm_password = models.CharField(blank=True, null=True, max_length=255)
+    designation = models.CharField(max_length=100, blank=True, null=True)
+    # password = models.CharField(blank=True, null=True, max_length=255)
+    # confirm_password = models.CharField(blank=True, null=True, max_length=255)
 
     def __str__(self):
         return self.employee_id
@@ -51,6 +59,8 @@ class VmRequest(models.Model):
     vdi_required = models.BooleanField(default=False)
     image = models.CharField(max_length=255, blank=True, null=True)
     flavor = models.CharField(max_length=255, blank=True, null=True)
+    network_id = models.CharField(max_length=100, null=True, blank=True)
+    network_name = models.CharField(max_length=255, null=True, blank=True)
     login_enable_date = models.CharField(blank=True, null=True, max_length=255)
     login_disable_date = models.CharField(blank=True, null=True, max_length=255)
     login_enable_time = models.CharField(blank=True, null=True, max_length=255)
@@ -71,6 +81,9 @@ class VmRequest(models.Model):
     delete_request_status = models.CharField(max_length=20, default="None")
     delete_request_reason = models.TextField(null=True, blank=True)
 
+    def __str__(self):
+        return self.vm_name
+    
     # Internet Access Registration Form fields
     # internet_access_required = models.BooleanField(default=False)
     # internet_private_ip = models.CharField(
@@ -94,8 +107,7 @@ class VmRequest(models.Model):
     # )
     # public_purpose = models.TextField(blank=True, null=True, verbose_name="Purpose of Public IP Request")
 
-    def __str__(self):
-        return self.vm_name
+    
 
 
 class VMInfo(models.Model):

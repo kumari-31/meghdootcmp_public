@@ -201,7 +201,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class EmployeeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
-        fields = ["phone_number", "password", "confirm_password"]
+        fields = ["phone_number", "designation"]
 
     def validate(self, data):
         # Check if password and confirm_password match

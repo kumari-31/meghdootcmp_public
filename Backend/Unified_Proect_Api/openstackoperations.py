@@ -208,6 +208,7 @@ def create_bootable_volume(
     vm_name,
     flavor_id,
     vm_req_id,
+    network_id,
 ):
     try:
         print("volume type in create boot volume", volume_type)

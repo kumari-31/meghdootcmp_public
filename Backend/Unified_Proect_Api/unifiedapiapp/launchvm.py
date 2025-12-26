@@ -237,8 +237,16 @@ def vm_approve_request(id):
         print("VMInfo created:", created)
         print("VMInfo object:", vm_info)
 
-        network_name = "demo_net"
-        print("network_name", network_name)
+        # Fetch selected network from request
+        network_id = vm_req.network_id
+        network_name = vm_req.network_name
+        if not network_id:
+            return {
+                "status": False,
+                "message": "No network selected for this VM request"
+            }
+
+        print("Using network →", network_name, network_id)
 
         # Establish the OpenStack connection and get flavor and image IDs
         flv_id = conn.compute.find_flavor(vm_req.flavor)
@@ -369,6 +377,7 @@ def vm_approve_request(id):
                                 current_vm_name,
                                 flavor_id,
                                 id,
+                                network_id,
                             )
 
                     # Store values into vm_detail
@@ -507,14 +516,14 @@ def vm_approve_request(id):
 
                 # Create the VM
                 server = create_vm(
-                    new_conn, current_vm_name, flavor_id, image_id, network_name
+                    new_conn, current_vm_name, flavor_id, image_id, network_id
                 )
                 print(server, "VM created for name: ", current_vm_name)
 
                 # Store the server ID in the vm_detail dictionary
                 vm_req = VmRequest.objects.get(id=int(id))
                 if server["status"]:
-                    vm_detail["vm_id"] = server.id
+                    vm_detail["vm_id"] = server["server_id"]
                     vm_req.creation_status = "Created"
                     vm_req.save()
                 else:
@@ -765,14 +774,15 @@ def vm_reject_request(request, id):
     return redirect("vm_response_display")
 
 
-def create_vm(conn, name, flavor_id, image_id, network_name):
+def create_vm(conn, name, flavor_id, image_id, network_id):
     try:
-        # print("====network id",network_id)
+        print("====network id",network_id)
         print("====image id", image_id)
         print("====flavor id", flavor_id)
 
-        network = conn.network.find_network(network_name)
-        network_id = network.id
+        network = conn.network.find_network(network_id)
+        if not network:
+            raise Exception(f"Network not found: {network_id}")
 
         server = conn.compute.create_server(
             name=name,
@@ -780,42 +790,31 @@ def create_vm(conn, name, flavor_id, image_id, network_name):
             image_id=image_id,
             networks=[{"uuid": network_id}],
         )
-        # Check the initial status of the server
-        # if server.status == 'ERROR':
-        #     print("VM creation resulted in an error.")
 
-        # return server
-
-        print(f"{server.name} creation initiated.")
-
-        # Wait until the server is fully created
-        server_id = server.id
-
-        if server.status == "ERROR":
-            print("VM creation resulted in an error.")
-
-        return {"server_id": server_id, "status": True}
+        print(f"{server.name} creation initiated (ID: {server.id})")
+        return {
+            "status": True,
+            "server_id": server.id
+        }
     except Exception as e:
-        print("An error occurred  create vm in launchvm:", str(e))
-        return {"server_id": None, "status": False, "error": str(e)}
+        print("❌ Error in create_vm:", str(e))
+        return {
+            "status": False,
+            "server_id": None,
+            "error": str(e)
+        }
 
 
-def create_multiple_vm(conn, base_name, flavor_id, image_id, network_name, count=1):
+def create_multiple_vm(conn, base_name, flavor_id, image_id, network_id, count=1):
     try:
-        print("====image id", image_id)
-        print("====flavor id", flavor_id)
-
-        network = conn.network.find_network(network_name)
+        network = conn.network.find_network(network_id)
         if not network:
-            print(f"Network '{network_name}' not found.")
-            return []
+            raise Exception(f"Network not found: {network_id}")
 
-        network_id = network.id
         vm_ids = []
 
         for i in range(count):
             vm_name = f"{base_name}_{i+1}" if count > 1 else base_name
-            print(f"Provisioning VM: {vm_name}")
 
             server = conn.compute.create_server(
                 name=vm_name,
@@ -824,17 +823,11 @@ def create_multiple_vm(conn, base_name, flavor_id, image_id, network_name, count
                 networks=[{"uuid": network_id}],
             )
 
-            server_id = server.id
-
-            if server.status == "ERROR":
-                print(f"VM creation failed for {vm_name}.")
-                continue
-
-            print(f"{vm_name} creation initiated. ID: {server_id}")
-            vm_ids.append(server_id)
+            vm_ids.append(server.id)
 
         return vm_ids
 
     except Exception as e:
-        print("An error occurred during VM creation:", str(e))
+        print("VM creation error:", str(e))
         return []
+

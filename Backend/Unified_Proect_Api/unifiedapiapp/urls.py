@@ -12,11 +12,11 @@ urlpatterns = [
     path("api/signup", views.signup, name="signup"),
     path("api/register", views.RegistrationListCreateAPIView.as_view(), name="register"),
     path("api/registration/", RegistrationListCreate.as_view(), name="registration-list-create"),
-    path("employee/register/<str:employee_id>/", EmployeeRegisterAPIView.as_view(), name="employee-register"),
-    path("employee/newregister/<str:employee_id>/", NewEmployeeRegisterAPIView.as_view(), name="employee-register"),
-    path("employee/register-pending/", PendingRegistrationRequestsAPIView.as_view(), name="pending-employee-register"),
-    path("employee/register-approve/", ApproveRegistrationRequestAPIView.as_view(), name="approve-employee-register"),
-    path("employee/fla-approved-pending-requests/", AcceptedByFLARegistrationRequestsAPIView.as_view(), name="fla-approved-pending-requests"),
+    path("api/employee/register/<str:employee_id>/", EmployeeRegisterAPIView.as_view(), name="employee-register"),
+    path("api/employee/newregister/<str:employee_id>/", NewEmployeeRegisterAPIView.as_view(), name="employee-register"),
+    path("api/employee/register-pending/", PendingRegistrationRequestsAPIView.as_view(), name="pending-employee-register"),
+    path("api/employee/register-approve/", ApproveRegistrationRequestAPIView.as_view(), name="approve-employee-register"),
+    path("api/employee/fla-approved-pending-requests/", AcceptedByFLARegistrationRequestsAPIView.as_view(), name="fla-approved-pending-requests"),
     path("api/all-registration-requests/", AllRegistrationRequestsAPIView.as_view(), name="all-registration-requests"),
 
     # -------------------------------

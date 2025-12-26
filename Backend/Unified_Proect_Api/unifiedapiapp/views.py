@@ -2167,35 +2167,6 @@ def create_user_with_details(first_name, email, password):
         return None
 
 
-# class EmployeeRegisterAPIView(APIView):
-#     permission_classes = []
-#     def post(self, request, employee_id):
-#         try:
-#             password = request.data['password']
-#             # Get the employee by employee_id
-#             employee = Employee.objects.get(employee_id=employee_id)
-#             create_user_with_details(employee.name,employee.email,password)
-#         except Employee.DoesNotExist:
-#             return Response(
-#                 {"error": f"Employee with ID {employee_id} not found."},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-
-#         # Serialize and validate the data
-#         serializer = EmployeeUpdateSerializer(employee, data=request.data, partial=True)
-#         if serializer.is_valid():
-#             # Save the updated employee instance
-#             serializer.save()
-#             return Response(
-#                 {
-#                     "message": f"Employee Registered successfully!",
-#                     "employee_id": employee.employee_id,
-#                     "employee_name": employee.name,
-#                     # "data": serializer.data,
-#                 },
-#                 status=status.HTTP_200_OK
-#             )
-#         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class EmployeeRegisterAPIView(APIView):
@@ -2207,10 +2178,30 @@ class EmployeeRegisterAPIView(APIView):
 
             # Get the employee by employee_id
             employee = Employee.objects.get(employee_id=employee_id)
+            if employee.user:
+                return Response(
+                    {"error": "Employee is already registered."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Call the function to create the user if required
+            # ✅ Create Django user ONLY ONCE
             if password:
-                create_user_with_details(employee.name, employee.email, password)
+                user, created = User.objects.get_or_create(
+                    username=employee.email,
+                    defaults={
+                        "email": employee.email,
+                        "first_name": employee.name,
+                    },
+                )
+
+                if created:
+                    user.set_password(password)  # 🔐 HASHED
+                    user.save()
+
+                # Link employee to user
+                employee.user = user
+                employee.save()
 
         except Employee.DoesNotExist:
             return Response(
@@ -2218,8 +2209,13 @@ class EmployeeRegisterAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+         # 🚫 REMOVE password from serializer input
+        clean_data = request.data.copy()
+        clean_data.pop("password", None)
+        clean_data.pop("confirm_password", None)
+
         # Serialize and validate the data
-        serializer = EmployeeUpdateSerializer(employee, data=request.data, partial=True)
+        serializer = EmployeeUpdateSerializer(employee, data=clean_data, partial=True)
         if serializer.is_valid():
             new_fields = {}
             updated_fields = {}
@@ -4645,10 +4641,6 @@ class CreateNetworkAPIViewUpdated(APIView):
 
 
 class ListNetworksAPIView(APIView):
-    """
-    API to list networks in OpenStack with full details.
-    """
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -4661,77 +4653,80 @@ class ListNetworksAPIView(APIView):
             )
 
         try:
-            # Optional name filter
-            network_name = request.query_params.get("name", None)
-
-            # List networks
-            if network_name:
-                networks = list(conn.network.networks(name=network_name))
-            else:
-                networks = list(conn.network.networks())
+            network_name = request.query_params.get("name")
+            networks = (
+                list(conn.network.networks(name=network_name))
+                if network_name
+                else list(conn.network.networks())
+            )
 
             if not networks:
                 return Response(
-                    {"error": "No networks found"}, status=status.HTTP_404_NOT_FOUND
+                    {"error": "No networks found"},
+                    status=status.HTTP_404_NOT_FOUND
                 )
 
             network_data = []
 
             for network in networks:
-                # Get subnets info
+                # ---------- SUBNETS ----------
                 subnets = []
                 for subnet_id in network.subnet_ids:
                     try:
                         subnet = conn.network.get_subnet(subnet_id)
-                        subnets.append(subnet.name)
+                        subnets.append({
+                            "name": subnet.name,
+                            "cidr": subnet.cidr,
+                            "gateway_ip": subnet.gateway_ip,
+                            "ip_version": subnet.ip_version
+                        })
                     except Exception:
-                        subnets.append(subnet_id)  # fallback to ID
+                        subnets.append({"id": subnet_id})
 
-                # Get DHCP agents associated
+                # ---------- DHCP AGENTS ----------
+                dhcp_agents = []
                 try:
-                    dhcp_agents = [
-                        agent.name
-                        for agent in conn.network.dhcp_agents(
-                            hosting_network=network.id
-                        )
-                    ]
+                    agents = conn.network.dhcp_agents(hosting_network=network.id)
+                    dhcp_agents = [agent.name for agent in agents]
                 except Exception:
-                    dhcp_agents = []
+                    pass
 
-                # Get availability zones (OpenStack networks usually belong to regions)
+                # ---------- AVAILABILITY ZONES ----------
                 try:
-                    azs = [az["name"] for az in conn.network.availability_zones()]
+                    azs = list(
+                        set(az["name"] for az in conn.network.availability_zones())
+                    )
                 except Exception:
                     azs = []
 
-                # Get project info
+                # ---------- PROJECT ----------
                 try:
                     project = conn.identity.get_project(network.project_id)
                     project_name = project.name
                 except Exception:
                     project_name = network.project_id
 
-                network_data.append(
-                    {
-                        "project": project_name,
-                        "network_name": network.name,
-                        "subnets": subnets,
-                        "dhcp_agents": dhcp_agents,
-                        "shared": network.is_shared,
-                        "external": network.is_router_external,
-                        "status": network.status,
-                        "admin_state_up": network.is_admin_state_up,
-                        "availability_zones": azs,
-                        "id": network.id,  # Include ID for actions like edit/delete
-                    }
-                )
+                network_data.append({
+                    "project": project_name,
+                    "network_name": network.name,
+                    "subnets": subnets,
+                    "dhcp_agents": dhcp_agents,
+                    "shared": network.is_shared,
+                    "external": network.is_router_external,
+                    "status": network.status,
+                    "admin_state_up": network.is_admin_state_up,
+                    "availability_zones": azs,
+                    "id": network.id,
+                })
 
             return Response(network_data, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
 
 
 class DeleteNetworkAPIView(APIView):
@@ -5676,6 +5671,8 @@ class VmRequestAPIView(APIView):
                 "designation",
                 "image",
                 "flavor",
+                "network_id",
+                "network_name",
                 "login_enable_date",
                 "login_disable_date",
                 "login_enable_time",

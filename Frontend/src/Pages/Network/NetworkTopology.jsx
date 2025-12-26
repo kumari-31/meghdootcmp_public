@@ -5,262 +5,462 @@ import ReactFlow, {
   MiniMap,
   useNodesState,
   useEdgesState,
-  MarkerType,
   Handle,
-  Position
+  Position,
+  NodeToolbar,
 } from "reactflow";
-import "reactflow/dist/style.css"; // IMPORTANT: Import styles
+import "reactflow/dist/style.css"; 
 import dagre from "dagre";
 import {
   Box,
   Typography,
   CircularProgress,
   Paper,
-  Tooltip,
-  IconButton
+  Tabs,
+  Tab,
+  Button,
+  Stack,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+  Divider,
+  IconButton,
+  Modal,
+  TextField,
+  FormControl,
+  FormControlLabel,
+  Checkbox,
+  InputLabel,
+  Select,
+  MenuItem
 } from "@mui/material";
+
+// Icons
 import RouterIcon from "@mui/icons-material/Router";
 import StorageIcon from "@mui/icons-material/Storage";
 import CloudIcon from "@mui/icons-material/Cloud";
-import apiClient from "../../Axios"; // Your axios instance
+import AddIcon from "@mui/icons-material/Add";
+import TimelineIcon from '@mui/icons-material/Timeline'; 
+import AccountTreeIcon from '@mui/icons-material/AccountTree'; 
+import CloseIcon from '@mui/icons-material/Close';
+import RiBallPenLine from "@mui/icons-material/Edit"; // Assuming this mapped to Edit or similar
 
-// --- 1. CONFIGURATION ---
+import apiClient from "../../Axios"; 
+
+// --- 1. CONFIGURATION & STYLES ---
 const nodeWidth = 172;
 const nodeHeight = 80;
 
-// --- 2. CUSTOM NODE COMPONENTS ---
-// We create custom nodes to use your MUI Icons inside the graph
-const CustomNetworkNode = ({ data }) => (
+const modalStyle = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  transform: 'translate(-50%, -50%)',
+  width: 500,
+  bgcolor: 'background.paper',
+  boxShadow: 24,
+  p: 4,
+  borderRadius: 2,
+};
+
+const styles = `
+  @keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(46, 125, 50, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+  }
+  @keyframes pulse-blue {
+    0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(25, 118, 210, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
+  }
+`;
+
+// --- 2. THE POPUP CARD (Hover/Click) ---
+const NodeInfoCard = ({ data, onClose, isLocked }) => (
   <Paper
-    elevation={3}
-    sx={{
-      p: 1,
-      minWidth: 150,
-      textAlign: "center",
-      border: "2px solid #1976d2",
-      borderRadius: 2,
-      bgcolor: "#e3f2fd"
-    }}
+    elevation={6}
+    sx={{ width: 280, p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.98)', border: '1px solid #ccc', pointerEvents: 'all' }}
   >
-    <Handle type="target" position={Position.Top} style={{ background: '#555' }} />
-    <CloudIcon color="primary" />
-    <Typography variant="subtitle2" fontWeight="bold">
-      {data.label}
-    </Typography>
-    <Handle type="source" position={Position.Bottom} style={{ background: '#555' }} />
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        {data.type === 'router' ? <RouterIcon color="warning"/> : data.type === 'instance' ? <StorageIcon color="secondary"/> : <CloudIcon color="primary"/>}
+        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ maxWidth: 180 }}>{data.label}</Typography>
+      </Box>
+      {isLocked && <IconButton size="small" onClick={(e) => { e.stopPropagation(); onClose(); }}><CloseIcon fontSize="small" /></IconButton>}
+    </Box>
+    <Divider sx={{ mb: 1 }} />
+    <List dense disablePadding>
+        {data.details && Object.entries(data.details).slice(0, 4).map(([k, v]) => (
+           (typeof v !== 'object' && v !== null) && (
+            <ListItem key={k} disablePadding sx={{ py: 0.5 }}>
+              <ListItemText primary={k} secondary={v} primaryTypographyProps={{ fontSize: '0.70rem', fontWeight: 'bold', color: '#555' }} secondaryTypographyProps={{ fontSize: '0.75rem', noWrap: true }} />
+            </ListItem>
+           )
+        ))}
+    </List>
+    <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
+       <Chip size="small" label={data.details?.status || 'Active'} color={data.details?.status === 'ERROR' ? 'error' : 'success'} variant="outlined" />
+    </Box>
   </Paper>
 );
 
-const getStatusColor = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'active': return '#2e7d32'; // Green
-    case 'error': return '#d32f2f';  // Red
-    default: return '#757575';       // Gray
-  }
+// --- 3. CUSTOM NODE COMPONENTS ---
+const CustomNetworkNode = ({ data, id, selected }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  return (
+    <Box onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)} sx={{ position: 'relative' }}>
+      <style>{styles}</style>
+      <NodeToolbar isVisible={selected || isHovered} position={Position.Right} offset={20}>
+        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} />
+      </NodeToolbar>
+      <Paper elevation={isHovered ? 6 : 3} sx={{ p: 1, minWidth: 100, textAlign: "center", border: selected ? "3px solid #000" : "3px solid #1976d2", borderRadius: "50%", width: 100, height: 100, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: "#e3f2fd", transition: 'all 0.3s ease', animation: 'pulse-blue 2s infinite', transform: isHovered ? 'scale(1.1)' : 'scale(1)', cursor: 'pointer' }}>
+        <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
+        <CloudIcon color="primary" sx={{ fontSize: 40 }} />
+        <Typography variant="caption" fontWeight="bold" sx={{ mt: 0.5 }}>{data.label}</Typography>
+        <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+      </Paper>
+    </Box>
+  );
 };
 
-const CustomDeviceNode = ({ data }) => (
-  <Tooltip title={data.details || ""} arrow>
-    <Paper
-      elevation={2}
-      sx={{
-        p: 1,
-        minWidth: 140,
-        textAlign: "center",
-        borderRadius: 4,
-        border: `2px solid ${getStatusColor(data.details.status)}`,
-        bgcolor: "#fff"
-      }}
-    >
-      <Handle type="target" position={Position.Top} />
-      {data.type === "router" ? (
-        <RouterIcon sx={{ color: "#ed6c02" }} />
-      ) : (
-        <StorageIcon sx={{ color: "#9c27b0" }} />
-      )}
-      <Typography variant="body2" noWrap>
-        {data.label}
-      </Typography>
-      <Typography variant="caption" display="block" color="text.secondary">
-        {data.subLabel}
-      </Typography>
-      <Handle type="source" position={Position.Bottom} />
-    </Paper>
-  </Tooltip>
-);
-
-// Define node types object
-const nodeTypes = {
-  networkNode: CustomNetworkNode,
-  deviceNode: CustomDeviceNode,
+const CustomDeviceNode = ({ data, id, selected }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const isRouter = data.type === 'router';
+  return (
+    <Box onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      <NodeToolbar isVisible={selected || isHovered} position={Position.Right} offset={20}>
+        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} />
+      </NodeToolbar>
+      <Paper elevation={isHovered ? 8 : 2} sx={{ p: 1, minWidth: 140, textAlign: "center", borderRadius: 3, border: selected ? "2px solid #000" : (isRouter ? "2px solid #ed6c02" : "2px solid #9c27b0"), bgcolor: "#fff", transition: 'all 0.3s ease', cursor: 'pointer', transform: isHovered ? 'translateY(-5px)' : 'translateY(0)' }}>
+        <Handle type="target" position={Position.Top} />
+        {isRouter ? <RouterIcon sx={{ color: "#ed6c02", fontSize: 30 }} /> : <StorageIcon sx={{ color: "#9c27b0", fontSize: 30 }} />}
+        <Typography variant="body2" fontWeight="bold" noWrap sx={{ mt: 0.5 }}>{data.label}</Typography>
+        <Handle type="source" position={Position.Bottom} />
+      </Paper>
+    </Box>
+  );
 };
 
-// --- 3. LAYOUT ALGORITHM (DAGRE) ---
-const getLayoutedElements = (nodes, edges, direction = "TB") => {
+const nodeTypes = { networkNode: CustomNetworkNode, deviceNode: CustomDeviceNode };
+
+// --- 4. LAYOUT LOGIC ---
+const getTreeLayout = (nodes, edges) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-
-  dagreGraph.setGraph({ rankdir: direction });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
-  });
-
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
-
+  dagreGraph.setGraph({ rankdir: "TB", ranksep: 150, nodesep: 100 });
+  nodes.forEach((node) => dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight }));
+  edges.forEach((edge) => dagreGraph.setEdge(edge.source, edge.target));
   dagre.layout(dagreGraph);
-
-  nodes.forEach((node) => {
+  const layoutNodes = nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
-    node.position = {
-      x: nodeWithPosition.x - nodeWidth / 2,
-      y: nodeWithPosition.y - nodeHeight / 2,
-    };
+    return { ...node, targetPosition: 'top', sourcePosition: 'bottom', position: { x: nodeWithPosition.x - nodeWidth / 2, y: nodeWithPosition.y - nodeHeight / 2 } };
   });
-
-  return { nodes, edges };
+  return { nodes: layoutNodes, edges: edges.map(e => ({ ...e, type: 'smoothstep', animated: true })) };
 };
+
+const getGraphLayout = (nodes, edges) => {
+  const networks = nodes.filter(n => n.type === 'networkNode');
+  const devices = nodes.filter(n => n.type === 'deviceNode');
+  const updatedNodes = [];
+  const networkSizes = networks.map(net => {
+    const connectedEdges = edges.filter(e => e.source === net.id);
+    const connectedDeviceIds = connectedEdges.map(e => e.target);
+    const myDevices = devices.filter(d => connectedDeviceIds.includes(d.id));
+    return { ...net, clusterRadius: Math.max(180, myDevices.length * 50), devices: myDevices };
+  });
+  const totalCircumference = networkSizes.reduce((acc, item) => acc + (item.clusterRadius * 2.5), 0);
+  const globalRadius = Math.max(300, totalCircumference / (2 * Math.PI));
+
+  networkSizes.forEach((netItem, index) => {
+    const angle = (index / networkSizes.length) * 2 * Math.PI;
+    const netX = Math.cos(angle) * globalRadius;
+    const netY = Math.sin(angle) * globalRadius;
+    updatedNodes.push({ id: netItem.id, type: netItem.type, data: netItem.data, position: { x: netX, y: netY }, sourcePosition: Position.Right, targetPosition: Position.Left });
+    netItem.devices.forEach((dev, dIndex) => {
+      const dAngle = (dIndex / netItem.devices.length) * 2 * Math.PI;
+      if (!updatedNodes.find(n => n.id === dev.id)) {
+        updatedNodes.push({ ...dev, position: { x: netX + Math.cos(dAngle) * netItem.clusterRadius, y: netY + Math.sin(dAngle) * netItem.clusterRadius }, sourcePosition: Position.Top, targetPosition: Position.Bottom });
+      }
+    });
+  });
+  const placedIds = new Set(updatedNodes.map(n => n.id));
+  let orphanCount = 0;
+  devices.forEach(d => { if (!placedIds.has(d.id)) { updatedNodes.push({ ...d, position: { x: (orphanCount * 160) - 300, y: 0 }, sourcePosition: Position.Top, targetPosition: Position.Bottom }); orphanCount++; } });
+  return { nodes: updatedNodes, edges: edges.map(e => ({ ...e, type: 'default', animated: true })) };
+};
+
+// --- 5. MAIN COMPONENT ---
 
 export default function NetworkTopology() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tabValue, setTabValue] = useState(0); 
+  const [rawGraphData, setRawGraphData] = useState({ nodes: [], edges: [] });
+
+  // --- CREATE ROUTER STATES ---
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [projects, setProjects] = useState([]);
+  const [rawNetworksList, setRawNetworksList] = useState([]); // Needed for dropdown
+  
+  const [newRouter, setNewRouter] = useState({
+    name: '',
+    admin_state_up: true,
+    external_network_name: '',
+    project_id: '',
+    project_name: '',
+    enable_snat: false,
+  });
+
+  const loadTopologyData = async () => {
+    try {
+      setLoading(true);
+      const [nRes, rRes, iRes, pRes] = await Promise.all([
+        apiClient.get("/networks/"),
+        apiClient.get("/routers/"),
+        apiClient.get("/instances/"),
+        apiClient.get('/openstack/projects/') // Fetch projects for the modal
+      ]);
+
+      setRawNetworksList(nRes.data);
+      setProjects(pRes.data);
+
+      const generatedNodes = [];
+      const generatedEdges = [];
+
+      nRes.data.forEach((net) => {
+        generatedNodes.push({ id: `net-${net.network_name}`, type: "networkNode", data: { label: net.network_name, details: net }, position: { x: 0, y: 0 } });
+      });
+
+      rRes.data.forEach((router) => {
+        const routerId = `router-${router["Router ID"]}`;
+        const netName = router["Network Name"];
+        generatedNodes.push({ id: routerId, type: "deviceNode", data: { label: router["Router Name"], type: "router", details: router }, position: { x: 0, y: 0 } });
+        if (netName) generatedEdges.push({ id: `e-${routerId}-${netName}`, source: `net-${netName}`, target: routerId, animated: true, style: { stroke: '#ed6c02', strokeWidth: 2 } });
+      });
+
+      iRes.data.forEach((inst) => {
+        const instId = `inst-${inst["Instance ID"]}`;
+        const connectedNets = Object.keys(inst["IP Addresses"] || {});
+        generatedNodes.push({ id: instId, type: "deviceNode", data: { label: inst["VM Name"], type: "instance", details: inst, subLabel: connectedNets[0] ? inst["IP Addresses"][connectedNets[0]][0] : "" }, position: { x: 0, y: 0 } });
+        connectedNets.forEach(netName => generatedEdges.push({ id: `e-${instId}-${netName}`, source: `net-${netName}`, target: instId, animated: true, style: { stroke: '#9c27b0' } }));
+      });
+
+      setRawGraphData({ nodes: generatedNodes, edges: generatedEdges });
+      
+      // Apply layout based on current tab
+      const layouted = tabValue === 0 
+        ? getTreeLayout(generatedNodes, generatedEdges) 
+        : getGraphLayout(generatedNodes, generatedEdges);
+      
+      setNodes(layouted.nodes);
+      setEdges(layouted.edges);
+
+    } catch (err) {
+      console.error("Failed to load topology", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Fetch Data
-        const [nRes, rRes, iRes] = await Promise.all([
-          apiClient.get("/networks/"),
-          apiClient.get("/routers/"),
-          apiClient.get("/instances/")
-        ]);
+    loadTopologyData();
+  }, []);
 
-        const rawNetworks = nRes.data;
-        const rawRouters = rRes.data;
-        const rawInstances = iRes.data;
+  // --- FORM HANDLERS ---
+  
+  const validateRouterForm = () => {
+    let errors = {};
+    if (!newRouter.name.trim()) errors.name = "Router name is required.";
+    else if (newRouter.name.length < 3) errors.name = "Router name must be at least 3 characters.";
+    else if (!/^[A-Za-z_\s]+$/.test(newRouter.name)) errors.name = "Router name can contain only alphabets and underscore (_).";
+    
+    if (!newRouter.external_network_name) errors.external_network_name = "Select an external network.";
+    if (!newRouter.project_id) errors.project_id = "Select a project.";
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-        const generatedNodes = [];
-        const generatedEdges = [];
+  const handleCreateRouter = async (e) => {
+    e.preventDefault();
+    if (creating) return; 
+    if (!validateRouterForm()) return;
 
-        // 1. Process Networks (The Central Hubs)
-        rawNetworks.forEach((net) => {
-          generatedNodes.push({
-            id: `net-${net.network_name}`,
-            type: "networkNode",
-            data: { label: net.network_name },
-            position: { x: 0, y: 0 } // Layout handles this later
-          });
-        });
+    // Optional: Check local duplicate name (Note: exact name might exist on backend but not in current graph view)
+    const existingRouter = rawGraphData.nodes.find((node) => node.data.label === newRouter.name && node.data.type === 'router');
+    if (existingRouter) {
+      alert('A router with the same name already exists.');
+      return;
+    }
 
-
-        // 2. Process Routers
-        rawRouters.forEach((router) => {
-          const routerId = `router-${router["Router ID"]}`;
-          const netName = router["Network Name"];
-          
-          generatedNodes.push({
-            id: routerId,
-            type: "deviceNode",
-            data: {
-              label: router["Router Name"],
-              type: "router",
-              details: JSON.stringify(router, null, 2),
-            },
-            position: { x: 0, y: 0 }
-          });
-
-          // Connect Router to Network
-          if (netName) {
-            generatedEdges.push({
-              id: `e-${routerId}-${netName}`,
-              source: `net-${netName}`, // Network is source (Top)
-              target: routerId,         // Router is target (Bottom)
-              animated: true,
-              style: { stroke: '#ed6c02', strokeWidth: 2 },
-            });
-          }
-        });
-
-        // 3. Process Instances
-        rawInstances.forEach((inst) => {
-          const instId = `inst-${inst["Instance ID"]}`;
-          
-          // Find which network this instance belongs to
-          // Note: Logic assumes instance connects to first found network in its IP list
-          // You might need to loop if it connects to multiple networks
-          const connectedNets = Object.keys(inst["IP Addresses"] || {});
-          
-          generatedNodes.push({
-            id: instId,
-            type: "deviceNode",
-            data: {
-              label: inst["VM Name"],
-              subLabel: connectedNets[0] ? inst["IP Addresses"][connectedNets[0]][0] : "No IP",
-              type: "instance",
-              details: JSON.stringify(inst, null, 2)
-            },
-            position: { x: 0, y: 0 }
-          });
-
-          connectedNets.forEach(netName => {
-             generatedEdges.push({
-              id: `e-${instId}-${netName}`,
-              source: `net-${netName}`,
-              target: instId,
-              type: 'smoothstep',
-              style: { stroke: '#9c27b0' },
-            });           
-          });
-        });
-
-        // 4. Apply Auto-Layout
-        const layouted = getLayoutedElements(generatedNodes, generatedEdges, "TB"); // TB = Top to Bottom
-        
-        setNodes(layouted.nodes);
-        setEdges(layouted.edges);
-      } catch (err) {
-        console.error("Failed to load topology", err);
-      } finally {
-        setLoading(false);
-      }
+    const payload = {
+      name: newRouter.name,
+      admin_state_up: newRouter.admin_state_up,
+      external_network_name: newRouter.external_network_name,
+      project_id: newRouter.project_id,
+      enable_snat: newRouter.enable_snat || false,
     };
 
-    loadData();
-  }, [setNodes, setEdges]);
+    try {
+      setCreating(true);
+      const response = await apiClient.post('/create-router/', payload);
+      if (response.status === 201 || response.status === 200) {
+        alert('Router created successfully');
+        setNewRouter({ name: '', admin_state_up: true, external_network_name: '', project_id: '', project_name: '', enable_snat: false });
+        setShowCreateForm(false);
+        // REFRESH TOPOLOGY
+        loadTopologyData();
+      } else {
+        alert('Unexpected response from the server.');
+      }
+    } catch (error) {
+      console.error('Error creating router:', error);
+      alert('Error creating router. Please check the inputs.');
+    } finally {
+      setCreating(false);
+    }
+  };
 
-  if (loading) {
-    return (
-      <Box sx={{ display: "flex", height: "80vh", alignItems: "center", justifyContent: "center" }}>
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>Mapping Topology...</Typography>
-      </Box>
-    );
-  }
+  const handleTabChange = (event, newValue) => {
+    setTabValue(newValue);
+    const layouted = newValue === 0 
+      ? getTreeLayout([...rawGraphData.nodes], [...rawGraphData.edges]) 
+      : getGraphLayout([...rawGraphData.nodes], [...rawGraphData.edges]);
+    setNodes(layouted.nodes);
+    setEdges(layouted.edges);
+  };
+
+  const onPaneClick = useCallback(() => {
+    setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
+  }, [setNodes]);
+
+  if (loading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}><CircularProgress /></Box>;
 
   return (
-    <Box sx={{ width: "100%", height: "85vh", border: "1px solid #ddd", bgcolor: "#fafafa" }}>
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onNodeClick={(event, node) => setSelectedNode(node)}
-        nodeTypes={nodeTypes}
-        fitView
-        attributionPosition="bottom-right"
-      >
-        <Controls />
-        <MiniMap />
-        <Background gap={12} size={1} />
-      </ReactFlow>
+    <Box sx={{ width: "100%", height: "90vh", bgcolor: "#f8f9fa", display: "flex", flexDirection: "column" }}>
+      
+      {/* TOOLBAR */}
+      <Paper elevation={0} sx={{ px: 3, py: 1, borderBottom: '1px solid #ddd', display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 10 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Typography variant="h6" color="text.secondary" sx={{ mr: 2, fontWeight: 'bold' }}>Network Topology</Typography>
+          <Tabs value={tabValue} onChange={handleTabChange} indicatorColor="primary" textColor="primary" sx={{ minHeight: 40 }}>
+            <Tab icon={<AccountTreeIcon fontSize="small"/>} iconPosition="start" label="Hierarchy" sx={{ minHeight: 40 }}/>
+            <Tab icon={<TimelineIcon fontSize="small"/>} iconPosition="start" label="Graph" sx={{ minHeight: 40 }}/>
+          </Tabs>
+        </Box>
+        <Stack direction="row" spacing={2}>
+           {/* CREATE ROUTER BUTTON TRIGGER */}
+           <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => setShowCreateForm(true)}>
+             Create Router
+           </Button>
+           <Button variant="outlined" size="small" startIcon={<AddIcon />}>Create Network</Button>
+        </Stack>
+      </Paper>
+
+      {/* CANVAS */}
+      <Box sx={{ flexGrow: 1, position: "relative" }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onPaneClick={onPaneClick} 
+          nodeTypes={nodeTypes}
+          fitView
+          minZoom={0.2}
+          attributionPosition="bottom-left"
+        >
+          <Controls />
+          <MiniMap style={{ height: 100, width: 150 }} zoomable pannable />
+          <Background gap={24} size={1} color="#aaa" />
+        </ReactFlow>
+      </Box>
+
+      {/* --- MODAL: CREATE ROUTER --- */}
+      <Modal open={showCreateForm} onClose={creating ? undefined : () => setShowCreateForm(false)}>
+        <Box sx={modalStyle}>
+          <Typography variant="h6" component="h2" gutterBottom>Create New Router</Typography>
+          <form onSubmit={handleCreateRouter}>
+            <FormControl fullWidth margin="normal">
+              <TextField
+                label="Router Name"
+                name="name"
+                value={newRouter.name}
+                onChange={(e) => setNewRouter({ ...newRouter, name: e.target.value })}
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+                required
+              />
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <FormControlLabel control={<Checkbox checked={newRouter.admin_state_up} onChange={(e) => setNewRouter({ ...newRouter, admin_state_up: e.target.checked })} />} label="Admin State Up" />
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <FormControlLabel control={<Checkbox checked={newRouter.enable_snat} onChange={(e) => setNewRouter({ ...newRouter, enable_snat: e.target.checked })} />} label="Enable SNAT" />
+            </FormControl>
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="external_network_name-label">External Network</InputLabel>
+              <Select
+                labelId="external_network_name-label"
+                id="external_network_name"
+                value={newRouter.external_network_name}
+                onChange={(e) => setNewRouter({ ...newRouter, external_network_name: e.target.value })}
+                error={!!formErrors.external_network_name}
+                label="External Network"
+                required
+              >
+                <MenuItem value="">Select Network</MenuItem>
+                {/* Ensure we map over rawNetworksList for dropdown, not graph nodes */}
+                {rawNetworksList
+                .filter((network) => network.external === true)
+                .map((network) => (
+                  <MenuItem key={network.id} value={network.id}>
+                    {network.network_name}
+                  </MenuItem>
+                ))}
+              </Select>
+              {formErrors.external_network_name && <Typography variant="caption" color="error">{formErrors.external_network_name}</Typography>}
+            </FormControl>
+
+            <FormControl fullWidth margin="normal">
+              <InputLabel id="project_name-label">Project</InputLabel>
+              <Select
+                labelId="project_name-label"
+                id="project_name"
+                value={newRouter.project_name}
+                onChange={(e) => {
+                  const selectedProject = projects.find(p => p.name === e.target.value);
+                  setNewRouter({ ...newRouter, project_id: selectedProject ? selectedProject.id : '', project_name: e.target.value });
+                }}
+                error={!!formErrors.project_id}
+                label="Project"
+                required
+              >
+                <MenuItem value="">Select Project</MenuItem>
+                {projects.map((project) => (
+                  <MenuItem key={project.id} value={project.name}>{project.name}</MenuItem>
+                ))}
+              </Select>
+              {formErrors.project_id && <Typography variant="caption" color="error">{formErrors.project_id}</Typography>}
+            </FormControl>
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
+                {creating ? <CircularProgress size={22} sx={{ color: "#fff" }} /> : "Create"}
+              </Button> 
+              <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">Cancel</Button>
+            </Box>
+          </form>
+        </Box>
+      </Modal>
     </Box>
   );
 }
-
 
 
 
