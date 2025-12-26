@@ -14,9 +14,14 @@ import {
   Box,
   Modal,
   TablePagination,
-  Chip,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { Tabs, Tab, Divider } from "@mui/material";
+
 import { CircularProgress } from "@mui/material";
 import { Skeleton } from "@mui/material";
 
@@ -77,12 +82,22 @@ const Networks = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0); // Current page
   const [rowsPerPage, setRowsPerPage] = useState(5); // Rows per page
+  const [projects, setProjects] = useState([]);
+
   const [selectedNetworks, setSelectedNetworks] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showUpdateForm, setShowUpdateForm] = useState(false);
   const [networkToUpdate, setNetworkToUpdate] = useState(null);
+
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [nameError, setNameError] = useState("");
+
+  const [activeTab, setActiveTab] = useState(0);
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
 
   const theme = useTheme();
   const [newNetwork, setNewNetwork] = useState({
@@ -112,11 +127,24 @@ const Networks = () => {
       setLoading(false);
     }
   };
+
+  const fetchProjects = async () => {
+    setError(null);
+    try {
+      const response = await apiClient.get("/openstack/projects/");
+      setProjects(response.data);
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
   // Validate network name: only letters, spaces, and underscore allowed
   const isValidNetworkName = (name) => /^[A-Za-z_\s]+$/.test(name);
 
   useEffect(() => {
     fetchNetworks();
+    fetchProjects();
   }, []);
 
   const showInitialLoader = loading && networks.length === 0;
@@ -151,6 +179,20 @@ const Networks = () => {
     );
   }
 
+
+  // When opening the update modal
+const handleOpenUpdateForm = (network) => {
+  setNetworkToUpdate({
+    id: network.id,
+    name: network.name,
+    admin_state_up: network.admin_state_up ?? true,
+    shared: network.shared ?? false,
+    external: network.external ?? false,
+  });
+  setFormErrors({});
+  setShowUpdateForm(true);
+};
+
   const NetworkSkeletonRow = () => (
     <StyledTableRow>
       {Array.from({ length: 12 }).map((_, index) => (
@@ -160,6 +202,12 @@ const Networks = () => {
       ))}
     </StyledTableRow>
   );
+
+  const isValidIP = (ip) => {
+    const regex =
+      /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+    return regex.test(ip);
+  };
 
   const validateNetworkField = (name, value) => {
     let error = "";
@@ -236,30 +284,49 @@ const Networks = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const fieldValue = type === "checkbox" ? checked : value;
 
-    setNewNetwork((prevState) => ({
-      ...prevState,
-      [name]: fieldValue,
+    const val = type === "checkbox" ? checked : value;
+
+    setNewNetwork((prev) => ({
+      ...prev,
+      [name]: val,
     }));
 
-    validateNetworkField(name, fieldValue); // live validation
+    // Real-time network name validation
+    if (name === "name") {
+      if (!value) {
+        setNameError("Network name is required.");
+      } else if (!isValidNetworkName(value)) {
+        setNameError("Only letters, spaces, and underscores are allowed.");
+      } else if (networks.some((n) => n.name === value)) {
+        setNameError("Network name already exists.");
+      } else {
+        setNameError(""); // No error
+      }
+    }
   };
 
   const handleUpdateInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    const fieldValue = type === "checkbox" ? checked : value;
-
-    setNetworkToUpdate((prevState) => ({
-      ...prevState,
-      [name]: fieldValue,
+    const { name, type, checked, value } = e.target;
+  
+    setNetworkToUpdate((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
     }));
-
-    if (name !== "is_shared") {
-      // don't validate checkbox
-      validateNetworkField(name, fieldValue);
+  
+    // Optional: live validation for network name
+    if (name === "name") {
+      if (!value.match(/^[A-Za-z_ ]*$/)) {
+        setFormErrors((prev) => ({
+          ...prev,
+          name: "Only letters, spaces, and underscores (_) allowed",
+        }));
+      } else {
+        setFormErrors((prev) => ({ ...prev, name: "" }));
+      }
     }
   };
+  
 
   // Validate CIDR format (e.g., 192.168.1.0/24)
   const isValidCIDR = (cidr) => {
@@ -270,139 +337,154 @@ const Networks = () => {
 
   const handleCreateNetwork = async (e) => {
     e.preventDefault();
-    if (creating) return; // ⛔ prevent double click
+    if (creating) return;
 
-    // Check for empty fields
-    if (
-      !newNetwork.name ||
-      !newNetwork.subnet_name ||
-      !newNetwork.network_address ||
-      !newNetwork.gateway_ip
-    ) {
-      alert("All fields are required");
+    // UNIQUE name check first
+    if (networks.some((n) => n.name === newNetwork.name)) {
+      alert("Network name already exists.");
+      return;
+    }
+    // REQUIRED validations
+    if (!newNetwork.name) {
+      alert("Network name is required.");
+      return;
+    }
+
+    if (!newNetwork.project_id) {
+      alert("Project is required.");
       return;
     }
 
     if (!isValidNetworkName(newNetwork.name)) {
-      alert("Network name can contain only alphabets and underscore (_).");
-      return;
-    }
-    // Validate IP address
-    if (!isValidIP(newNetwork.gateway_ip)) {
-      alert("Invalid Gateway IP address");
-      return;
-    }
-
-    // Validate CIDR
-    if (!isValidCIDR(newNetwork.network_address)) {
       alert(
-        "Invalid Network Address (CIDR format required, e.g., 192.168.1.0/24)"
+        "Network name can contain only alphabets, spaces, and underscore (_)."
       );
       return;
     }
 
-    // Check unique network name
-    const existingNetwork = networks.find(
-      (network) => network.name === newNetwork.name
-    );
-    if (existingNetwork) {
-      alert(
-        "A network with the same name already exists. Please choose a different name."
-      );
+    if (newNetwork.create_subnet) {
+      if (!newNetwork.subnet_name || !newNetwork.network_address) {
+        alert("Subnet name and network address are required.");
+        return;
+      }
+
+      if (!isValidCIDR(newNetwork.network_address)) {
+        alert("Invalid CIDR format (e.g., 192.168.1.0/24)");
+        return;
+      }
+
+      if (!newNetwork.disable_gateway) {
+        if (!newNetwork.gateway_ip) {
+          alert("Gateway IP is required.");
+          return;
+        }
+        if (!isValidIP(newNetwork.gateway_ip)) {
+          alert("Invalid Gateway IP address");
+          return;
+        }
+      }
+    }
+
+    // UNIQUE name check
+    if (networks.some((n) => n.name === newNetwork.name)) {
+      alert("Network name already exists.");
       return;
     }
 
-    // Proceed with API request
     try {
-      setCreating(true); // 🔄 START LOADER
-      const response = await apiClient.post("/networks/create/", {
+      setCreating(true);
+
+      const payload = {
         name: newNetwork.name,
+        project_id: newNetwork.project_id,
+
+        provider_network_type: newNetwork.provider_network_type,
+        physical_network: ["flat", "vlan"].includes(
+          newNetwork.provider_network_type
+        )
+          ? newNetwork.physical_network
+          : null,
+
+        segmentation_id:
+          newNetwork.provider_network_type === "vlan"
+            ? Number(newNetwork.segmentation_id)
+            : newNetwork.provider_network_type === "vxlan"
+            ? Number(newNetwork.segmentation_id || 0)
+            : null,
+
+        admin_state_up: newNetwork.admin_state_up,
+        shared: newNetwork.shared,
+        external: newNetwork.external,
+
+        availability_zone_hints: ["nova"],
+
+        create_subnet: newNetwork.create_subnet,
         subnet_name: newNetwork.subnet_name,
         network_address: newNetwork.network_address,
-        gateway_ip: newNetwork.gateway_ip,
-      });
-      if (response.status === 201 || response.status === 200) {
-        alert("Network created successfully");
-        setShowCreateForm(false);
-        setNewNetwork({
-          name: "",
-          subnet_name: "",
-          network_address: "",
-          gateway_ip: "",
-        });
-        fetchNetworks();
-      }
-    } catch (error) {
-      console.error("Error creating network:", error);
-      alert("Error creating network. Please check the inputs and try again.");
+        gateway_ip: newNetwork.disable_gateway ? null : newNetwork.gateway_ip,
+        disable_gateway: newNetwork.disable_gateway,
+        ip_version: newNetwork.ip_version,
+        enable_dhcp: newNetwork.enable_dhcp,
+        dns_nameservers: newNetwork.dns_nameservers
+          ? newNetwork.dns_nameservers.split(",").map((ip) => ip.trim())
+          : [],
+      };
+
+      const res = await apiClient.post("/networks/create/", payload);
+
+      alert("Network created successfully");
+      setShowCreateForm(false);
+      fetchNetworks();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create network.");
     } finally {
-      setCreating(false); // ✅ STOP LOADER
+      setCreating(false);
     }
   };
-
   const handleUpdateNetwork = async (e) => {
     e.preventDefault();
-
-    if (updating) return; // ⛔ prevent double submit
-    if (!networkToUpdate) {
-      alert("No network selected for update.");
+    if (!networkToUpdate) return;
+  
+    // Required validation for name only (other fields are booleans)
+    if (!networkToUpdate.name) {
+      alert("Network name is required.");
       return;
     }
-
-    if (
-      !networkToUpdate.name ||
-      !networkToUpdate.subnet_name ||
-      !networkToUpdate.network_address ||
-      !networkToUpdate.gateway_ip
-    ) {
-      alert("All fields are required");
+    if (!!formErrors.name) {
+      alert("Please fix errors before submitting.");
       return;
     }
-    if (!isValidNetworkName(networkToUpdate.name)) {
-      alert("Network name can contain only alphabets and underscore (_).");
-      return;
-    }
-
-    if (!isValidIP(networkToUpdate.gateway_ip)) {
-      alert("Invalid Gateway IP address");
-      return;
-    }
-
-    if (!isValidCIDR(networkToUpdate.network_address)) {
-      alert(
-        "Invalid Network Address (CIDR format required, e.g., 192.168.1.0/24)"
-      );
-      return;
-    }
-
+  
     try {
-      setUpdating(true); // 🔄 START LOADER
-      const response = await apiClient.put(
+      setUpdating(true);
+  
+      const payload = {
+        name: networkToUpdate.name,
+        admin_state_up: networkToUpdate.admin_state_up,
+        shared: networkToUpdate.shared,
+        external: networkToUpdate.external,
+      };
+  
+      const res = await apiClient.put(
         `/networks/edit/${networkToUpdate.id}/`,
-        {
-          network_name: networkToUpdate.name,
-          is_shared: networkToUpdate.is_shared,
-          subnet_name: networkToUpdate.subnet_name,
-          gateway_ip: networkToUpdate.gateway_ip,
-          cidr: networkToUpdate.network_address,
-        }
+        payload
       );
-
-      if (response.status === 200) {
+  
+      if (res.status === 200) {
         alert("Network updated successfully");
         setShowUpdateForm(false);
         setNetworkToUpdate(null);
         fetchNetworks();
       }
-    } catch (error) {
-      console.error("Error updating network:", error);
-      alert(
-        "An error occurred while updating the network. Please try again later."
-      );
+    } catch (err) {
+      console.error(err);
+      alert("Failed to update network.");
     } finally {
-      setUpdating(false); // ✅ STOP LOADER
+      setUpdating(false);
     }
   };
+  
 
   const handleDeleteSelectedNetworks = async () => {
     if (selectedNetworks.length === 0) {
@@ -471,16 +553,6 @@ const Networks = () => {
     borderRadius: "8px",
   };
 
-  const NetworkTypeBadge = ({ external }) => (
-  <Chip
-    label={external ? "External" : "Internal"}
-    color={external ? "error" : "success"}
-    size="small"
-    variant="outlined"
-  />
-);
-
-
   return (
     <div style={volumesContainerStyle}>
       <div style={headerContainerVolumesStyle}>
@@ -525,71 +597,271 @@ const Networks = () => {
         open={showCreateForm}
         onClose={creating ? undefined : () => setShowCreateForm(false)}
       >
-        <Box sx={modalStyle}>
-          <Typography variant="h6" component="h2" gutterBottom>
+        <Box sx={{ ...modalStyle, width: 600 }}>
+          <Typography variant="h6" gutterBottom>
             Create New Network
           </Typography>
+
           <form onSubmit={handleCreateNetwork}>
-            <TextField
-              label="Name"
-              name="name"
-              onChange={handleInputChange}
-              value={newNetwork.name}
-              fullWidth
-              margin="normal"
-              required
-              error={!!formErrors.name}
-              helperText={formErrors.name}
-            />
-            <TextField
-              label="Subnet Name"
-              name="subnet_name"
-              onChange={handleInputChange}
-              value={newNetwork.subnet_name}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-              label="Network Address"
-              name="network_address"
-              onChange={handleInputChange}
-              value={newNetwork.network_address}
-              fullWidth
-              margin="normal"
-              required
-              error={!!formErrors.network_address}
-              helperText={formErrors.network_address}
-            />
-            <TextField
-              label="Gateway IP"
-              name="gateway_ip"
-              onChange={handleInputChange}
-              value={newNetwork.gateway_ip}
-              fullWidth
-              margin="normal"
-              required
-              error={!!formErrors.gateway_ip}
-              helperText={formErrors.gateway_ip}
-            />
+            {/* ===== TABS ===== */}
+            <Tabs
+              value={activeTab}
+              onChange={handleTabChange}
+              variant="fullWidth"
+              sx={{ mb: 2 }}
+            >
+              <Tab label="Network" />
+              <Tab label="Subnet" />
+              <Tab label="Subnet Details" />
+            </Tabs>
+
+            <Divider sx={{ mb: 2 }} />
+
+            {/* ===== TAB CONTENT SCROLL AREA ===== */}
+            <Box sx={{ maxHeight: "55vh", overflowY: "auto", pr: 1 }}>
+              {/* ================= TAB 0 : NETWORK ================= */}
+              {activeTab === 0 && (
+                <>
+                  <TextField
+                    label="Network Name"
+                    name="name"
+                    value={newNetwork.name}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                    required
+                    error={!!nameError}
+                    helperText={nameError}
+                  />
+
+                  {/* Project */}
+                  <FormControl fullWidth margin="normal" required>
+                    <InputLabel>Project</InputLabel>
+                    <Select
+                      label="Project"
+                      value={newNetwork.project_id || ""}
+                      onChange={(e) =>
+                        setNewNetwork({
+                          ...newNetwork,
+                          project_id: e.target.value,
+                        })
+                      }
+                    >
+                      <MenuItem value="">Select Project</MenuItem>
+                      {projects.map((p) => (
+                        <MenuItem key={p.id} value={p.id}>
+                          {p.name}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  <TextField
+                    label="Provider Network Type"
+                    name="provider_network_type"
+                    select
+                    SelectProps={{ native: true }}
+                    value={newNetwork.provider_network_type || "flat"}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  >
+                    <option value="flat">FLAT</option>
+                    <option value="vxlan">VXLAN</option>
+                    <option value="vlan">VLAN</option>
+                  </TextField>
+
+                  {(newNetwork.provider_network_type === "flat" ||
+                    newNetwork.provider_network_type === "vlan") && (
+                    <FormControl fullWidth margin="normal" required>
+                      <InputLabel>Physical Network</InputLabel>
+                      <Select
+                        name="physical_network"
+                        value={newNetwork.physical_network || ""}
+                        onChange={handleInputChange}
+                        label="Physical Network"
+                      >
+                        <MenuItem value="">Select Physical Network</MenuItem>
+                        <MenuItem value="physnet1">physnet1</MenuItem>
+                        <MenuItem value="provider">provider</MenuItem>
+                      </Select>
+                    </FormControl>
+                  )}
+
+                  {(newNetwork.provider_network_type === "vxlan" ||
+                    newNetwork.provider_network_type === "vlan") && (
+                    <TextField
+                      label="Segmentation ID"
+                      name="segmentation_id"
+                      type="number"
+                      value={newNetwork.segmentation_id || ""}
+                      onChange={handleInputChange}
+                      fullWidth
+                      margin="normal"
+                      required
+                      inputProps={{
+                        min:
+                          newNetwork.provider_network_type === "vlan" ? 1 : 1,
+                        max:
+                          newNetwork.provider_network_type === "vlan"
+                            ? 4094
+                            : 16777215,
+                      }}
+                      helperText={
+                        newNetwork.provider_network_type === "vlan"
+                          ? "VLAN ID (1–4094)"
+                          : "VXLAN VNI (1–16777215)"
+                      }
+                    />
+                  )}
+
+                  <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="admin_state_up"
+                        checked={newNetwork.admin_state_up ?? true}
+                        onChange={handleInputChange}
+                      />{" "}
+                      Admin State
+                    </label>
+
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="shared"
+                        checked={newNetwork.shared || false}
+                        onChange={handleInputChange}
+                      />{" "}
+                      Shared
+                    </label>
+
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="external"
+                        checked={newNetwork.external || false}
+                        onChange={handleInputChange}
+                      />{" "}
+                      External
+                    </label>
+                  </Box>
+
+                  <TextField
+                    label="Availability Zone Hints"
+                    name="availability_zone_hints"
+                    value="nova"
+                    fullWidth
+                    margin="normal"
+                    InputProps={{
+                      readOnly: true,
+                    }}
+                    helperText="Fixed availability zone (Nova)"
+                  />
+
+                  <TextField
+                    label="MTU"
+                    name="mtu"
+                    type="number"
+                    value={newNetwork.mtu || ""}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  />
+                </>
+              )}
+
+              {/* ================= TAB 1 : SUBNET ================= */}
+              {activeTab === 1 && (
+                <>
+                  <TextField
+                    label="Subnet Name"
+                    name="subnet_name"
+                    value={newNetwork.subnet_name || ""}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  />
+
+                  <TextField
+                    label="Network Address (CIDR)"
+                    name="network_address"
+                    value={newNetwork.network_address || ""}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  />
+
+                  <TextField
+                    label="IP Version"
+                    name="ip_version"
+                    select
+                    SelectProps={{ native: true }}
+                    value={newNetwork.ip_version || 4}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  >
+                    <option value={4}>IPv4</option>
+                    <option value={6}>IPv6</option>
+                  </TextField>
+                </>
+              )}
+
+              {/* ================= TAB 2 : SUBNET DETAILS ================= */}
+              {/* ================= TAB 2 : SUBNET DETAILS ================= */}
+              {activeTab === 2 && (
+                <>
+                  <TextField
+                    label="Gateway IP"
+                    name="gateway_ip"
+                    value={newNetwork.gateway_ip || ""}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  />
+
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="disable_gateway"
+                      checked={newNetwork.disable_gateway || false}
+                      onChange={handleInputChange}
+                    />{" "}
+                    Disable Gateway
+                  </label>
+
+                  <label>
+                    <input
+                      type="checkbox"
+                      name="enable_dhcp"
+                      checked={newNetwork.enable_dhcp ?? true}
+                      onChange={handleInputChange}
+                    />{" "}
+                    Enable DHCP
+                  </label>
+
+                  <TextField
+                    label="DNS Nameservers (comma separated)"
+                    name="dns_nameservers"
+                    value={newNetwork.dns_nameservers || ""}
+                    onChange={handleInputChange}
+                    fullWidth
+                    margin="normal"
+                  />
+                </>
+              )}
+            </Box>
+
+            {/* ===== ACTION BUTTONS ===== */}
             <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                sx={{ mr: 1 }}
-                disabled={creating}
-              >
-                {creating ? (
-                  <CircularProgress size={22} sx={{ color: "#fff" }} />
-                ) : (
-                  "Create"
-                )}
+              <Button type="submit" variant="contained" disabled={creating}>
+                {creating ? <CircularProgress size={20} /> : "Create"}
               </Button>
               <Button
-                type="button"
-                onClick={() => setShowCreateForm(false)}
+                sx={{ ml: 1 }}
                 variant="outlined"
+                onClick={() => setShowCreateForm(false)}
               >
                 Cancel
               </Button>
@@ -607,6 +879,7 @@ const Networks = () => {
             Update Network
           </Typography>
           <form onSubmit={handleUpdateNetwork}>
+            {/* Network Name */}
             <TextField
               label="Name"
               name="name"
@@ -618,49 +891,48 @@ const Networks = () => {
               error={!!formErrors.name}
               helperText={formErrors.name}
             />
-            <TextField
-              label="Subnet Name"
-              name="subnet_name"
-              onChange={handleUpdateInputChange}
-              value={networkToUpdate?.subnet_name || ""}
-              fullWidth
-              margin="normal"
-              required
-            />
-            <TextField
-              label="Gateway IP"
-              name="gateway_ip"
-              onChange={handleUpdateInputChange}
-              value={networkToUpdate?.gateway_ip || ""}
-              fullWidth
-              margin="normal"
-              required
-              error={!!formErrors.gateway_ip}
-              helperText={formErrors.gateway_ip}
-            />
-            <TextField
-              label="Network Address (CIDR)"
-              name="network_address"
-              onChange={handleUpdateInputChange}
-              value={networkToUpdate?.network_address || ""}
-              fullWidth
-              margin="normal"
-              required
-              error={!!formErrors.network_address}
-              helperText={formErrors.network_address}
-            />
+
+            {/* Admin State */}
+            <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
+              <Typography component="label" sx={{ mr: 2 }}>
+                Admin State
+              </Typography>
+              <input
+                type="checkbox"
+                name="admin_state_up"
+                onChange={handleUpdateInputChange}
+                checked={networkToUpdate?.admin_state_up ?? true}
+              />
+            </Box>
+
+            {/* Shared */}
             <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
               <Typography component="label" sx={{ mr: 2 }}>
                 Shared
               </Typography>
               <input
                 type="checkbox"
-                name="is_shared"
+                name="shared"
                 onChange={handleUpdateInputChange}
-                checked={networkToUpdate?.is_shared || false}
+                checked={networkToUpdate?.shared || false}
               />
             </Box>
-            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+
+            {/* External */}
+            <Box sx={{ display: "flex", alignItems: "center", mt: 2 }}>
+              <Typography component="label" sx={{ mr: 2 }}>
+                External Network
+              </Typography>
+              <input
+                type="checkbox"
+                name="external"
+                onChange={handleUpdateInputChange}
+                checked={networkToUpdate?.external || false}
+              />
+            </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
               <Button
                 type="submit"
                 variant="contained"
@@ -685,6 +957,7 @@ const Networks = () => {
           </form>
         </Box>
       </Modal>
+
       <TableContainer
         component={Paper}
         sx={{
@@ -728,6 +1001,7 @@ const Networks = () => {
               <StyledTableCell>Project</StyledTableCell>
               <StyledTableCell>Network Name</StyledTableCell>
               <StyledTableCell>Subnets</StyledTableCell>
+              <StyledTableCell>DHCP Agents</StyledTableCell>
               <StyledTableCell>Shared</StyledTableCell>
               <StyledTableCell>External</StyledTableCell>
               <StyledTableCell>Status</StyledTableCell>
@@ -758,33 +1032,16 @@ const Networks = () => {
                       <StyledTableCell>{network.project}</StyledTableCell>
                       <StyledTableCell>{network.network_name}</StyledTableCell>
                       <StyledTableCell>
-                        {network.subnets?.map((s, i) => (
-                          <Tooltip
-                            key={i}
-                            title={
-                              <>
-                                <div>
-                                  <b>Gateway:</b> {s.gateway_ip}
-                                </div>
-                                <div>
-                                  <b>IP Version:</b> IPv{s.ip_version}
-                                </div>
-                              </>
-                            }
-                            arrow
-                          >
-                            <div>
-                              {s.name} ({s.cidr})
-                            </div>
-                          </Tooltip>
-                        ))}
+                        {network.subnets?.join(", ")}
                       </StyledTableCell>
-
+                      <StyledTableCell>
+                        {network.dhcp_agents?.join(", ")}
+                      </StyledTableCell>
                       <StyledTableCell>
                         {network.shared ? "Yes" : "No"}
                       </StyledTableCell>
                       <StyledTableCell>
-                        <NetworkTypeBadge external={network.external} />
+                        {network.external ? "Yes" : "No"}
                       </StyledTableCell>
                       <StyledTableCell>{network.status}</StyledTableCell>
                       <StyledTableCell>

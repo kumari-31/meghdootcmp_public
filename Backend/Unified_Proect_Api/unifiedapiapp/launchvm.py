@@ -377,7 +377,7 @@ def vm_approve_request(id):
                                 current_vm_name,
                                 flavor_id,
                                 id,
-                                network_id=network_id
+                                network_id,
                             )
 
                     # Store values into vm_detail
@@ -523,7 +523,7 @@ def vm_approve_request(id):
                 # Store the server ID in the vm_detail dictionary
                 vm_req = VmRequest.objects.get(id=int(id))
                 if server["status"]:
-                    vm_detail["vm_id"] = server.id
+                    vm_detail["vm_id"] = server["server_id"]
                     vm_req.creation_status = "Created"
                     vm_req.save()
                 else:

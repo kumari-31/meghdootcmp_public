@@ -544,11 +544,14 @@ const showInitialLoader = loading && floatingIps.length === 0;
                 />
               </StyledTableCell>
               <StyledTableCell>Sr. No.</StyledTableCell> {/* Sr. No. header is now after the checkbox header */}
-              <StyledTableCell>Floating Ip Address</StyledTableCell>
-              {/* <StyledTableCell>Fixed Ip Address</StyledTableCell> */}
-              <StyledTableCell>Floating IP ID</StyledTableCell>
-              <StyledTableCell>Port ID</StyledTableCell>
-              <StyledTableCell>Status</StyledTableCell>
+              <StyledTableCell>Project</StyledTableCell>
+<StyledTableCell>Floating IP Address</StyledTableCell>
+<StyledTableCell>Mapped Fixed IP Address</StyledTableCell>
+<StyledTableCell>Description</StyledTableCell>
+<StyledTableCell>Pool</StyledTableCell>
+<StyledTableCell>Status</StyledTableCell>
+
+
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
@@ -574,28 +577,40 @@ const showInitialLoader = loading && floatingIps.length === 0;
             </StyledTableCell>
 
             <StyledTableCell>
-              <Tooltip title={floatingIp.floating_ip_address}>
-                <span>{floatingIp.floating_ip_address}</span>
-              </Tooltip>
-            </StyledTableCell>
+  <Tooltip title={floatingIp.project_name || "Null"}>
+    <span>{floatingIp.project_name || "Null"}</span>
+  </Tooltip>
+</StyledTableCell>
+
+<StyledTableCell>
+  <Tooltip title={floatingIp.floating_ip_address}>
+    <span>{floatingIp.floating_ip_address}</span>
+  </Tooltip>
+</StyledTableCell>
+
+<StyledTableCell>
+  <Tooltip title={floatingIp.fixed_ip_address || "Null"}>
+    <span>{floatingIp.fixed_ip_address || "Null"}</span>
+  </Tooltip>
+</StyledTableCell>
+
+<StyledTableCell>
+  <Tooltip title={floatingIp.description || "Null"}>
+    <span>{floatingIp.description || "Null"}</span>
+  </Tooltip>
+</StyledTableCell>
+
+<StyledTableCell>
+  <Tooltip title={floatingIp.pool || "Null"}>
+    <span>{floatingIp.pool || "Null"}</span>
+  </Tooltip>
+</StyledTableCell>
 
             <StyledTableCell>
-              <Tooltip title={floatingIp.id}>
-                <span>{floatingIp.id}</span>
-              </Tooltip>
-            </StyledTableCell>
-
-            <StyledTableCell>
-              <Tooltip title={floatingIp.port_id || 'null'}>
-                <span>{floatingIp.port_id || 'Null'}</span>
-              </Tooltip>
-            </StyledTableCell>
-
-            <StyledTableCell>
-              <Tooltip title={floatingIp.status}>
-                <span>{floatingIp.status}</span>
-              </Tooltip>
-            </StyledTableCell>
+  <Tooltip title={floatingIp.status}>
+    <span>{floatingIp.status}</span>
+  </Tooltip>
+</StyledTableCell>
 
             <StyledTableCell>
               <Box display="flex" justifyContent="center" gap={1}>
