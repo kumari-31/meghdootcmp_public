@@ -304,9 +304,7 @@ const Images = () => {
 
       <header className="App-header" style={{ borderColor: "#222" }}>
       <h1
-        style={{
-          color: theme.palette.mode === "dark" ? "#f0f6fc" : "#1e293b"
-        }}
+        
       >
         Images Dashboard
       </h1>

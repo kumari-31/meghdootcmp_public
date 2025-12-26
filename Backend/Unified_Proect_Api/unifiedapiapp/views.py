@@ -69,6 +69,12 @@ from .serializers import (CombinedDataSerializer, CombinedFormSerializer,
                           UserSerializer, VMInfoSerializer,
                           VmRequestSerializer)
 from .table_imp import *
+from django.db import transaction
+from django.db import transaction
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+
+
 
 from openstackoperations import (
     get_conn,
@@ -2169,90 +2175,109 @@ def create_user_with_details(first_name, email, password):
 
 
 
+
 class EmployeeRegisterAPIView(APIView):
     permission_classes = []
 
     def post(self, request, employee_id):
         try:
-            password = request.data.get("password", None)
-
-            # Get the employee by employee_id
+            # 🔍 Fetch employee
             employee = Employee.objects.get(employee_id=employee_id)
+
             if employee.user:
                 return Response(
                     {"error": "Employee is already registered."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Call the function to create the user if required
-            # ✅ Create Django user ONLY ONCE
-            if password:
-                user, created = User.objects.get_or_create(
-                    username=employee.email,
-                    defaults={
-                        "email": employee.email,
-                        "first_name": employee.name,
-                    },
+            password = request.data.get("password")
+            confirm_password = request.data.get("confirm_password")
+
+            # 🚫 Prevent empty registration
+            clean_data = request.data.copy()
+            clean_data.pop("password", None)
+            clean_data.pop("confirm_password", None)
+
+            if not clean_data and not password:
+                return Response(
+                    {"error": "No data provided for registration or update."},
+                    status=status.HTTP_400_BAD_REQUEST,
                 )
 
-                if created:
-                    user.set_password(password)  # 🔐 HASHED
+            with transaction.atomic():
+
+                # 🔐 Password validation
+                if password:
+                    if password != confirm_password:
+                        return Response(
+                            {"error": "Password and confirm password do not match."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    try:
+                        validate_password(password)
+                    except ValidationError as e:
+                        return Response(
+                            {"error": e.messages},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    # 📧 Ensure unique user
+                    if User.objects.filter(username=employee.email).exists():
+                        return Response(
+                            {"error": "User already exists."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    # 👤 Create user
+                    user = User.objects.create(
+                        username=employee.email,
+                        email=employee.email,
+                        first_name=employee.name,
+                    )
+                    user.set_password(password)
                     user.save()
 
-                # Link employee to user
-                employee.user = user
-                employee.save()
+                    employee.user = user
+                    employee.save()
 
-        except Employee.DoesNotExist:
-            return Response(
-                {"error": f"Employee with ID {employee_id} not found."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-         # 🚫 REMOVE password from serializer input
-        clean_data = request.data.copy()
-        clean_data.pop("password", None)
-        clean_data.pop("confirm_password", None)
-
-        # Serialize and validate the data
-        serializer = EmployeeUpdateSerializer(employee, data=clean_data, partial=True)
-        if serializer.is_valid():
-            new_fields = {}
-            updated_fields = {}
-
-            # Check for fields that are being registered or updated
-            for field, value in serializer.validated_data.items():
-                current_value = getattr(employee, field, None)
-                if not current_value:  # Field is empty, so it's being registered
-                    new_fields[field] = value
-                elif (
-                    current_value != value
-                ):  # Field already has a value and it's being updated
-                    updated_fields[field] = value
-
-            if new_fields or updated_fields:
-                # Save the updated employee instance
-                serializer.save()
-                response_message = "Employee details processed successfully!"
-
-                if new_fields and updated_fields:
-                    response_message = "Employee registered and updated successfully!"
-                elif new_fields:
-                    response_message = "Employee registered successfully!"
-                elif updated_fields:
-                    response_message = "Employee updated successfully!"
-
-                return Response(
-                    {
-                        "message": response_message,
-                        "new_fields": new_fields,
-                        "updated_fields": updated_fields,
-                        "employee_id": employee.employee_id,
-                        "employee_name": employee.name,
-                    },
-                    status=status.HTTP_200_OK,
+                # 📦 Serializer validation
+                serializer = EmployeeUpdateSerializer(
+                    employee, data=clean_data, partial=True
                 )
-            else:
+                serializer.is_valid(raise_exception=True)
+
+                new_fields = {}
+                updated_fields = {}
+
+                for field, value in serializer.validated_data.items():
+                    current_value = getattr(employee, field, None)
+                    if not current_value:
+                        new_fields[field] = value
+                    elif current_value != value:
+                        updated_fields[field] = value
+
+                if new_fields or updated_fields:
+                    serializer.save()
+
+                    if new_fields and updated_fields:
+                        message = "Employee registered and updated successfully!"
+                    elif new_fields:
+                        message = "Employee registered successfully!"
+                    else:
+                        message = "Employee updated successfully!"
+
+                    return Response(
+                        {
+                            "message": message,
+                            "new_fields": new_fields,
+                            "updated_fields": updated_fields,
+                            "employee_id": employee.employee_id,
+                            "employee_name": employee.name,
+                        },
+                        status=status.HTTP_200_OK,
+                    )
+
                 return Response(
                     {
                         "message": "No changes detected. Data already up-to-date.",
@@ -2261,41 +2286,71 @@ class EmployeeRegisterAPIView(APIView):
                     },
                     status=status.HTTP_200_OK,
                 )
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        except Employee.DoesNotExist:
+            return Response(
+                {"error": f"Employee with ID {employee_id} not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
 class NewEmployeeRegisterAPIView(APIView):
     permission_classes = []
 
     def post(self, request, employee_id):
         try:
-            password = request.data.get("password", None)
-
-            # Get the employee by employee_id
             employee = Employee.objects.get(employee_id=employee_id)
 
-            # Check if employee is FLA by checking if any employees have this employee as their FLA
-            is_fla = Employee.objects.filter(fla_employee_id=employee_id).exists()
+            # 🚫 Already registered
+            if employee.user:
+                return Response(
+                    {"error": "Employee is already registered."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-            # Create registration request based on employee type
-            registration_data = {
-                "employee_id": employee_id,
-                "name": employee.name,
-                "email": employee.email,
-                "user_type": "FLA" if is_fla else "Employee",
-                "fla_employee_id": employee.fla_employee_id,
-                "request_timestamp": timezone.now(),
-            }
+            password = request.data.get("password")
+            confirm_password = request.data.get("confirm_password")
 
-            # Check if a pending request already exists
+            # 🔐 Password validation
+            if not password:
+                return Response(
+                    {"error": "Password is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            if password != confirm_password:
+                return Response(
+                    {"error": "Password and confirm password do not match."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            try:
+                validate_password(password)
+            except ValidationError as e:
+                return Response(
+                    {"error": e.messages},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 🔍 FLA check
+            is_fla = Employee.objects.filter(
+                fla_employee_id=employee_id
+            ).exists()
+
+            if not is_fla and not employee.fla_employee_id:
+                return Response(
+                    {"error": "FLA is not assigned for this employee."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # 🚫 Block duplicate requests
             existing_request = UserRegistrationRequest.objects.filter(
-                employee_id=employee_id, admin_status="Pending"
-            ).first()
+                employee_id=employee_id
+            ).exclude(admin_status="Rejected").first()
 
             if existing_request:
                 return Response(
                     {
-                        "error": "A registration request is already pending for this employee.",
+                        "error": "Registration request already exists.",
                         "request_id": existing_request.id,
                         "status": {
                             "fla_status": existing_request.fla_status,
@@ -2305,42 +2360,45 @@ class NewEmployeeRegisterAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Create the registration request
-            registration_request = UserRegistrationRequest.objects.create(
-                **registration_data
-            )
+            with transaction.atomic():
 
-            # If the user is a FLA, automatically set FLA status to accepted
-            if registration_data["user_type"] == "FLA":
-                registration_request.fla_status = "Accepted"
-                registration_request.fla_approved_timestamp = timezone.now()
+                registration_request = UserRegistrationRequest.objects.create(
+                    employee_id=employee_id,
+                    name=employee.name,
+                    email=employee.email,
+                    user_type="FLA" if is_fla else "Employee",
+                    fla_employee_id=employee.fla_employee_id,
+                    request_timestamp=timezone.now(),
+                    temporary_password=make_password(password),
+                )
+
+                if is_fla:
+                    registration_request.fla_status = "Accepted"
+                    registration_request.fla_approved_timestamp = timezone.now()
+                    next_step = "Awaiting admin approval"
+                else:
+                    next_step = "Awaiting FLA approval"
+
                 registration_request.save()
-                response_message = "FLA registration request sent for admin approval"
-            else:
-                response_message = "Registration request sent for FLA approval"
 
-            # Store password temporarily (encrypted)
-            if password:
-                registration_request.temporary_password = make_password(password)
-                registration_request.save()
-
-            # Return detailed response
             return Response(
                 {
-                    "message": response_message,
+                    "message": (
+                        "FLA registration request sent for admin approval"
+                        if is_fla
+                        else "Registration request sent for FLA approval"
+                    ),
                     "request_details": {
                         "request_id": registration_request.id,
                         "employee_id": employee.employee_id,
                         "name": employee.name,
-                        "user_type": registration_data["user_type"],
+                        "user_type": registration_request.user_type,
                         "status": {
                             "fla_status": registration_request.fla_status,
                             "admin_status": registration_request.admin_status,
                         },
                     },
-                    "next_step": (
-                        "Awaiting admin approval" if is_fla else "Awaiting FLA approval"
-                    ),
+                    "next_step": next_step,
                 },
                 status=status.HTTP_200_OK,
             )
@@ -2350,96 +2408,111 @@ class NewEmployeeRegisterAPIView(APIView):
                 {"error": f"Employee with ID {employee_id} not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            
 
 class ApproveRegistrationRequestAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            request_id = request.data.get("request_id")
-            user_role = request.auth.get("role")
-
-            registration_request = UserRegistrationRequest.objects.get(id=request_id)
-            print(
-                request.auth.get("employee_id"),
-                registration_request.fla_employee_id,
-                "=======",
-            )
-
-            if user_role == "FLA":
-                if registration_request.user_type == "FLA":
-                    return Response(
-                        {"error": "FLAs cannot approve FLA registration requests"},
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-
-                if registration_request.fla_employee_id != request.auth.get(
-                    "employee_id"
-                ):
-                    return Response(
-                        {
-                            "error": "You are not authorized to approve this registration request"
-                        },
-                        status=status.HTTP_403_FORBIDDEN,
-                    )
-
-                registration_request.fla_status = "Accepted"
-                registration_request.fla_approved_timestamp = timezone.now()
-                registration_request.save()
-
+            if not request.auth:
                 return Response(
-                    {
-                        "message": "Registration request approved by FLA",
-                        "next_step": "Awaiting admin approval",
-                        "status": {"fla_status": "Accepted", "admin_status": "Pending"},
-                    }
+                    {"error": "Authentication credentials missing"},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
 
-            elif user_role == "ADMIN":
-                # For employee registrations, check FLA approval
-                if (
-                    registration_request.user_type == "Employee"
-                    and registration_request.fla_status != "Accepted"
-                ):
+            request_id = request.data.get("request_id")
+            if not request_id:
+                return Response(
+                    {"error": "request_id is required"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            user_role = request.auth.get("role")
+            employee_id = request.auth.get("employee_id")
+
+            registration_request = UserRegistrationRequest.objects.get(id=request_id)
+
+            # 🚫 Prevent double admin approval
+            if registration_request.admin_status == "Accepted":
+                return Response(
+                    {"error": "Registration request already approved by admin"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            with transaction.atomic():
+
+                if user_role == "FLA":
+
+                    if registration_request.user_type == "FLA":
+                        return Response(
+                            {"error": "FLAs cannot approve FLA registration requests"},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+                    if not employee_id or registration_request.fla_employee_id != employee_id:
+                        return Response(
+                            {"error": "You are not authorized to approve this request"},
+                            status=status.HTTP_403_FORBIDDEN,
+                        )
+
+                    if registration_request.fla_status == "Accepted":
+                        return Response(
+                            {"error": "Request already approved by FLA"},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                    registration_request.fla_status = "Accepted"
+                    registration_request.fla_approved_timestamp = timezone.now()
+                    registration_request.save()
+
                     return Response(
                         {
-                            "error": "Employee registration must be approved by FLA first",
-                            "current_status": {
-                                "fla_status": registration_request.fla_status,
+                            "message": "Registration request approved by FLA",
+                            "next_step": "Awaiting admin approval",
+                            "status": {
+                                "fla_status": "Accepted",
                                 "admin_status": registration_request.admin_status,
                             },
                         },
-                        status=status.HTTP_400_BAD_REQUEST,
+                        status=status.HTTP_200_OK,
                     )
 
-                registration_request.admin_status = "Accepted"
-                registration_request.admin_approved_timestamp = timezone.now()
-                registration_request.save()
+                elif user_role == "ADMIN":
 
-                # Here you would typically create the user account
-                # create_user_with_details(registration_request.name,
-                #                         registration_request.email,
-                #                         decrypt_password(registration_request.temporary_password))
+                    if (
+                        registration_request.user_type == "Employee"
+                        and registration_request.fla_status != "Accepted"
+                    ):
+                        return Response(
+                            {
+                                "error": "Employee registration must be approved by FLA first",
+                                "current_status": {
+                                    "fla_status": registration_request.fla_status,
+                                    "admin_status": registration_request.admin_status,
+                                },
+                            },
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
 
-                return Response(
-                    {
-                        "message": "Registration request approved by admin",
-                        "status": "Registration completed",
-                        "user_details": {
-                            "employee_id": registration_request.employee_id,
-                            "name": registration_request.name,
-                            "email": registration_request.email,
-                            "user_type": registration_request.user_type,
+                    registration_request.admin_status = "Accepted"
+                    registration_request.admin_approved_timestamp = timezone.now()
+                    registration_request.save()
+
+                    return Response(
+                        {
+                            "message": "Registration request approved by admin",
+                            "status": "Registration completed",
+                            "user_details": {
+                                "employee_id": registration_request.employee_id,
+                                "name": registration_request.name,
+                                "email": registration_request.email,
+                                "user_type": registration_request.user_type,
+                            },
                         },
-                    }
-                )
+                        status=status.HTTP_200_OK,
+                    )
 
-            else:
                 return Response(
                     {"error": "Unauthorized role for approval"},
                     status=status.HTTP_403_FORBIDDEN,
@@ -2450,27 +2523,40 @@ class ApproveRegistrationRequestAPIView(APIView):
                 {"error": "Registration request not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
-
+          
 class PendingRegistrationRequestsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         try:
+            if not request.auth:
+                return Response(
+                    {"error": "Authentication credentials missing."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
             user_role = request.auth.get("role")
             employee_id = request.auth.get("employee_id")
 
-            if user_role == "FLA":
-                # Get requests from employees where this user is the FLA
-                pending_requests = UserRegistrationRequest.objects.filter(
-                    fla_employee_id=employee_id, fla_status="Pending"
+            if user_role not in ["FLA", "ADMIN"]:
+                return Response(
+                    {"error": "Unauthorized role."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
-            elif user_role == "ADMIN":
-                # Get FLA requests or employee requests approved by FLA
+
+            if user_role == "FLA":
+                if not employee_id:
+                    return Response(
+                        {"error": "Employee ID missing for FLA user."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                pending_requests = UserRegistrationRequest.objects.filter(
+                    fla_employee_id=employee_id,
+                    fla_status="Pending",
+                )
+
+            else:  # ADMIN
                 pending_requests = UserRegistrationRequest.objects.filter(
                     models.Q(user_type="FLA", admin_status="Pending")
                     | models.Q(
@@ -2478,10 +2564,6 @@ class PendingRegistrationRequestsAPIView(APIView):
                         fla_status="Accepted",
                         admin_status="Pending",
                     )
-                )
-            else:
-                return Response(
-                    {"error": "Unauthorized role"}, status=status.HTTP_403_FORBIDDEN
                 )
 
             requests_data = [
@@ -2501,14 +2583,18 @@ class PendingRegistrationRequestsAPIView(APIView):
             ]
 
             return Response(
-                {"pending_requests": requests_data, "count": len(requests_data)}
+                {
+                    "pending_requests": requests_data,
+                    "count": len(requests_data),
+                },
+                status=status.HTTP_200_OK,
             )
 
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 # --------------------------6 June 2025--------------------------
 
@@ -2518,7 +2604,13 @@ class AcceptedByFLARegistrationRequestsAPIView(APIView):
 
     def get(self, request):
         try:
-            user_role = request.auth.get("role", None)
+            if not request.auth:
+                return Response(
+                    {"error": "Authentication credentials missing"},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            user_role = request.auth.get("role")
 
             if user_role != "ADMIN":
                 return Response(
@@ -2526,9 +2618,8 @@ class AcceptedByFLARegistrationRequestsAPIView(APIView):
                     status=status.HTTP_403_FORBIDDEN,
                 )
 
-            # Get only requests where FLA has accepted
             requests = UserRegistrationRequest.objects.filter(
-                Q(user_type="Employee") & Q(fla_status="Accepted")
+                Q(user_type="Employee", fla_status="Accepted")
             ).order_by("-request_timestamp")
 
             data = [
@@ -2552,11 +2643,11 @@ class AcceptedByFLARegistrationRequestsAPIView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
+        except Exception:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 def get_employee_details(request):
     # import_data()
@@ -2651,15 +2742,24 @@ class AllRegistrationRequestsAPIView(APIView):
 
     def get(self, request):
         try:
+            if not request.auth:
+                return Response(
+                    {"error": "Authentication credentials missing"},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            user_role = request.auth.get("role")
+
+            if user_role != "ADMIN":
+                return Response(
+                    {"error": "Access denied"},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
             registration_requests = UserRegistrationRequest.objects.all().order_by(
                 "-request_timestamp"
             )
-            user_role = request.auth.get("role", None)
-            print("user role", user_role)
-            if user_role != "ADMIN":
-                return Response(
-                    {"error": "Access denied"}, status=status.HTTP_403_FORBIDDEN
-                )
+
             data = [
                 {
                     "request_id": req.id,
@@ -2681,11 +2781,11 @@ class AllRegistrationRequestsAPIView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except Exception as e:
+        except Exception:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Something went wrong"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
 
 # -----------------------------4 june 2025---------------------
 class EmployeeDeleteAPIView(APIView):
@@ -5129,19 +5229,19 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             )
 
         # --- Password strength ---
-        password_pattern = (
-            r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$"
-        )
-        if password and not re.match(password_pattern, password):
-            return Response(
-                {
-                    "error": (
-                        "Password must be at least 6 characters long, "
-                        "contain one uppercase letter, one number, and one special character."
-                    )
-                },
-                status=400,
-            )
+        # password_pattern = (
+        #     r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$"
+        # )
+        # if password and not re.match(password_pattern, password):
+        #     return Response(
+        #         {
+        #             "error": (
+        #                 "Password must be at least 6 characters long, "
+        #                 "contain one uppercase letter, one number, and one special character."
+        #             )
+        #         },
+        #         status=400,
+        #     )
 
         # --- OTP (must be 6 digits) ---
         if otp and not re.fullmatch(r"\d{6}", otp):
@@ -5475,6 +5575,7 @@ class ForgotPasswordView(APIView):
         )
 
 
+
 class ResetPasswordView(APIView):
     permission_classes = []
 
@@ -5484,40 +5585,96 @@ class ResetPasswordView(APIView):
         new_password = request.data.get("new_password")
         confirm_password = request.data.get("confirm_password")
 
-        if not (email and otp and new_password and confirm_password):
-            return Response({"error": "All fields are required"}, status=400)
+        # ---------- Required fields ----------
+        if not all([email, otp, new_password, confirm_password]):
+            return Response(
+                {"error": "All fields are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        # ---------- Email format ----------
+        if not re.fullmatch(r"[A-Za-z0-9._%+-]+@cdac\.in", email):
+            return Response(
+                {"error": "Invalid email format"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ---------- Password match ----------
         if new_password != confirm_password:
-            return Response({"error": "Passwords do not match"}, status=400)
+            return Response(
+                {"error": "Passwords do not match"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
+        # ---------- Password strength (regex) ----------
+        password_pattern = (
+            r"^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$"
+        )
+        if not re.match(password_pattern, new_password):
+            return Response(
+                {
+                    "error": (
+                        "Password must be at least 6 characters long and contain "
+                        "one letter, one number, and one special character."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ---------- Django password validators ----------
+        try:
+            validate_password(new_password)
+        except ValidationError as e:
+            return Response(
+                {"error": e.messages},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # ---------- OTP format ----------
         if not re.fullmatch(r"\d{6}", otp):
-            return Response({"error": "OTP must be 6 digits"}, status=400)
+            return Response(
+                {"error": "OTP must be exactly 6 digits"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         stored_data = cache.get(f"reset_otp_{email}")
         if not stored_data:
-            return Response({"error": "OTP expired or invalid"}, status=400)
+            return Response(
+                {"error": "OTP expired or invalid"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        if getattr(settings, "OTP_TEST_MODE", False) is False:
+        # ---------- OTP verification ----------
+        if not getattr(settings, "OTP_TEST_MODE", False):
             if otp != stored_data["otp"]:
-                return Response({"error": "Invalid OTP"}, status=400)
+                return Response(
+                    {"error": "Invalid OTP"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-        # OK → Update password
+        # ---------- Update password ----------
         from django.contrib.auth import get_user_model
 
         User = get_user_model()
         try:
             user = User.objects.get(username=email)
         except User.DoesNotExist:
-            return Response({"error": "Invalid email"}, status=404)
+            # SECURITY: do not leak existence
+            return Response(
+                {"error": "Invalid request"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        user.set_password(new_password)  # <- securely updates password
+        user.set_password(new_password)
         user.save()
 
-        # Remove OTP
+        # ---------- Cleanup ----------
         cache.delete(f"reset_otp_{email}")
 
-        return Response({"message": "Password reset successful!"}, status=200)
-
+        return Response(
+            {"message": "Password reset successful"},
+            status=status.HTTP_200_OK,
+        )
 
 # ------------------------12 Dec 2024-----------------------
 
@@ -5785,6 +5942,8 @@ class VmRequestUpdateAPIView(APIView):
                     "designation",
                     "image",
                     "flavor",
+                    "network_name",
+                    "network_id",
                     "login_enable_date",
                     "login_disable_date",
                     "login_enable_time",
