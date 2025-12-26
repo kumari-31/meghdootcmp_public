@@ -40,7 +40,7 @@ urlpatterns = [
     # 3️⃣ OpenStack APIs
     # -------------------------------
     # Flavors
-    path("api/flavors/", views.ListFlavors.as_view(), name="get_flavor_list"),
+    path("api/flavors/", ListFlavors.as_view(), name="get_flavor_list"),
     path("api/flavors/delete/", DeleteFlavorAPIView.as_view(), name="delete_flavor"),
     path("api/flavors/create/", CreateFlavorAPIView.as_view(), name="create_flavor"),
     path("flavors/metadata/<str:flavor_id>/", UpdateFlavorMetadataAPIView.as_view(), name="update-flavor-metadata"),

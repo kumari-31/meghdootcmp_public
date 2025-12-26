@@ -291,11 +291,12 @@ const VmRequest = () => {
           count_of_vms: 1,
           purpose: "",
           purpose_of_request: "",
-          project_name: "",
+          project_name: "",network_id: "",
           designation: "",
           vdi_required: true,
           image: "",
           flavor: "",
+          network_id: "",
           login_enable_date: "",
           login_disable_date: "",
           login_enable_time: "",
@@ -533,6 +534,7 @@ const VmRequest = () => {
                         setFormData({
                           ...formData,
                           network_id: newValue ? newValue.id : "",
+                          network_name: newValue ? newValue.network_name : "",
                         });
                       }}
                       renderOption={(props, option) => (

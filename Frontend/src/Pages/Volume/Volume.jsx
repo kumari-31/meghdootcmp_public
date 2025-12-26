@@ -542,7 +542,7 @@ const Volumes = () => {
             <FormControl fullWidth margin="normal">
               <InputLabel id="volume-source-label">Volume Source</InputLabel>
               <Select
-                labelId="volume-source-label"
+                label="volume-source"
                 id="volume_source"
                 name="volume_source"
                 value={newVolume.volume_source}
@@ -593,7 +593,7 @@ const Volumes = () => {
             <FormControl fullWidth margin="normal">
               <InputLabel id="volume-type-label">Volume Type</InputLabel>
               <Select
-                labelId="volume-type-label"
+                label="volume-type-label"
                 id="volume_type"
                 name="volume_type" // This will be mapped to 'type' in the payload
                 value={newVolume.volume_type}
@@ -621,7 +621,7 @@ const Volumes = () => {
             <FormControl fullWidth margin="normal">
               <InputLabel id="availability-zone-label">Availability Zone</InputLabel>
               <Select
-                labelId="availability-zone-label"
+                label="availability-zone-label"
                 id="availability_zone"
                 name="availability_zone"
                 value={newVolume.availability_zone}

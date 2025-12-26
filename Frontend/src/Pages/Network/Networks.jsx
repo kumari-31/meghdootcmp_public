@@ -18,6 +18,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Chip,
 } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import { Tabs, Tab, Divider } from "@mui/material";
@@ -179,19 +180,18 @@ const Networks = () => {
     );
   }
 
-
   // When opening the update modal
-const handleOpenUpdateForm = (network) => {
-  setNetworkToUpdate({
-    id: network.id,
-    name: network.name,
-    admin_state_up: network.admin_state_up ?? true,
-    shared: network.shared ?? false,
-    external: network.external ?? false,
-  });
-  setFormErrors({});
-  setShowUpdateForm(true);
-};
+  const handleOpenUpdateForm = (network) => {
+    setNetworkToUpdate({
+      id: network.id,
+      name: network.name,
+      admin_state_up: network.admin_state_up ?? true,
+      shared: network.shared ?? false,
+      external: network.external ?? false,
+    });
+    setFormErrors({});
+    setShowUpdateForm(true);
+  };
 
   const NetworkSkeletonRow = () => (
     <StyledTableRow>
@@ -308,12 +308,12 @@ const handleOpenUpdateForm = (network) => {
 
   const handleUpdateInputChange = (e) => {
     const { name, type, checked, value } = e.target;
-  
+
     setNetworkToUpdate((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-  
+
     // Optional: live validation for network name
     if (name === "name") {
       if (!value.match(/^[A-Za-z_ ]*$/)) {
@@ -326,7 +326,6 @@ const handleOpenUpdateForm = (network) => {
       }
     }
   };
-  
 
   // Validate CIDR format (e.g., 192.168.1.0/24)
   const isValidCIDR = (cidr) => {
@@ -445,7 +444,7 @@ const handleOpenUpdateForm = (network) => {
   const handleUpdateNetwork = async (e) => {
     e.preventDefault();
     if (!networkToUpdate) return;
-  
+
     // Required validation for name only (other fields are booleans)
     if (!networkToUpdate.name) {
       alert("Network name is required.");
@@ -455,22 +454,22 @@ const handleOpenUpdateForm = (network) => {
       alert("Please fix errors before submitting.");
       return;
     }
-  
+
     try {
       setUpdating(true);
-  
+
       const payload = {
         name: networkToUpdate.name,
         admin_state_up: networkToUpdate.admin_state_up,
         shared: networkToUpdate.shared,
         external: networkToUpdate.external,
       };
-  
+
       const res = await apiClient.put(
         `/networks/edit/${networkToUpdate.id}/`,
         payload
       );
-  
+
       if (res.status === 200) {
         alert("Network updated successfully");
         setShowUpdateForm(false);
@@ -484,7 +483,6 @@ const handleOpenUpdateForm = (network) => {
       setUpdating(false);
     }
   };
-  
 
   const handleDeleteSelectedNetworks = async () => {
     if (selectedNetworks.length === 0) {
@@ -540,6 +538,15 @@ const handleOpenUpdateForm = (network) => {
       }
     }
   };
+
+  const NetworkTypeBadge = ({ external }) => (
+    <Chip
+      label={external ? "External" : "Internal"}
+      color={external ? "error" : "success"}
+      size="small"
+      variant="outlined"
+    />
+  );
 
   const modalStyle = {
     position: "absolute",
@@ -1001,7 +1008,7 @@ const handleOpenUpdateForm = (network) => {
               <StyledTableCell>Project</StyledTableCell>
               <StyledTableCell>Network Name</StyledTableCell>
               <StyledTableCell>Subnets</StyledTableCell>
-              <StyledTableCell>DHCP Agents</StyledTableCell>
+              <StyledTableCell>Subnet Gateway</StyledTableCell>
               <StyledTableCell>Shared</StyledTableCell>
               <StyledTableCell>External</StyledTableCell>
               <StyledTableCell>Status</StyledTableCell>
@@ -1032,17 +1039,40 @@ const handleOpenUpdateForm = (network) => {
                       <StyledTableCell>{network.project}</StyledTableCell>
                       <StyledTableCell>{network.network_name}</StyledTableCell>
                       <StyledTableCell>
-                        {network.subnets?.join(", ")}
+                        {network.subnets?.map((s, i) => (
+                          <Tooltip
+                            key={i}
+                            title={
+                              <>
+                                <div>
+                                  <b>Gateway:</b> {s.gateway_ip}
+                                </div>
+                                <div>
+                                  <b>IP Version:</b> IPv{s.ip_version}
+                                </div>
+                              </>
+                            }
+                            arrow
+                          >
+                            <div>
+                              {s.name} ({s.cidr})
+                            </div>
+                          </Tooltip>
+                        ))}
                       </StyledTableCell>
                       <StyledTableCell>
-                        {network.dhcp_agents?.join(", ")}
+                        {network.subnets?.map((s, i) => (
+                          <div key={i}>{s.gateway_ip}</div>
+                        ))}
                       </StyledTableCell>
+
                       <StyledTableCell>
                         {network.shared ? "Yes" : "No"}
                       </StyledTableCell>
                       <StyledTableCell>
-                        {network.external ? "Yes" : "No"}
+                        <NetworkTypeBadge external={network.external} />
                       </StyledTableCell>
+
                       <StyledTableCell>{network.status}</StyledTableCell>
                       <StyledTableCell>
                         {network.admin_state_up ? "Up" : "Down"}
