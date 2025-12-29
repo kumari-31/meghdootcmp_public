@@ -382,23 +382,7 @@ def wait_for_server_status(server, target_status="ACTIVE", retries=1800, delay=5
         raise Exception(f"Server in unexpected state: {status}")
 
     raise TimeoutError("Server build timeout")
-    # """Wait for the server to reach the target status."""
-    # for attempt in range(retries):
-    #     print("before status check=====")
-    #     server = conn.compute.get_server(server.id)
-    #     print(server.status, "===> server status")
-    #     if server.status == target_status:
-    #         print(f"Server {server.name} is now {target_status}.")
-    #         return True
-    #     else:
-    #         print(
-    #             f"Server {server.name} is in {server.status} state. Waiting...: attempt: {attempt}"
-    #         )
-    #         time.sleep(delay)
-    # print(
-    #     f"Server {server.name} did not reach {target_status} status after {retries} attempts."
-    # )
-    # return False
+
 
 
 def get_guac_user(username, token):

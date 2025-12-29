@@ -21,7 +21,7 @@ pm2 list
 # pm2 stop app_name
 # To restart the application
 # pm2 restart app_name
-apt install python3.11-venv   
+sudo apt install python3.11-venv   
 sudo apt install build-essential python3-all-dev
 pip install -r requirements.txt
 reportlab,pillow>=9.0.0 (install manually if needed or add to requirements.txt)
@@ -40,7 +40,7 @@ CREATE DATABASE meghdootcmp;
 
 -- Grant Permissions
 GRANT ALL PRIVILEGES ON DATABASE meghdootcmp TO rootcmp;
-
+ALTER SCHEMA public OWNER TO rootcmp;
 -- Exit the prompt
 \q
 exit

@@ -184,6 +184,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "name",
             "employee_id",
             "email",
+            "phone_number",
             "group",
             "fla_name",
             "fla_email",
@@ -203,11 +204,7 @@ class EmployeeUpdateSerializer(serializers.ModelSerializer):
         model = Employee
         fields = ["phone_number", "designation"]
 
-    def validate(self, data):
-        # Check if password and confirm_password match
-        if data.get("password") != data.get("confirm_password"):
-            raise serializers.ValidationError("Passwords do not match.")
-        return data
+    
 
 
 # class TicketSerializer(serializers.ModelSerializer):

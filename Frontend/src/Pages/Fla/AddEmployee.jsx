@@ -10,8 +10,8 @@ import apiClient from "../../Axios"; // adjust path to your actual apiClient
 const AddEmployee = () => {
   const [employees, setEmployees] = useState([]);
   const [newEmployee, setNewEmployee] = useState({
-    name: "", employee_id: "", email: "", group: "FOSS",
-    fla_name: "Ms V A Prabha", fla_email: "prabhav@cdac.in", fla_employee_id: "101897"
+    name: "", employee_id: "", email: "", phone_number: "", group: "FOSS",
+    fla_name: "", fla_email: "", fla_employee_id: ""
   });
   const [editEmployee, setEditEmployee] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -32,7 +32,7 @@ const AddEmployee = () => {
   const handleAddEmployee = async () => {
     try {
       await apiClient.post("/employees/", newEmployee);
-      setNewEmployee({ ...newEmployee, name: "", employee_id: "", email: "" });
+      setNewEmployee({ ...newEmployee, name: "", employee_id: "", email: "", phone_number: "" });
       fetchEmployees();
     } catch (error) {
       console.error("Error adding employee:", error);
@@ -69,11 +69,12 @@ const AddEmployee = () => {
       <Card sx={{ mb: 3, p: 2 }}>
         <Typography variant="h6" gutterBottom>Add New Employee</Typography>
         <Grid2 container spacing={2}>
-          {["name", "employee_id", "email"].map((field) => (
+          {["name", "employee_id", "email", "phone_number"].map((field) => (
             <Grid2 item xs={12} sm={4} key={field}>
               <TextField
                 fullWidth
                 label={field.replace("_", " ").toUpperCase()}
+                type={field === "phone_number" ? "tel" : "text"}
                 value={newEmployee[field]}
                 onChange={(e) => setNewEmployee({ ...newEmployee, [field]: e.target.value })}
               />
