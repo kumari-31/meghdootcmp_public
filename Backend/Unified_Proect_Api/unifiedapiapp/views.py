@@ -6556,7 +6556,11 @@ class VmRequestStatusUpdateAPIView(APIView):
         try:
             vm_request_id = request.data.get("vm_request_id")
             new_status = request.data.get("status")
-            rejection_reason = request.data.get("rejection_reason", "No reason provided")
+            rejection_reason = (
+            request.data.get("rejection_reason")
+            or request.data.get("fla_rejection_reason")
+            or "No reason provided")
+
 
             if not vm_request_id or not new_status:
                 return Response(
@@ -6663,11 +6667,11 @@ Cloud Team
             # =====================================================
             else:
                 vm_request.fla_status = new_status
-                vm_request.fla_approved_timestamp = timezone.now()
-
+                
                 # ---------- FLA REJECT ----------
                 if new_status == "Rejected":
                     vm_request.fla_rejection_reason = rejection_reason
+                    vm_request.fla_approved_timestamp = None
                     vm_request.save()
 
                     subject = "VM Request Rejected by FLA"
@@ -6699,6 +6703,7 @@ Cloud Team
                     )
 
                 # ---------- FLA ACCEPT ----------
+                vm_request.fla_approved_timestamp = timezone.now()
                 vm_request.save()
 
                 subject = "VM Request Approved by FLA – Admin Action Required"
@@ -16245,19 +16250,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                     f"MariaDB deployment and service created for {app_name} on port {node_port}."
                 )
 
-            try:
-                employee = Employee.objects.get(employee_id=service_request.employee_id)
-                subject = "Service Request Status Update from Admin"
-                message = f"""Dear {employee.name},\n\nYour service request for {service_request.service_name} has been {new_status} by the Admin.\n\n{f"Remarks: {remarks}" if remarks else ""}\n\nThanks & Regards,\nCloud Team"""
-
-                from_email = "rakshanavg20@gmail.com"
-                to_email = [employee.email]
-                print(
-                    f"Email notification sent to {to_email} for {service_request.service_name}"
-                )
-
-            except Exception as e:
-                print(f"Error sending email: {e}")
+          
 
             serializer = ServiceRequestSerializer(service_request)
             return Response(
