@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import apiClient from '../../Axios';
-import { GoAlert } from 'react-icons/go';
-import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
-import '../style.css';
-
+import React, { useEffect, useState } from "react";
+import apiClient from "../../Axios";
+import { GoAlert } from "react-icons/go";
+import { RiDeleteBin6Line, RiBallPenLine } from "react-icons/ri";
+import "../style.css";
 
 import {
   Table,
@@ -23,12 +22,13 @@ import {
   Select,
   MenuItem,
   TablePagination,
-} from '@mui/material';
+  Typography,
+} from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { CircularProgress } from '@mui/material';
+import { CircularProgress } from "@mui/material";
 import Skeleton from "@mui/material/Skeleton";
-import { styled } from '@mui/material/styles';
-import { tableCellClasses } from '@mui/material/TableCell';
+import { styled } from "@mui/material/styles";
+import { tableCellClasses } from "@mui/material/TableCell";
 
 // Styled Table Components
 const StyledTableCell = styled(TableCell)(({ theme }) => ({
@@ -53,7 +53,6 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   },
 }));
 
-
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   backgroundColor:
     theme.palette.mode === "dark"
@@ -72,12 +71,11 @@ const StyledTableRow = styled(TableRow)(({ theme }) => ({
   },
 }));
 
-
 const Volumes = () => {
   const [volumes, setVolumes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0); // Current page
   const [rowsPerPage, setRowsPerPage] = useState(5); // Rows per page
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -86,78 +84,101 @@ const Volumes = () => {
   const [volumeToUpdate, setVolumeToUpdate] = useState(null);
 
   const [errors, setErrors] = useState({
-    name: '',
-    description: '',
+    name: "",
+    description: "",
   });
-  
+
   const [creating, setCreating] = useState(false);
   const [updating, setUpdating] = useState(false);
 
-  const theme = useTheme(); 
+  const [instanceModalOpen, setInstanceModalOpen] = useState(false);
+  const [selectedInstanceId, setSelectedInstanceId] = useState(null);
+  const [instanceDetails, setInstanceDetails] = useState(null);
+
+  const theme = useTheme();
   const [newVolume, setNewVolume] = useState({
-    name: '', // Changed from volume_name to name
-    description: '',
-    volume_source: 'none', // This is for internal UI logic, not sent to API in this format
-    image_name: '', // To store selected image name
-    volume_type: '_Default_', // Changed from volume_type to type in API payload
+    name: "", // Changed from volume_name to name
+    description: "",
+    volume_source: "none", // This is for internal UI logic, not sent to API in this format
+    image_name: "", // To store selected image name
+    volume_type: "_Default_", // Changed from volume_type to type in API payload
     size: 1,
-    availability_zone: 'nova',
+    availability_zone: "nova",
     // group_id is not in your example payload, so removed from here if not needed
   });
-  const [volumeTypes, setVolumeTypes] = useState(['_Default_']); // Initialize with default
+  const [volumeTypes, setVolumeTypes] = useState(["_Default_"]); // Initialize with default
   const [images, setImages] = useState([]); // To store fetched images
 
   // Status dropdown options
   const statusOptions = [
-    'available',
-    'inuse',
-    'error',
-    'creating',
-    'attaching',
-    'detaching',
-    'error_deleting',
-    'maintenance',
-    'reserved',
+    "available",
+    "inuse",
+    "error",
+    "creating",
+    "attaching",
+    "detaching",
+    "error_deleting",
+    "maintenance",
+    "reserved",
   ];
 
   const fetchVolumes = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get('/volumes/');
+      const response = await apiClient.get("/volumes/");
       setVolumes(response.data);
     } catch (error) {
-      console.error('Error fetching volumes:', error);
-      setError('Failed to fetch volumes.');
+      console.error("Error fetching volumes:", error);
+      setError("Failed to fetch volumes.");
     } finally {
       setLoading(false);
     }
   };
 
+  const handleAttachedToClick = async (instanceId) => {
+    if (!instanceId) {
+      alert("No instance attached to this volume.");
+      return;
+    }
+    
+    try {
+      const response = await apiClient.get(`/instances/${instanceId}/`);
+      const instance = response.data;
+      // Show instance details in modal
+      setSelectedInstance(instance);
+      setShowInstanceModal(true);
+    } catch (error) {
+      console.error("Error fetching instance:", error);
+      alert("Failed to fetch instance details.");
+    }
+  };
+  
+
   const fetchVolumeTypes = async () => {
     setError(null);
     try {
-      const response = await apiClient.get('/volume-types/');
+      const response = await apiClient.get("/volume-types/");
       if (response.data && Array.isArray(response.data)) {
-        const types = response.data.map(type => type.name); // Assuming 'name' property
-        setVolumeTypes([ ...types]);
+        const types = response.data.map((type) => type.name); // Assuming 'name' property
+        setVolumeTypes([...types]);
       }
     } catch (error) {
-      console.error('Error fetching volume types:', error);
-      setError('Failed to fetch volume types.');
+      console.error("Error fetching volume types:", error);
+      setError("Failed to fetch volume types.");
     }
   };
 
   const fetchImages = async () => {
     setError(null);
     try {
-      const response = await apiClient.get('/images/'); // Your image API endpoint
+      const response = await apiClient.get("/images/"); // Your image API endpoint
       if (response.data && Array.isArray(response.data)) {
         setImages(response.data);
       }
     } catch (error) {
-      console.error('Error fetching images:', error);
-      setError('Failed to fetch images.');
+      console.error("Error fetching images:", error);
+      setError("Failed to fetch images.");
     }
   };
 
@@ -170,12 +191,14 @@ const Volumes = () => {
     initializeData();
   }, []);
 
-
   const showInitialLoader = loading && volumes.length === 0;
   if (showInitialLoader) {
     return (
       <div className="cloud-container">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="7.87722 9.61948 33.01 16.88"
+        >
           <path
             d="M 12 26 H 37 C 42 26 41 20  37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
             className="cloud-back"
@@ -218,10 +241,9 @@ const Volumes = () => {
   };
 
   const filteredVolumes = volumes.filter((volume) =>
-    Object.values(volume)
-      .some((value) =>
-        value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    Object.values(volume).some((value) =>
+      value?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
 
   const handlePageChange = (_, newPage) => {
@@ -256,40 +278,40 @@ const Volumes = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-  
+
     // Create a copy of errors
     let newErrors = { ...errors };
-  
+
     // Name validation
-    if (name === 'name') {
+    if (name === "name") {
       if (!value) {
-        newErrors.name = 'Name is required';
+        newErrors.name = "Name is required";
       } else if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-        newErrors.name = 'Name can only contain letters, numbers, _ or -';
+        newErrors.name = "Name can only contain letters, numbers, _ or -";
       } else if (value.length > 50) {
-        newErrors.name = 'Name cannot exceed 50 characters';
+        newErrors.name = "Name cannot exceed 50 characters";
       } else {
-        newErrors.name = '';
+        newErrors.name = "";
       }
     }
-  
+
     // Description validation
-    if (name === 'description') {
+    if (name === "description") {
       if (value.length > 200) {
-        newErrors.description = 'Description cannot exceed 200 characters';
+        newErrors.description = "Description cannot exceed 200 characters";
       } else {
-        newErrors.description = '';
+        newErrors.description = "";
       }
     }
-  
+
     setErrors(newErrors);
-  
+
     setNewVolume((prevState) => ({
       ...prevState,
       [name]: value,
     }));
   };
-  
+
   // Only for status dropdown
   const handleUpdateStatusChange = (e) => {
     const { value } = e.target;
@@ -303,16 +325,16 @@ const Volumes = () => {
     e.preventDefault();
 
     if (creating) return; // ⛔ prevent double click
-     // Final validation
-  if (errors.name || errors.description || !newVolume.name) {
-    alert('Please fix the errors before submitting.');
-    return;
-  }
+    // Final validation
+    if (errors.name || errors.description || !newVolume.name) {
+      alert("Please fix the errors before submitting.");
+      return;
+    }
 
-  if (!newVolume.size || newVolume.size <= 0) {
-    alert('Size must be greater than 0.');
-    return;
-  }
+    if (!newVolume.size || newVolume.size <= 0) {
+      alert("Size must be greater than 0.");
+      return;
+    }
 
     const payload = {
       name: newVolume.name,
@@ -322,40 +344,42 @@ const Volumes = () => {
       type: newVolume.volume_type, // Map volume_type to 'type' for API
     };
 
-    if (newVolume.volume_source === 'image' && newVolume.image_name) {
+    if (newVolume.volume_source === "image" && newVolume.image_name) {
       payload.image_name = newVolume.image_name;
-    } else if (newVolume.volume_source !== 'none') {
-        // Handle other sources if your API supports them in a different way,
-        // for now, based on your example, only 'image_name' is shown.
-        // If snapshot/volume source ID is also expected, you'll need to add a field for it
-        // and add it to the payload. For this example, we only cover image_name.
+    } else if (newVolume.volume_source !== "none") {
+      // Handle other sources if your API supports them in a different way,
+      // for now, based on your example, only 'image_name' is shown.
+      // If snapshot/volume source ID is also expected, you'll need to add a field for it
+      // and add it to the payload. For this example, we only cover image_name.
     }
-
 
     try {
       setCreating(true); // 🔄 START LOADER
-      const response = await apiClient.post('/create-volume/', payload);
+      const response = await apiClient.post("/create-volume/", payload);
       if (response.status === 201 || response.status === 200) {
-        alert('Volume created successfully');
+        alert("Volume created successfully");
         setShowCreateForm(false);
         setNewVolume({
-          name: '',
-          description: '',
-          volume_source: 'none',
-          image_name: '',
-          volume_type: '_Default_',
+          name: "",
+          description: "",
+          volume_source: "none",
+          image_name: "",
+          volume_type: "_Default_",
           size: 1,
-          availability_zone: 'nova',
+          availability_zone: "nova",
         });
         fetchVolumes();
       } else {
         alert(`Failed to create volume. Status: ${response.status}`);
       }
     } catch (error) {
-      console.error('Error creating volume:', error);
-      alert(`Error creating volume: ${error.response?.data?.message || error.message || 'Unknown error'}`);
-    }
-    finally {
+      console.error("Error creating volume:", error);
+      alert(
+        `Error creating volume: ${
+          error.response?.data?.message || error.message || "Unknown error"
+        }`
+      );
+    } finally {
       setCreating(false); // ✅ STOP LOADER
     }
   };
@@ -364,42 +388,48 @@ const Volumes = () => {
     e.preventDefault();
 
     if (updating) return; // ⛔ prevent double submit
-    if (!volumeToUpdate.id ) {
-      alert('Volume ID and status are required for update.');
+    if (!volumeToUpdate.id) {
+      alert("Volume ID and status are required for update.");
       return;
     }
 
     try {
       setUpdating(true); // 🔄 START LOADER
       // Use the specific update-volume-status API endpoint
-      const response = await apiClient.post(`/update-volume-status/${volumeToUpdate.id}/`, {
-        status: volumeToUpdate.status,
-      });
+      const response = await apiClient.post(
+        `/update-volume-status/${volumeToUpdate.id}/`,
+        {
+          status: volumeToUpdate.status,
+        }
+      );
 
       if (response.status === 200) {
-        alert('Volume status updated successfully');
+        alert("Volume status updated successfully");
         setShowUpdateForm(false);
         setVolumeToUpdate(null);
         fetchVolumes();
       } else {
-        alert(`Unexpected response. Please try again. Status: ${response.status}`);
+        alert(
+          `Unexpected response. Please try again. Status: ${response.status}`
+        );
       }
     } catch (error) {
-      alert('Error updating volume status');
+      alert("Error updating volume status");
       console.error(error);
-    }
-    finally {
+    } finally {
       setUpdating(false); // ✅ STOP LOADER
     }
   };
 
   const handleDeleteSelectedVolumes = async () => {
     if (selectedVolumes.length === 0) {
-      alert('No volumes selected for deletion');
+      alert("No volumes selected for deletion");
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete the selected volumes?')) {
+    if (
+      !window.confirm("Are you sure you want to delete the selected volumes?")
+    ) {
       return;
     }
 
@@ -408,36 +438,40 @@ const Volumes = () => {
         await apiClient.delete(`/delete-volume/${volumeId}/`);
       }
 
-      alert('Selected volumes deleted successfully');
+      alert("Selected volumes deleted successfully");
       setSelectedVolumes([]);
       fetchVolumes();
     } catch (error) {
-      console.error('Error deleting selected volumes:', error);
-      alert('An error occurred while deleting selected volumes.');
+      console.error("Error deleting selected volumes:", error);
+      alert("An error occurred while deleting selected volumes.");
     }
   };
 
   const handleDeleteVolume = async (volumeId) => {
-    if (!window.confirm('Are you sure you want to delete this volume?')) {
+    if (!window.confirm("Are you sure you want to delete this volume?")) {
       return;
     }
 
     try {
       const response = await apiClient.delete(`/delete-volume/${volumeId}/`);
       if (response.status === 200 || response.status === 204) {
-        alert('Volume deleted successfully');
+        alert("Volume deleted successfully");
         fetchVolumes();
       } else {
-        console.error('Unexpected response:', response);
-        alert('Unexpected server response while deleting the volume.');
+        console.error("Unexpected response:", response);
+        alert("Unexpected server response while deleting the volume.");
       }
     } catch (error) {
       if (error.response) {
-        console.error('Server error:', error.response);
-        alert(`Failed to delete the volume: ${error.response.data.message || 'Unknown error'}`);
+        console.error("Server error:", error.response);
+        alert(
+          `Failed to delete the volume: ${
+            error.response.data.message || "Unknown error"
+          }`
+        );
       } else {
-        console.error('Error:', error.message);
-        alert('An error occurred while attempting to delete the volume.');
+        console.error("Error:", error.message);
+        alert("An error occurred while attempting to delete the volume.");
       }
     }
   };
@@ -448,40 +482,42 @@ const Volumes = () => {
 
   const formatAge = (isoDate) => {
     if (!isoDate) return "N/A";
-  
+
     const created = new Date(isoDate);
     const now = new Date();
-  
+
     let diffMs = now - created;
     if (diffMs < 0) return "Just now";
-  
+
     const minutes = Math.floor(diffMs / (1000 * 60));
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
     if (days > 0) {
       const remainingHours = hours % 24;
-      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${remainingHours !== 1 ? "s" : ""}`;
+      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${
+        remainingHours !== 1 ? "s" : ""
+      }`;
     }
-  
+
     if (hours > 0) {
       const remainingMinutes = minutes % 60;
       return `${hours} hour${hours > 1 ? "s" : ""}, ${remainingMinutes} min`;
     }
-  
+
     return `${minutes} min`;
   };
-  
+
   const modalStyle = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
     width: 400,
     bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
-    borderRadius: '8px',
+    borderRadius: "8px",
   };
 
   return (
@@ -496,24 +532,36 @@ const Volumes = () => {
             onChange={handleSearchChange}
             variant="outlined"
           />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="contained"  onClick={() => setShowCreateForm(true)}
-               sx={{
-                backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button
+              variant="contained"
+              onClick={() => setShowCreateForm(true)}
+              sx={{
+                backgroundColor:
+                  theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
                 color: "#fff",
                 "&:hover": {
-                  backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
-                }
-              }} > 
+                  backgroundColor:
+                    theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+                },
+              }}
+            >
               Create Volume <RiBallPenLine />
             </Button>
-            <Button variant="contained" color="error" onClick={handleDeleteSelectedVolumes}>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={handleDeleteSelectedVolumes}
+            >
               Delete <RiDeleteBin6Line />
             </Button>
           </div>
         </div>
       </div>
-      <Modal open={showCreateForm} onClose={ creating ? undefined :  () => setShowCreateForm(false)}>
+      <Modal
+        open={showCreateForm}
+        onClose={creating ? undefined : () => setShowCreateForm(false)}
+      >
         <Box sx={modalStyle}>
           <h2>Create New Volume</h2>
           <form onSubmit={handleCreateVolume}>
@@ -523,7 +571,7 @@ const Volumes = () => {
                 name="name" // Changed name to 'name'
                 placeholder="Volume Name"
                 onChange={handleInputChange}
-                value={newVolume.name} 
+                value={newVolume.name}
                 // Use newVolume.name
                 error={!!errors.name}
                 helperText={errors.name}
@@ -557,7 +605,7 @@ const Volumes = () => {
               </Select>
             </FormControl>
 
-            {newVolume.volume_source === 'image' && (
+            {newVolume.volume_source === "image" && (
               <FormControl fullWidth margin="normal">
                 <InputLabel id="image-name-label">Source Image</InputLabel>
                 <Select
@@ -569,7 +617,9 @@ const Volumes = () => {
                   required
                 >
                   {images.map((image) => (
-                    <MenuItem key={image.id} value={image.name}> {/* Assuming image object has 'id' and 'name' */}
+                    <MenuItem key={image.id} value={image.name}>
+                      {" "}
+                      {/* Assuming image object has 'id' and 'name' */}
                       {image.name}
                     </MenuItem>
                   ))}
@@ -577,12 +627,19 @@ const Volumes = () => {
               </FormControl>
             )}
 
-            {(newVolume.volume_source === 'snapshot' || newVolume.volume_source === 'volume') && (
+            {(newVolume.volume_source === "snapshot" ||
+              newVolume.volume_source === "volume") && (
               <FormControl fullWidth margin="normal">
                 <TextField
-                  label={`Source ${newVolume.volume_source.charAt(0).toUpperCase() + newVolume.volume_source.slice(1)} ID`}
+                  label={`Source ${
+                    newVolume.volume_source.charAt(0).toUpperCase() +
+                    newVolume.volume_source.slice(1)
+                  } ID`}
                   name="volume_source_id" // This would be sent to the API if it accepts snapshot/volume UUIDs directly
-                  placeholder={`${newVolume.volume_source.charAt(0).toUpperCase() + newVolume.volume_source.slice(1)} UUID`}
+                  placeholder={`${
+                    newVolume.volume_source.charAt(0).toUpperCase() +
+                    newVolume.volume_source.slice(1)
+                  } UUID`}
                   onChange={handleInputChange}
                   value={newVolume.volume_source_id}
                   required
@@ -619,7 +676,9 @@ const Volumes = () => {
               />
             </FormControl>
             <FormControl fullWidth margin="normal">
-              <InputLabel id="availability-zone-label">Availability Zone</InputLabel>
+              <InputLabel id="availability-zone-label">
+                Availability Zone
+              </InputLabel>
               <Select
                 label="availability-zone-label"
                 id="availability_zone"
@@ -632,15 +691,25 @@ const Volumes = () => {
                 </MenuItem>
               </Select>
             </FormControl>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }} disabled={creating}>
-              {creating ? (
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{ mr: 1 }}
+                disabled={creating}
+              >
+                {creating ? (
                   <CircularProgress size={22} sx={{ color: "#fff" }} />
                 ) : (
                   "Create"
                 )}
               </Button>
-              <Button type="button" onClick={() => setShowCreateForm(false)} variant="outlined">
+              <Button
+                type="button"
+                onClick={() => setShowCreateForm(false)}
+                variant="outlined"
+              >
                 Cancel
               </Button>
             </Box>
@@ -648,7 +717,7 @@ const Volumes = () => {
         </Box>
       </Modal>
 
-      <Modal open={showUpdateForm} onClose={ () => setShowUpdateForm(false)}>
+      <Modal open={showUpdateForm} onClose={() => setShowUpdateForm(false)}>
         <Box sx={modalStyle}>
           <h2>Update Volume Status</h2>
           <form onSubmit={handleUpdateVolume}>
@@ -658,22 +727,33 @@ const Volumes = () => {
                 labelId="status-label"
                 id="status"
                 name="status"
-                value={volumeToUpdate?.status || ''}
+                value={volumeToUpdate?.status || ""}
                 onChange={handleUpdateStatusChange}
                 label="Status"
               >
                 {statusOptions.map((status) => (
                   <MenuItem key={status} value={status}>
-                    {status.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())}
+                    {status
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (char) => char.toUpperCase())}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-              <Button type="submit" variant="contained" color="primary" sx={{ mr: 1 }}>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{ mr: 1 }}
+              >
                 Update Status
               </Button>
-              <Button type="button" onClick={() => setShowUpdateForm(false)} variant="outlined">
+              <Button
+                type="button"
+                onClick={() => setShowUpdateForm(false)}
+                variant="outlined"
+              >
                 Cancel
               </Button>
             </Box>
@@ -696,18 +776,18 @@ const Volumes = () => {
           boxShadow: theme.shadows[3],
         })}
       >
-        <Table 
-        sx={{
-          width: "100%",
-          minWidth: 650,
-          tableLayout: "auto",
-      
-          // REMOVE ALL BORDERS
-          border: "none !important",
-          "& td, & th": { border: "none !important" },
-          "& .MuiTableCell-root": { borderBottom: "none !important" },
-          "& .MuiTableRow-root": { border: "none !important" },
-        }}
+        <Table
+          sx={{
+            width: "100%",
+            minWidth: 650,
+            tableLayout: "auto",
+
+            // REMOVE ALL BORDERS
+            border: "none !important",
+            "& td, & th": { border: "none !important" },
+            "& .MuiTableCell-root": { borderBottom: "none !important" },
+            "& .MuiTableRow-root": { border: "none !important" },
+          }}
         >
           <TableHead>
             <TableRow>
@@ -715,8 +795,15 @@ const Volumes = () => {
                 <input
                   type="checkbox"
                   onChange={handleSelectAll}
-                  checked={filteredVolumes.length > 0 &&
-                    filteredVolumes.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).every(volume => selectedVolumes.includes(volume.id))}
+                  checked={
+                    filteredVolumes.length > 0 &&
+                    filteredVolumes
+                      .slice(
+                        page * rowsPerPage,
+                        page * rowsPerPage + rowsPerPage
+                      )
+                      .every((volume) => selectedVolumes.includes(volume.id))
+                  }
                 />
               </StyledTableCell>
               <StyledTableCell>Sr. No.</StyledTableCell>
@@ -749,14 +836,38 @@ const Volumes = () => {
                     </StyledTableCell>
                     <StyledTableCell>{volume.name}</StyledTableCell>
                     <StyledTableCell>{volume.host}</StyledTableCell>
-                    <StyledTableCell>{volume.attached_to}</StyledTableCell>
+                    <StyledTableCell>
+                      {volume.attached_to ? (
+                        <Typography
+                          sx={{
+                            cursor: "pointer",
+                            color: theme.palette.primary.main,
+                            textDecoration: "underline",
+                          }}
+                          onClick={() =>
+                            handleAttachedToClick(volume.attached_instance_id)
+                          } // add attached_instance_id in your API
+                        >
+                          {volume.attached_to}
+                        </Typography>
+                      ) : (
+                        "N/A"
+                      )}
+                    </StyledTableCell>
+
                     <StyledTableCell>{volume.id}</StyledTableCell>
                     <StyledTableCell>{volume.status}</StyledTableCell>
                     <StyledTableCell>{volume.volume_type}</StyledTableCell>
                     <StyledTableCell>{volume.size}</StyledTableCell>
-                    <StyledTableCell>{formatAge(volume.created_at)}</StyledTableCell>
-                    <StyledTableCell>{volume.bootable ? "Yes" : "No"}</StyledTableCell>
-                    <StyledTableCell>{volume.encryption ? "Yes" : "No"}</StyledTableCell>
+                    <StyledTableCell>
+                      {formatAge(volume.created_at)}
+                    </StyledTableCell>
+                    <StyledTableCell>
+                      {volume.bootable ? "Yes" : "No"}
+                    </StyledTableCell>
+                    <StyledTableCell>
+                      {volume.encryption ? "Yes" : "No"}
+                    </StyledTableCell>
                     <StyledTableCell>
                       <Button
                         size="small"
@@ -771,37 +882,81 @@ const Volumes = () => {
             )}
           </TableBody>
         </Table>
-         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
-                <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 7, 10]}
-                    component="div"
-                    count={filteredVolumes.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handlePageChange}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    sx={{
-                      borderTop: "none",
-                      width: "100%",
-                    }}
-                  />
-                </Box>
-      </TableContainer>
+        <Modal
+          open={instanceModalOpen}
+          onClose={() => setInstanceModalOpen(false)}
+        >
+          <Box sx={modalStyle}>
+            <h2>Instance Details</h2>
+            {instanceDetails ? (
+              <Box>
+                <p>
+                  <strong>Name:</strong> {instanceDetails.name}
+                </p>
+                <p>
+                  <strong>ID:</strong> {instanceDetails.id}
+                </p>
+                <p>
+                  <strong>Status:</strong> {instanceDetails.status}
+                </p>
+                <p>
+                  <strong>IP:</strong> {instanceDetails.ip || "N/A"}
+                </p>
+                <p>
+                  <strong>Flavor:</strong> {instanceDetails.flavor || "N/A"}
+                </p>
+                <p>
+                  <strong>Host:</strong> {instanceDetails.host}
+                </p>
+                <p>
+                  <strong>Volumes Attached:</strong>{" "}
+                  {instanceDetails.volumes?.join(", ") || "None"}
+                </p>
+              </Box>
+            ) : (
+              <CircularProgress />
+            )}
+          </Box>
+        </Modal>
 
+        {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+          <TablePagination
+            rowsPerPageOptions={[5, 7, 10]}
+            component="div"
+            count={filteredVolumes.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handlePageChange}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={{
+              borderTop: "none",
+              width: "100%",
+            }}
+          />
+        </Box>
+      </TableContainer>
     </div>
   );
 };
 
 // Inline CSS Styles
-const volumesContainerStyle = { padding: '20px', fontFamily: 'sans-serif' };
+const volumesContainerStyle = { padding: "20px", fontFamily: "sans-serif" };
 const headerContainerVolumesStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '20px',
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
 };
-const searchContainerStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
-const volumesTableStyle = { width: '100%', borderCollapse: 'collapse', marginTop: '20px' };
+const searchContainerStyle = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+};
+const volumesTableStyle = {
+  width: "100%",
+  borderCollapse: "collapse",
+  marginTop: "20px",
+};
 
 export default Volumes;

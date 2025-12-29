@@ -10,6 +10,7 @@ import ReactFlow, {
   NodeToolbar,
 } from "reactflow";
 import "reactflow/dist/style.css"; 
+import "../style.css";
 import dagre from "dagre";
 import {
   Box,
@@ -206,7 +207,7 @@ export default function NetworkTopology() {
   const [formErrors, setFormErrors] = useState({});
   const [projects, setProjects] = useState([]);
   const [rawNetworksList, setRawNetworksList] = useState([]); // Needed for dropdown
-  
+    const [error, setError] = useState(null);
   const [newRouter, setNewRouter] = useState({
     name: '',
     admin_state_up: true,
@@ -339,7 +340,36 @@ export default function NetworkTopology() {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
   }, [setNodes]);
 
-  if (loading) return <Box sx={{ display: "flex", justifyContent: "center", mt: 10 }}><CircularProgress /></Box>;
+ 
+    if (loading) {
+      return (
+        <div className="cloud-container">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="7.87722 9.61948 33.01 16.88"
+          >
+            <path
+              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+              className="cloud-back"
+            />
+            <path
+              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+              className="cloud-front"
+            />
+          </svg>
+          <div className="loading-message">Loading...</div>
+        </div>
+      );
+    }
+  
+    if (error) {
+      return (
+        <div className="error-message">
+          <GoAlert />
+          <h2>❌ Server Down</h2>
+        </div>
+      );
+    }
 
   return (
     <Box sx={{ width: "100%", height: "90vh", bgcolor: "#f8f9fa", display: "flex", flexDirection: "column" }}>

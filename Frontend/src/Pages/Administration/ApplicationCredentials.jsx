@@ -1,28 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import apiClient from '../../Axios';
+import React, { useEffect, useState } from "react";
+import apiClient from "../../Axios";
+import { Tooltip } from "@mui/material";
+
 import {
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Paper, Button, TextField, Box, Modal, FormControl, Snackbar, Alert,
-  Slide, TablePagination, Checkbox, InputLabel, Select, MenuItem, Chip ,useTheme
-} from '@mui/material';
-import { styled } from '@mui/material/styles';
-import { tableCellClasses } from '@mui/material/TableCell';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { DatePicker, TimePicker } from '@mui/x-date-pickers';
-import dayjs from 'dayjs';
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Button,
+  TextField,
+  Box,
+  Modal,
+  FormControl,
+  Snackbar,
+  Alert,
+  Slide,
+  TablePagination,
+  Checkbox,
+  InputLabel,
+  Select,
+  MenuItem,
+  Chip,
+  useTheme,
+} from "@mui/material";
+import { styled } from "@mui/material/styles";
+import { tableCellClasses } from "@mui/material/TableCell";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker, TimePicker } from "@mui/x-date-pickers";
+import dayjs from "dayjs";
 import {
   CheckCircleOutline,
   ErrorOutline,
   InfoOutlined,
-  WarningOutlined
-} from '@mui/icons-material';
+  WarningOutlined,
+} from "@mui/icons-material";
 import Skeleton from "@mui/material/Skeleton";
 
-import { RiDeleteBin6Line, RiBallPenLine } from 'react-icons/ri';
-import { GoAlert } from 'react-icons/go';
-import '../style.css';
-import { CircularProgress } from '@mui/material';
+import { RiDeleteBin6Line, RiBallPenLine } from "react-icons/ri";
+import { GoAlert } from "react-icons/go";
+import "../style.css";
+import { CircularProgress } from "@mui/material";
 
 // ---------- Styled Components ----------
 // Styled Table Components
@@ -48,7 +69,6 @@ const StyledTableCell = styled(TableCell)(({ theme }) => ({
   },
 }));
 
-
 const StyledTableRow = styled(TableRow)(({ theme }) => ({
   backgroundColor:
     theme.palette.mode === "dark"
@@ -73,7 +93,7 @@ const ApplicationCredentials = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selectedCredentials, setSelectedCredentials] = useState([]);
@@ -82,28 +102,27 @@ const ApplicationCredentials = () => {
   const [availableRoles, setAvailableRoles] = useState([]);
 
   const [newCredential, setNewCredential] = useState({
-    name: '',
-    description: '',
-    secret: '',
-    expiration_date: '',
-    expiration_time: '',
+    name: "",
+    description: "",
+    secret: "",
+    expiration_date: "",
+    expiration_time: "",
     roles: [],
     unrestricted: false,
   });
   const [creating, setCreating] = useState(false);
 
-
   // Snackbar
-   const theme = useTheme();
+  const theme = useTheme();
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
-  const [snackbarSeverity, setSnackbarSeverity] = useState('success');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState("success");
 
   const [errors, setErrors] = useState({
     name: "",
-    description: ""
+    description: "",
   });
-  
+
   // ---------- Snackbar Functions ----------
   const showSnackbar = (message, severity) => {
     setSnackbarMessage(message);
@@ -112,19 +131,19 @@ const ApplicationCredentials = () => {
   };
 
   const handleSnackbarClose = (_, reason) => {
-    if (reason === 'clickaway') return;
+    if (reason === "clickaway") return;
     setSnackbarOpen(false);
   };
 
   // ---------- Fetch Data ----------
   const fetchApplicationCredentials = async () => {
-    setLoading(true); 
+    setLoading(true);
     setError(null);
     try {
-      const res = await apiClient.get('/identity/application-credentials/');
+      const res = await apiClient.get("/identity/application-credentials/");
       setCredentials(res.data?.data || []);
     } catch (err) {
-      console.error('Error fetching credentials:', err);
+      console.error("Error fetching credentials:", err);
       setError(err);
     } finally {
       setLoading(false);
@@ -133,10 +152,10 @@ const ApplicationCredentials = () => {
 
   const fetchRoles = async () => {
     try {
-      const res = await apiClient.get('/roles/');
+      const res = await apiClient.get("/roles/");
       setAvailableRoles(res.data);
     } catch (err) {
-      console.error('Error fetching roles:', err);
+      console.error("Error fetching roles:", err);
     }
   };
 
@@ -144,6 +163,37 @@ const ApplicationCredentials = () => {
     fetchApplicationCredentials();
     fetchRoles();
   }, []);
+
+  const formatExpiration = (isoDate) => {
+    if (!isoDate) return "N/A";
+
+    // Normalize string to remove microseconds
+    const normalized = isoDate.split(".")[0] + "Z";
+    const expiry = new Date(normalized);
+    const now = new Date();
+
+    let diffMs = expiry - now;
+
+    if (diffMs <= 0) return "Expired";
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (days > 0) {
+      const remainingHours = hours % 24;
+      return `${days} day${days > 1 ? "s" : ""}, ${remainingHours} hour${
+        remainingHours !== 1 ? "s" : ""
+      }`;
+    }
+
+    if (hours > 0) {
+      const remainingMinutes = minutes % 60;
+      return `${hours} hour${hours > 1 ? "s" : ""}, ${remainingMinutes} min`;
+    }
+
+    return `${minutes} min`;
+  };
 
   // ---------- Handlers ----------
   const handleSearchChange = (e) => {
@@ -185,103 +235,115 @@ const ApplicationCredentials = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-  
+
     let errorMsg = "";
-  
+
     if (name === "name") {
       if (!/^[A-Za-z0-9_-]{3,30}$/.test(value)) {
-        errorMsg = "Name must be 3–30 characters, only letters, numbers, - and _ allowed.";
+        errorMsg =
+          "Name must be 3–30 characters, only letters, numbers, - and _ allowed.";
       }
     }
-  
+
     if (name === "description") {
       if (value && !/^[A-Za-z0-9 .,_-]{3,100}$/.test(value)) {
-        errorMsg = "Description must be 3–100 characters (letters, numbers, spaces allowed).";
+        errorMsg =
+          "Description must be 3–100 characters (letters, numbers, spaces allowed).";
       }
     }
-  
+
     setErrors((prev) => ({ ...prev, [name]: errorMsg }));
-  
+
     setNewCredential((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
-  
 
   const handleRoleChange = (e) => {
     const { value } = e.target;
     setNewCredential((prev) => ({
       ...prev,
-      roles: typeof value === 'string' ? value.split(',') : value,
+      roles: typeof value === "string" ? value.split(",") : value,
     }));
   };
 
   // ---------- Create Credential ----------
   const handleCreateCredential = async (e) => {
     e.preventDefault();
-    if (creating) return; 
+    if (creating) return;
     const payload = { ...newCredential };
     try {
-      setCreating(true); 
-      const res = await apiClient.post('/identity/application-credentials/', payload);
+      setCreating(true);
+      const res = await apiClient.post(
+        "/identity/application-credentials/",
+        payload
+      );
       if ([200, 201].includes(res.status)) {
-        showSnackbar('Credential created successfully', 'success');
+        showSnackbar("Credential created successfully", "success");
         setShowCreateForm(false);
         setNewCredential({
-          name: '',
-          description: '',
-          secret: '',
-          expiration_date: '',
-          expiration_time: '',
+          name: "",
+          description: "",
+          secret: "",
+          expiration_date: "",
+          expiration_time: "",
           roles: [],
           unrestricted: false,
         });
         fetchApplicationCredentials();
       } else {
-        showSnackbar('Unexpected response from server', 'error');
+        showSnackbar("Unexpected response from server", "error");
       }
     } catch (err) {
-      console.error('Error creating credential:', err);
-      showSnackbar(err.response?.data?.detail || 'Failed to create credential', 'error');
-    }
-    finally {
+      console.error("Error creating credential:", err);
+      showSnackbar(
+        err.response?.data?.detail || "Failed to create credential",
+        "error"
+      );
+    } finally {
       setCreating(false); // ✅ STOP LOADER
     }
   };
 
   // ---------- Delete Credential ----------
   const handleDeleteCredential = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this credential?')) return;
+    if (!window.confirm("Are you sure you want to delete this credential?"))
+      return;
     try {
-      const res = await apiClient.delete(`/identity/application-credentials/${id}/`);
+      const res = await apiClient.delete(
+        `/identity/application-credentials/${id}/`
+      );
       if ([200, 204].includes(res.status)) {
-        showSnackbar('Credential deleted successfully', 'success');
+        showSnackbar("Credential deleted successfully", "success");
         fetchApplicationCredentials();
       } else {
-        showSnackbar('Error deleting credential', 'error');
+        showSnackbar("Error deleting credential", "error");
       }
     } catch {
-      showSnackbar('Error deleting credential', 'error');
+      showSnackbar("Error deleting credential", "error");
     }
   };
 
   const handleDeleteSelected = async () => {
     if (selectedCredentials.length === 0) {
-      showSnackbar('No credentials selected for deletion', 'warning');
+      showSnackbar("No credentials selected for deletion", "warning");
       return;
     }
-    if (!window.confirm('Are you sure you want to delete selected credentials?')) return;
+    if (
+      !window.confirm("Are you sure you want to delete selected credentials?")
+    )
+      return;
 
     try {
       for (const id of selectedCredentials) {
         await apiClient.delete(`/identity/application-credentials/${id}/`);
       }
-      showSnackbar('Selected credentials deleted successfully', 'success');
+      showSnackbar("Selected credentials deleted successfully", "success");
       setSelectedCredentials([]);
       fetchApplicationCredentials();
     } catch {
-      showSnackbar('Error deleting selected credentials', 'error');
+      showSnackbar("Error deleting selected credentials", "error");
     }
   };
 
@@ -291,7 +353,10 @@ const ApplicationCredentials = () => {
   if (showInitialLoader) {
     return (
       <div className="cloud-container">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="7.87722 9.61948 33.01 16.88">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="7.87722 9.61948 33.01 16.88"
+        >
           <path
             d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
             className="cloud-back"
@@ -305,7 +370,6 @@ const ApplicationCredentials = () => {
       </div>
     );
   }
-  
 
   if (error) {
     return (
@@ -323,31 +387,31 @@ const ApplicationCredentials = () => {
           <StyledTableCell>
             <Skeleton variant="rectangular" width={18} height={18} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={30} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={140} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={180} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={120} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={160} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Skeleton width={180} />
           </StyledTableCell>
-  
+
           <StyledTableCell>
             <Box display="flex" justifyContent="center">
               <Skeleton variant="rectangular" width={70} height={30} />
@@ -358,26 +422,29 @@ const ApplicationCredentials = () => {
     </>
   );
 
-  
   // ---------- Modal Styles ----------
   const modalStyle = {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    transform: "translate(-50%, -50%)",
     width: 600,
     bgcolor: theme.palette.background.paper,
     boxShadow: 24,
     p: 4,
-    borderRadius: '8px',
+    borderRadius: "8px",
   };
 
   const getAlertIcon = (sev) => {
     switch (sev) {
-      case 'success': return <CheckCircleOutline sx={{ mr: 1 }} />;
-      case 'error': return <ErrorOutline sx={{ mr: 1 }} />;
-      case 'warning': return <WarningOutlined sx={{ mr: 1 }} />;
-      default: return <InfoOutlined sx={{ mr: 1 }} />;
+      case "success":
+        return <CheckCircleOutline sx={{ mr: 1 }} />;
+      case "error":
+        return <ErrorOutline sx={{ mr: 1 }} />;
+      case "warning":
+        return <WarningOutlined sx={{ mr: 1 }} />;
+      default:
+        return <InfoOutlined sx={{ mr: 1 }} />;
     }
   };
 
@@ -393,16 +460,18 @@ const ApplicationCredentials = () => {
             onChange={handleSearchChange}
             variant="outlined"
           />
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: "flex", gap: "8px" }}>
             <Button
               variant="contained"
               sx={{
-                backgroundColor: theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
+                backgroundColor:
+                  theme.palette.mode === "light" ? "#2e7d32" : "#388e3c",
                 color: "#fff",
                 "&:hover": {
-                  backgroundColor: theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
-                }
-              }} 
+                  backgroundColor:
+                    theme.palette.mode === "light" ? "#1b5e20" : "#2e7d32",
+                },
+              }}
               onClick={() => setShowCreateForm(true)}
             >
               Create <RiBallPenLine />
@@ -420,59 +489,74 @@ const ApplicationCredentials = () => {
 
       {/* ---------- Create Modal ---------- */}
       <Modal
-          open={showCreateForm}
-          onClose={creating ? undefined : () => setShowCreateForm(false)}
-        >
-
+        open={showCreateForm}
+        onClose={creating ? undefined : () => setShowCreateForm(false)}
+      >
         <Box sx={modalStyle}>
           <h2>Create Application Credential</h2>
           <form onSubmit={handleCreateCredential}>
-          <TextField
-            fullWidth
-            label="Name"
-            name="name"
-            value={newCredential.name}
-            onChange={handleInputChange}
-            required
-            margin="normal"
-            error={Boolean(errors.name)}
-            helperText={errors.name}
-          />
+            <TextField
+              fullWidth
+              label="Name"
+              name="name"
+              value={newCredential.name}
+              onChange={handleInputChange}
+              required
+              margin="normal"
+              error={Boolean(errors.name)}
+              helperText={errors.name}
+            />
 
-          <TextField
-            fullWidth
-            label="Description"
-            name="description"
-            value={newCredential.description}
-            onChange={handleInputChange}
-            margin="normal"
-            error={Boolean(errors.description)}
-            helperText={errors.description}
-          />
-            <TextField fullWidth label="Secret" name="secret" value={newCredential.secret} onChange={handleInputChange} margin="normal" required />
+            <TextField
+              fullWidth
+              label="Description"
+              name="description"
+              value={newCredential.description}
+              onChange={handleInputChange}
+              margin="normal"
+              error={Boolean(errors.description)}
+              helperText={errors.description}
+            />
+            <TextField
+              fullWidth
+              label="Secret"
+              name="secret"
+              value={newCredential.secret}
+              onChange={handleInputChange}
+              margin="normal"
+              required
+            />
 
             <LocalizationProvider dateAdapter={AdapterDayjs}>
               <DatePicker
                 label="Expiration Date"
-                value={newCredential.expiration_date ? dayjs(newCredential.expiration_date) : null}
+                value={
+                  newCredential.expiration_date
+                    ? dayjs(newCredential.expiration_date)
+                    : null
+                }
                 onChange={(date) =>
                   setNewCredential((prev) => ({
                     ...prev,
-                    expiration_date: date ? date.format('MM/DD/YYYY') : '',
+                    expiration_date: date ? date.format("MM/DD/YYYY") : "",
                   }))
                 }
-                slotProps={{ textField: { fullWidth: true, margin: 'normal' } }}
+                slotProps={{ textField: { fullWidth: true, margin: "normal" } }}
               />
               <TimePicker
                 label="Expiration Time"
-                value={newCredential.expiration_time ? dayjs(newCredential.expiration_time, 'HH:mm') : null}
+                value={
+                  newCredential.expiration_time
+                    ? dayjs(newCredential.expiration_time, "HH:mm")
+                    : null
+                }
                 onChange={(time) =>
                   setNewCredential((prev) => ({
                     ...prev,
-                    expiration_time: time ? time.format('HH:mm') : '',
+                    expiration_time: time ? time.format("HH:mm") : "",
                   }))
                 }
-                slotProps={{ textField: { fullWidth: true, margin: 'normal' } }}
+                slotProps={{ textField: { fullWidth: true, margin: "normal" } }}
               />
             </LocalizationProvider>
 
@@ -483,51 +567,54 @@ const ApplicationCredentials = () => {
                 value={newCredential.roles}
                 onChange={handleRoleChange}
                 renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((v) => <Chip key={v} label={v} />)}
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                    {selected.map((v) => (
+                      <Chip key={v} label={v} />
+                    ))}
                   </Box>
                 )}
               >
                 {availableRoles.map((r) => (
-                  <MenuItem key={r.id} value={r.name}>{r.name}</MenuItem>
+                  <MenuItem key={r.id} value={r.name}>
+                    {r.name}
+                  </MenuItem>
                 ))}
               </Select>
             </FormControl>
 
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-            <Button
-              type="submit"
-              variant="contained"
-              color="primary"
-              sx={{ mr: 1 }}
-              disabled={creating}
-            >
-              {creating ? (
-                <CircularProgress size={22} sx={{ color: '#fff' }} />
-              ) : (
-                'Create'
-              )}
-            </Button>
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+              <Button
+                type="submit"
+                variant="contained"
+                color="primary"
+                sx={{ mr: 1 }}
+                disabled={creating}
+              >
+                {creating ? (
+                  <CircularProgress size={22} sx={{ color: "#fff" }} />
+                ) : (
+                  "Create"
+                )}
+              </Button>
 
               <Button
-                  type="button"
-                  onClick={() => {
-                    setShowCreateForm(false);
-                    setNewCredential({
-                      name: '',
-                      description: '',
-                      secret: '',
-                      expiration_date: '',
-                      expiration_time: '',
-                      roles: [],
-                      unrestricted: false,
-                    });
-                  }}
-                  variant="outlined"
-                >
-                  Cancel
-                </Button>
-
+                type="button"
+                onClick={() => {
+                  setShowCreateForm(false);
+                  setNewCredential({
+                    name: "",
+                    description: "",
+                    secret: "",
+                    expiration_date: "",
+                    expiration_time: "",
+                    roles: [],
+                    unrestricted: false,
+                  });
+                }}
+                variant="outlined"
+              >
+                Cancel
+              </Button>
             </Box>
           </form>
         </Box>
@@ -535,40 +622,44 @@ const ApplicationCredentials = () => {
 
       {/* ---------- Table ---------- */}
       <TableContainer
-  component={Paper}
-  sx={(theme) => ({
-    width: "fit-content",
-    minWidth: "75%",
-    maxWidth: "100%",
-    margin: "0 auto",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "center",
+        component={Paper}
+        sx={(theme) => ({
+          width: "fit-content",
+          minWidth: "75%",
+          maxWidth: "100%",
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
 
-    backgroundColor: theme.palette.background.paper,
-    boxShadow: theme.shadows[3],
-  })}
->
-
+          backgroundColor: theme.palette.background.paper,
+          boxShadow: theme.shadows[3],
+        })}
+      >
         <Table
-        sx={{
-          width: "100%",
-          minWidth: 650,
-          tableLayout: "auto",
-      
-          // REMOVE ALL BORDERS
-          border: "none !important",
-          "& td, & th": { border: "none !important" },
-          "& .MuiTableCell-root": { borderBottom: "none !important" },
-          "& .MuiTableRow-root": { border: "none !important" },
-        }}
+          sx={{
+            width: "100%",
+            minWidth: 650,
+            tableLayout: "auto",
+
+            // REMOVE ALL BORDERS
+            border: "none !important",
+            "& td, & th": { border: "none !important" },
+            "& .MuiTableCell-root": { borderBottom: "none !important" },
+            "& .MuiTableRow-root": { border: "none !important" },
+          }}
         >
           <TableHead>
             <TableRow>
               <StyledTableCell>
                 <Checkbox
                   onChange={handleSelectAll}
-                  checked={currentCredentials.length > 0 && currentCredentials.every((c) => selectedCredentials.includes(c.id))}
+                  checked={
+                    currentCredentials.length > 0 &&
+                    currentCredentials.every((c) =>
+                      selectedCredentials.includes(c.id)
+                    )
+                  }
                 />
               </StyledTableCell>
               <StyledTableCell>Sr. No.</StyledTableCell>
@@ -580,77 +671,102 @@ const ApplicationCredentials = () => {
               <StyledTableCell>Actions</StyledTableCell>
             </TableRow>
           </TableHead>
-          
 
           <TableBody>
-  {loading ? (
-    <CredentialTableSkeleton rows={rowsPerPage} />
-  ) : (
-    currentCredentials.map((cred, index) => (
-      <StyledTableRow key={cred.id}>
-        <StyledTableCell>
-          <Checkbox
-            checked={selectedCredentials.includes(cred.id)}
-            onChange={() => handleSelectCredential(cred.id)}
-          />
-        </StyledTableCell>
+            {loading ? (
+              <CredentialTableSkeleton rows={rowsPerPage} />
+            ) : (
+              currentCredentials.map((cred, index) => (
+                <StyledTableRow key={cred.id}>
+                  <StyledTableCell>
+                    <Checkbox
+                      checked={selectedCredentials.includes(cred.id)}
+                      onChange={() => handleSelectCredential(cred.id)}
+                    />
+                  </StyledTableCell>
 
-        <StyledTableCell>{page * rowsPerPage + index + 1}</StyledTableCell>
-        <StyledTableCell>{cred.name}</StyledTableCell>
-        <StyledTableCell>{cred.description || '-'}</StyledTableCell>
-        <StyledTableCell>{cred.expires_at || cred.expiration || '-'}</StyledTableCell>
-        <StyledTableCell>{cred.roles?.join(', ') || 'N/A'}</StyledTableCell>
-        <StyledTableCell>{cred.id}</StyledTableCell>
+                  <StyledTableCell>
+                    {page * rowsPerPage + index + 1}
+                  </StyledTableCell>
+                  <StyledTableCell>{cred.name}</StyledTableCell>
+                  <StyledTableCell>{cred.description || "-"}</StyledTableCell>
+                  <StyledTableCell>
+                    <Tooltip
+                      title={
+                        cred.expires_at || cred.expiration
+                          ? new Date(
+                              (cred.expires_at || cred.expiration).split(
+                                "."
+                              )[0] + "Z"
+                            ).toLocaleString(undefined, {
+                              weekday: "short",
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : "N/A"
+                      }
+                    >
+                      <span>
+                        {formatExpiration(cred.expires_at || cred.expiration)}
+                      </span>
+                    </Tooltip>
+                  </StyledTableCell>
 
-        <StyledTableCell>
-          <Box display="flex" justifyContent="center">
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={() => handleDeleteCredential(cred.id)}
-            >
-              Delete
-            </Button>
-          </Box>
-        </StyledTableCell>
-      </StyledTableRow>
-    ))
-  )}
-</TableBody>
+                  <StyledTableCell>
+                    {cred.roles?.join(", ") || "N/A"}
+                  </StyledTableCell>
+                  <StyledTableCell>{cred.id}</StyledTableCell>
 
+                  <StyledTableCell>
+                    <Box display="flex" justifyContent="center">
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteCredential(cred.id)}
+                      >
+                        Delete
+                      </Button>
+                    </Box>
+                  </StyledTableCell>
+                </StyledTableRow>
+              ))
+            )}
+          </TableBody>
         </Table>
 
-         {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
-                <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-                  <TablePagination
-                    rowsPerPageOptions={[5, 10, 25]}
-                    component="div"
-                    count={filteredCredentials.length}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                    sx={{
-                      borderTop: "none",
-                      width: "100%",
-                    }}
-                  />
-                </Box>
+        {/* ⬇️ PAGINATION INSIDE TABLE CONTAINER */}
+        <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25]}
+            component="div"
+            count={filteredCredentials.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            sx={{
+              borderTop: "none",
+              width: "100%",
+            }}
+          />
+        </Box>
       </TableContainer>
-
 
       {/* ---------- Snackbar ---------- */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={6000}
         onClose={handleSnackbarClose}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
         TransitionComponent={Slide}
       >
         <Alert
           onClose={handleSnackbarClose}
           severity={snackbarSeverity}
-          sx={{ width: '100%', display: 'flex', alignItems: 'center' }}
+          sx={{ width: "100%", display: "flex", alignItems: "center" }}
         >
           {getAlertIcon(snackbarSeverity)}
           {snackbarMessage}
@@ -661,13 +777,17 @@ const ApplicationCredentials = () => {
 };
 
 // ---------- Inline Styles ----------
-const containerStyle = { padding: '20px', fontFamily: 'sans-serif' };
+const containerStyle = { padding: "20px", fontFamily: "sans-serif" };
 const headerStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '20px',
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
 };
-const searchActionStyle = { display: 'flex', gap: '10px', alignItems: 'center' };
+const searchActionStyle = {
+  display: "flex",
+  gap: "10px",
+  alignItems: "center",
+};
 
 export default ApplicationCredentials;
