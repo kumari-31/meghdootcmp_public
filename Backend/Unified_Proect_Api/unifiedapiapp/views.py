@@ -281,12 +281,6 @@ def get_openstack_connection():
     )
 
 
-# print("AUTH_URL:", os.getenv('AUTH_URL'))
-# print("PROJECT_NAME:", os.getenv('PROJECT_NAME'))
-# print("USERNAME:", os.getenv("OPENSTACK_UNAME"))
-# print("PASSWORD:", os.getenv("PASSWORD"))
-# print("USER_DOMAIN_NAME:", os.getenv('USER_DOMAIN_NAME'))
-# print("PROJECT_DOMAIN_NAME:", os.getenv('PROJECT_DOMAIN_NAME'))
 
 
 class CombinedFormView(APIView):
@@ -426,6 +420,15 @@ def metrics_view(request):
 
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
+
+
+def get_admin_emails():
+    return list(
+        User.objects.filter(is_superuser=True, is_active=True)
+        .exclude(email__isnull=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
 
 class UserRegistrationAPIView(APIView):
 
@@ -6449,7 +6452,7 @@ class VmRequestBulkApproveAPIView(APIView):
 
 class ServiceRequestRejectionAPIView(APIView):
     """
-    API to reject a service request based on the user's role (FLA or ADMIN).
+    Reject a service request by FLA or ADMIN and notify employee
     """
 
     permission_classes = [IsAuthenticated]
@@ -6461,70 +6464,89 @@ class ServiceRequestRejectionAPIView(APIView):
 
             if not service_request_id or not rejection_reason:
                 return Response(
-                    {"error": "service_request_id and rejection_reason are required."},
+                    {"error": "service_request_id and rejection_reason are required"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Get role from token
             token_role = request.auth.get("role", None)
 
             if token_role not in ["FLA", "ADMIN"]:
                 return Response(
-                    {"error": "Unauthorized role."}, status=status.HTTP_403_FORBIDDEN
+                    {"error": "Unauthorized role"},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
             service_request = ServiceRequest.objects.get(id=service_request_id)
+            employee = Employee.objects.get(
+                employee_id=service_request.employee_id
+            )
 
+            # ---------------- FLA REJECT ----------------
             if token_role == "FLA":
                 service_request.fla_status = "Rejected"
                 service_request.fla_rejection_reason = rejection_reason
-                service_request.fla_action_timestamp = (
-                    timezone.now()
-                )  # Assumes this field exists
+                service_request.fla_action_timestamp = timezone.now()
 
-            elif token_role == "ADMIN":
-                # Admin can only reject a request if the FLA has already approved it.
+            # ---------------- ADMIN REJECT ----------------
+            else:
                 if service_request.fla_status != "Accepted":
                     return Response(
                         {
-                            "error": f"Admin cannot reject this request because its FLA status is '{service_request.fla_status}'. It must be 'Accepted'."
+                            "error": "Admin can reject only after FLA approval"
                         },
                         status=status.HTTP_400_BAD_REQUEST,
                     )
 
                 service_request.admin_status = "Rejected"
                 service_request.admin_rejection_reason = rejection_reason
-                service_request.admin_action_timestamp = (
-                    timezone.now()
-                )  # Assumes this field exists
+                service_request.admin_action_timestamp = timezone.now()
 
             service_request.save()
 
+            # ---------------- EMAIL TO EMPLOYEE ----------------
+            subject = "Service Request Rejected"
+            message = f"""
+Dear {employee.name},
+
+Your service request has been rejected.
+
+Service Name : {service_request.service_name}
+Rejected By  : {token_role}
+Reason       : {rejection_reason}
+
+Regards,
+Cloud Team
+            """
+
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [employee.email],
+                fail_silently=False,
+            )
+
             return Response(
-                {"message": f"Service request rejected successfully by {token_role}."},
+                {"message": f"Service request rejected by {token_role} and email sent"},
                 status=status.HTTP_200_OK,
             )
 
         except ServiceRequest.DoesNotExist:
             return Response(
-                {"error": "Service Request not found."},
+                {"error": "Service request not found"},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
         except Exception as e:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
 
 
 from django.contrib.auth.models import User
 
-def get_admin_emails():
-    return list(
-        User.objects.filter(is_superuser=True, is_active=True)
-        .exclude(email__isnull=True)
-        .exclude(email="")
-        .values_list("email", flat=True)
-    )
 
 
 class VmRequestStatusUpdateAPIView(APIView):
@@ -14174,6 +14196,7 @@ class FlaServiceRequestAPIView(APIView):
         try:
             request_id = request.data.get("request_id")
             new_status = request.data.get("status")
+            rejection_reason = request.data.get("rejection_reason", "No reason provided")
 
             if not request_id or not new_status:
                 return Response(
@@ -14182,183 +14205,95 @@ class FlaServiceRequestAPIView(APIView):
                 )
 
             service_request = ServiceRequest.objects.get(id=request_id)
+            employee = Employee.objects.get(
+                employee_id=service_request.employee_id
+            )
 
-            # Update FLA status and timestamp
+            # ---------------- FLA ACTION ----------------
             service_request.fla_status = new_status
-            if new_status == "Accepted":
-                service_request.fla_approved_timestamp = timezone.now()
+            service_request.fla_action_timestamp = timezone.now()
 
-            service_request.save()
+            # ---------- FLA REJECT ----------
+            if new_status == "Rejected":
+                service_request.fla_rejection_reason = rejection_reason
+                service_request.save()
 
-            # Send email notification
-            try:
-                employee = Employee.objects.get(employee_id=service_request.employee_id)
-                subject = "Service Request Status Update"
-                message = f"""Dear {employee.name},
+                subject = "Service Request Rejected by FLA"
+                message = f"""
+Dear {employee.name},
 
-Your service request for {service_request.service_name} has been {new_status} by your FLA.
+Your service request has been rejected by your FLA.
 
-Thanks & Regards,
-Cloud Team"""
+Service Name : {service_request.service_name}
+Project      : {service_request.project_name}
+Reason       : {rejection_reason}
 
-                from_email = "rakshanavg20@gmail.com"
-                to_email = [employee.email]
+Regards,
+Cloud Team
+                """
 
-                # Uncomment to enable email sending
-                # send_mail(subject, message, from_email, to_email, fail_silently=False)
-                print(
-                    f"Email notification sent for service request status update: {service_request.service_name}"
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [employee.email],
+                    fail_silently=False,
                 )
 
-            except Exception as e:
-                print(f"Error in sending email: {e}")
+                return Response(
+                    {"message": "Service request rejected by FLA and email sent to employee"},
+                    status=status.HTTP_200_OK,
+                )
 
-            serializer = ServiceRequestSerializer(service_request)
+            # ---------- FLA ACCEPT ----------
+            service_request.fla_approved_timestamp = timezone.now()
+            service_request.save()
+
+            admin_emails = get_admin_emails()
+
+            subject = "Service Request Approved by FLA – Admin Action Required"
+            message = f"""
+Dear Admin,
+
+A service request has been approved by FLA.
+
+Employee Name : {employee.name}
+Employee ID   : {employee.employee_id}
+Service Name  : {service_request.service_name}
+Project       : {service_request.project_name}
+
+Please login to CMP dashboard and take action.
+
+Regards,
+Cloud Team
+            """
+
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                admin_emails,
+                fail_silently=False,
+            )
+
             return Response(
-                {
-                    "message": "Service request status updated successfully",
-                    "data": serializer.data,
-                },
+                {"message": "Service request approved by FLA and email sent to Admin"},
                 status=status.HTTP_200_OK,
             )
 
         except ServiceRequest.DoesNotExist:
             return Response(
-                {"error": "Service request not found"}, status=status.HTTP_404_NOT_FOUND
+                {"error": "Service request not found"},
+                status=status.HTTP_404_NOT_FOUND,
             )
+
         except Exception as e:
-            print("Error in updating service request status:", e)
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 
-# class ServiceRequestPendingAdminAPIView(APIView):
-#     """
-#     API to list service requests where FLA has approved (fla_status='Accepted')
-#     but Admin status is still pending (admin_status='Pending').
-#     """
-#     permission_classes = [IsAuthenticated, IsAdminUserPermission]
-
-#     def get(self, request):
-#         try:
-#             # Ensure the user has admin role
-#             role = request.auth.get('role', None)
-#             if role != 'ADMIN':
-#                 return Response(
-#                     {"error": "Only admins can access this API."},
-#                     status=status.HTTP_403_FORBIDDEN
-#                 )
-
-#             # Filter service requests where FLA has accepted but Admin has not yet approved
-#             service_requests = ServiceRequest.objects.filter(
-#                 fla_status="Accepted",
-#                 admin_status="Pending"
-#             )
-
-#             # Implement pagination
-#             page = int(request.GET.get('page', 1))
-#             size = int(request.GET.get('size', 10))  # Default 10 items per page
-#             total_records = service_requests.count()
-#             start = (page - 1) * size
-#             end = start + size
-#             service_requests = service_requests[start:end]
-
-#             # Serialize the results
-#             serializer = ServiceRequestSerializer(service_requests, many=True)
-
-#             return Response(
-#                 {
-#                     "totalRecords": total_records,
-#                     "page": page,
-#                     "size": size,
-#                     "data": serializer.data,
-#                 },
-#                 status=status.HTTP_200_OK
-#             )
-#         except Exception as e:
-#             return Response(
-#                 {"error": str(e)},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-
-#     def put(self, request):
-#         """
-#         Update service request status by Admin
-#         """
-#         try:
-#             request_id = request.data.get('request_id')
-#             new_status = request.data.get('status')
-#             remarks = request.data.get('remarks', '')  # Optional remarks field
-
-#             if not request_id or not new_status:
-#                 return Response(
-#                     {"error": "request_id and status are required"},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-
-#             # Get the service request
-#             service_request = ServiceRequest.objects.get(id=request_id)
-
-#             # Verify that FLA has approved and admin hasn't processed yet
-#             # if service_request.fla_status != "Accepted" or service_request.admin_status != "Pending":
-#             #     return Response(
-#             #         {"error": "Invalid request state. Only FLA approved and admin pending requests can be processed."},
-#             #         status=status.HTTP_400_BAD_REQUEST
-#             #     )
-
-#             # Update admin status and timestamp
-#             service_request.admin_status = new_status
-#             service_request.admin_approved_timestamp = timezone.now()
-#             if remarks:
-#                 service_request.admin_remarks = remarks
-
-#             service_request.save()
-#             pod_name = f"nginx-service-{request_id}"
-#             if deploy_nginx_pod(pod_name, 80):
-#                 print(f"Successfully deployed nginx pod: {pod_name}")
-#             else:
-#                 print(f"Warning: Failed to deploy nginx pod: {pod_name}")
-#             # Send email notification
-#             try:
-#                 employee = Employee.objects.get(employee_id=service_request.employee_id)
-#                 subject = 'Service Request Status Update from Admin'
-#                 message = f'''Dear {employee.name},
-
-# Your service request for {service_request.service_name} has been {new_status} by the Admin.
-
-# {f"Remarks: {remarks}" if remarks else ""}
-
-# Thanks & Regards,
-# Cloud Team'''
-
-#                 from_email = 'rakshanavg20@gmail.com'
-#                 to_email = [employee.email]
-
-#                 # Uncomment to enable email sending
-#                 # send_mail(subject, message, from_email, to_email, fail_silently=False)
-#                 print(f"Email notification sent for admin service request update: {service_request.service_name}")
-
-#             except Exception as e:
-#                 print(f"Error in sending email: {e}")
-
-#             serializer = ServiceRequestSerializer(service_request)
-#             return Response({
-#                 "message": "Service request status updated successfully by admin",
-#                 "data": serializer.data
-#             }, status=status.HTTP_200_OK)
-
-#         except ServiceRequest.DoesNotExist:
-#             return Response(
-#                 {"error": "Service request not found"},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-#         except Exception as e:
-#             print("Error in updating service request admin status:", e)
-#             return Response(
-#                 {"error": str(e)},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
 
 
 class FLAEmployeesListAPIView(APIView):
@@ -15334,123 +15269,21 @@ class ServiceRequestAPIView(APIView):
 #             serializer = ServiceRequestSerializer(data=request.data)
 #             if serializer.is_valid():
 #                 service_request = serializer.save()
-
-#                 # If service is MongoDB, trigger deployment
-#                 if service_request.service_name.lower() in ['mongo', 'mongodb']:
-#                     # Validate MongoDB required fields
-#                     required_fields = ["replica", "app_name", "root_password", "username", "password", "database", "node_port"]
-#                     missing_fields = [field for field in required_fields if not getattr(service_request, field)]
-
-#                     if missing_fields:
-#                         return Response({
-#                             "error": f"Missing MongoDB fields: {', '.join(missing_fields)}"
-#                         }, status=status.HTTP_400_BAD_REQUEST)
-
-#                     # Trigger MongoDB deployment
-#                     deployment_result = self.deploy_mongodb(service_request)
-
-#                     if deployment_result.get('success'):
-#                         service_request.deployment_status = 'Deployed'
-#                         service_request.save()
-#                         return Response({
-#                             "message": "Service request created and MongoDB deployed successfully",
-#                             "service_request": ServiceRequestSerializer(service_request).data,
-#                             "deployment": deployment_result
-#                         }, status=status.HTTP_201_CREATED)
-#                     else:
-#                         service_request.deployment_status = 'Failed'
-#                         service_request.save()
-#                         return Response({
-#                             "message": "Service request created but MongoDB deployment failed",
-#                             "service_request": ServiceRequestSerializer(service_request).data,
-#                             "deployment_error": deployment_result.get('error')
-#                         }, status=status.HTTP_201_CREATED)
-
-#                 return Response({
-#                     "message": "Service request created successfully",
-#                     "service_request": ServiceRequestSerializer(service_request).data
-#                 }, status=status.HTTP_201_CREATED)
-
-#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-#     def deploy_mongodb(self, service_request):
-#         """Deploy MongoDB using the existing DeployMongoDBAPIView logic"""
-#         try:
-#             data = {
-#                 "replica": service_request.replica,
-#                 "app_name": service_request.app_name,
-#                 "root_password": service_request.root_password,
-#                 "username": service_request.username,
-#                 "password": service_request.password,
-#                 "database": service_request.database,
-#                 "node_port": service_request.node_port
-#             }
-
-#             app_name = data["app_name"]
-#             namespace = "default"
-#             labels = {"app": app_name}
-
-#             apps_v1, core_v1 = get_k8s_client3()
-
-#             # Deployment
-#             container = client.V1Container(
-#                 name=app_name,
-#                 image="mongo:latest",
-#                 ports=[client.V1ContainerPort(container_port=27017)],
-#                 env=[
-#                     client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]),
-#                     client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=data["root_password"]),
-#                     client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=data["database"]),
-#                 ]
-#             )
-
-#             template = client.V1PodTemplateSpec(
-#                 metadata=client.V1ObjectMeta(labels=labels),
-#                 spec=client.V1PodSpec(containers=[container])
-#             )
-
-#             spec = client.V1DeploymentSpec(
-#                 replicas=int(data["replica"]),
-#                 selector=client.V1LabelSelector(match_labels=labels),
-#                 template=template
-#             )
-
-#             deployment = client.V1Deployment(
-#                 api_version="apps/v1",
-#                 kind="Deployment",
-#                 metadata=client.V1ObjectMeta(name=app_name),
-#                 spec=spec
-#             )
-
-#             apps_v1.create_namespaced_deployment(namespace=namespace, body=deployment)
-
-#             # Service
-#             service = client.V1Service(
-#                 metadata=client.V1ObjectMeta(name=app_name),
-#                 spec=client.V1ServiceSpec(
-#                     type="NodePort",
-#                     selector=labels,
-#                     ports=[
-#                         client.V1ServicePort(
-#                             port=27017,
-#                             target_port=27017,
-#                             node_port=int(data["node_port"])
-#                         )
-#                     ]
+#                 # Do NOT deploy here, just save the details
+#                 return Response(
+#                     {
+#                         "message": "Service request created successfully",
+#                         "service_request": ServiceRequestSerializer(
+#                             service_request
+#                         ).data,
+#                     },
+#                     status=status.HTTP_201_CREATED,
 #                 )
-#             )
-
-#             core_v1.create_namespaced_service(namespace=namespace, body=service)
-
-#             return {"success": True, "message": f"MongoDB '{app_name}' deployed successfully."}
-
-#         except client.exceptions.ApiException as e:
-#             return {"success": False, "error": f"Kubernetes API error: {e.reason}"}
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 #         except Exception as e:
-#             return {"success": False, "error": f"Unexpected error: {str(e)}"}
+#             return Response(
+#                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
 
 
 class ServiceRequestCreateAPIView(APIView):
@@ -15459,24 +15292,73 @@ class ServiceRequestCreateAPIView(APIView):
     def post(self, request):
         try:
             serializer = ServiceRequestSerializer(data=request.data)
+
             if serializer.is_valid():
-                service_request = serializer.save()
-                # Do NOT deploy here, just save the details
+                # Save service request
+                service_request = serializer.save(
+                    admin_status="Pending",
+                    fla_status="Pending",
+                    request_timestamp=timezone.now(),
+                )
+
+                # Fetch employee & FLA details
+                employee = Employee.objects.get(
+                    employee_id=service_request.employee_id
+                )
+
+                # -------------------------------
+                # 📧 SEND EMAIL TO FLA
+                # -------------------------------
+                subject = "Service Deployment Request – Approval Required"
+
+                message = f"""
+Dear {employee.fla_name},
+
+A new service deployment request has been submitted.
+
+Employee Name : {employee.name}
+Employee ID   : {employee.employee_id}
+Service Name  : {service_request.service_name}
+Project       : {service_request.project_name}
+Purpose       : {service_request.purpose}
+
+Please login to the CMP dashboard to review and approve the request.
+
+Regards,
+Cloud Team
+                """
+
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [employee.fla_email],
+                    fail_silently=False,
+                )
+
                 return Response(
                     {
-                        "message": "Service request created successfully",
+                        "message": "Service request created successfully and sent to FLA",
                         "service_request": ServiceRequestSerializer(
                             service_request
                         ).data,
                     },
                     status=status.HTTP_201_CREATED,
                 )
+
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        except Exception as e:
+
+        except Employee.DoesNotExist:
             return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": "Employee or FLA details not found"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 class ServiceRequestAPIView(APIView):
     permission_classes = [IsAuthenticated]
