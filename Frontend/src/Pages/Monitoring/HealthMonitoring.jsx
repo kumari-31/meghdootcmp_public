@@ -8,6 +8,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import "../style.css";
+import { GoAlert } from "react-icons/go";
 
 /* -------------------- MAIN COMPONENT -------------------- */
 const hostDataCache = {};
@@ -22,7 +24,7 @@ const HealthMonitoring = () => {
   const [loadAverage, setLoadAverage] = useState({});
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
-
+  const [error, setError] = useState(null);
   /* -------------------- LOAD HOSTS -------------------- */
   useEffect(() => {
     apiClient.get("/hosts/").then((res) => {
@@ -45,23 +47,31 @@ const HealthMonitoring = () => {
 
   /* -------------------- LOAD DATA -------------------- */
   useEffect(() => {
+    setLoading(true); 
   if (!selectedHost) return;
 
+ // ✅ MOVE THIS TO THE TOP
   // 🔥 Load from cache first
   const cached =
     hostDataCache[selectedHost] ||
     JSON.parse(sessionStorage.getItem(`host-cache-${selectedHost}`));
 
-  if (cached) {
-    hostDataCache[selectedHost] = cached;
-    setCPU(cached.cpu);
-    setMemory(cached.memory);
-    setDisk(cached.disk);
-    setLoadAverage(cached.loadAverage);
-    setSummary(cached.summary);
-    setAlerts(cached.alerts);
-    return;
-  }
+    if (cached) {
+      hostDataCache[selectedHost] = cached;
+  
+      // ⏱ simulate small delay so loader is visible (UX polish)
+      setTimeout(() => {
+        setCPU(cached.cpu);
+        setMemory(cached.memory);
+        setDisk(cached.disk);
+        setLoadAverage(cached.loadAverage);
+        setSummary(cached.summary);
+        setAlerts(cached.alerts);
+        setLoading(false); // ✅ IMPORTANT
+      }, 300);
+  
+      return;
+    }
 
   setLoading(true);
 
@@ -113,6 +123,40 @@ const HealthMonitoring = () => {
     );
   };
 
+
+    /* -------------------- LOADING & ERROR -------------------- */
+    if (loading) {
+      return (
+        <div className="cloud-container">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="7.87722 9.61948 33.01 16.88"
+          >
+            <path
+              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+              className="cloud-back"
+            />
+            <path
+              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
+              className="cloud-front"
+            />
+          </svg>
+          <div className="loading-message">Loading ...</div>
+        </div>
+      );
+    }
+  
+    if (error) {
+      return (
+        <div className="error-message">
+          <GoAlert size={40} />
+          <h2>❌ Server Down</h2>
+          <p>{error}</p>
+        </div>
+      );
+    }
+  
+
   /* -------------------- UI -------------------- */
   return (
     <div style={{ padding: 24 }}>
@@ -158,7 +202,6 @@ const HealthMonitoring = () => {
         )}
       </div>
 
-      {loading && <p>Loading...</p>}
 
       {!loading && summary && (
         <>

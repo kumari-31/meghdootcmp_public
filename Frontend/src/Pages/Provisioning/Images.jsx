@@ -301,15 +301,15 @@ const Images = () => {
         }}
       >
 
-
-      <header className="App-header" style={{ borderColor: "#222" }}>
+<div style={headerStyle}>
+      
       <h1
         
       >
         Images Dashboard
       </h1>
 
-      </header>
+      </div>
 
       <div className="card-container">
         {imageData.map((image, index) => (
@@ -542,7 +542,16 @@ const Images = () => {
         </Alert>
       </Snackbar>
     </div>
+   
   );
 };
+const headerStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
+};
+
+
 
 export default Images;
