@@ -33,8 +33,6 @@ class Employee(models.Model):
     fla_email = models.EmailField(null=True, blank=True)
     phone_number = models.CharField(blank=True, null=True, max_length=15)
     designation = models.CharField(max_length=100, blank=True, null=True)
-    # password = models.CharField(blank=True, null=True, max_length=255)
-    # confirm_password = models.CharField(blank=True, null=True, max_length=255)
 
     def __str__(self):
         return self.employee_id
@@ -208,45 +206,6 @@ class ImageRecord(models.Model):
         return self.name
 
 
-# class ServiceRequest(models.Model):
-#     STATUS_CHOICES = (
-#         ('Pending', 'Pending'),
-#         ('Accepted', 'Accepted'),
-#         ('Rejected', 'Rejected')
-#     )
-
-#     employee_id = models.CharField(max_length=100)
-#     service_name = models.CharField(max_length=255)
-#     purpose = models.TextField(blank=True, null=True)
-#     project_name = models.CharField(max_length=255)
-#     designation = models.CharField(max_length=100)
-#     name = models.CharField(max_length=255)  # requester's name
-#     email = models.EmailField()
-#     purpose_of_request = models.TextField(blank=True, null=True)
-
-#     # Status fields
-#     admin_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-#     fla_status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='Pending')
-
-#     # Timestamp fields
-#     request_timestamp = models.DateTimeField(default=timezone.now)
-#     fla_approved_timestamp = models.DateTimeField(null=True, blank=True)
-#     admin_approved_timestamp = models.DateTimeField(null=True, blank=True)
-
-
-#     # Service specific fields
-#     service_start_date = models.DateField(blank=True, null=True)
-#     service_end_date = models.DateField(blank=True, null=True)
-#     service_requirements = models.TextField(blank=True, null=True)
-#     additional_notes = models.TextField(blank=True, null=True)
-
-#     fla_rejection_reason = models.TextField(null=True, blank=True)
-#     admin_rejection_reason = models.TextField(null=True, blank=True)
-#     fla_action_timestamp = models.DateTimeField(null=True, blank=True)
-#     admin_action_timestamp= models.DateTimeField(null=True, blank=True)
-
-#     def __str__(self):
-#         return f"{self.employee_id} - {self.service_name}"
 
 
 def ticket_attachment_upload_path(instance, filename):

@@ -1,4 +1,5 @@
 asgiref==3.8.1
+async-timeout==5.0.1
 autopage==0.5.2
 cachetools==5.5.2
 certifi==2024.8.30
@@ -48,6 +49,7 @@ oslo.utils==8.0.0
 packaging==24.2
 pandas==2.2.3
 pbr==6.1.0
+pillow==12.0.0
 pkce==1.0.3
 platformdirs==4.3.6
 pluggy==1.5.0
@@ -74,6 +76,7 @@ python-novaclient==18.11.0
 python-openstackclient==7.2.1
 pytz==2024.2
 PyYAML==6.0.2
+reportlab==4.4.7
 requests==2.32.3
 requests-oauthlib==2.0.0
 requestsexceptions==1.4.0

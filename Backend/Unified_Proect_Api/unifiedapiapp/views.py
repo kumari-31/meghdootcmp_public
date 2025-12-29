@@ -2673,19 +2673,52 @@ def get_employee_details(request):
         return JsonResponse({"error": "Employee not found"}, status=404)
 
 
+# class EmployeeCreateAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         # Deserialize and validate data
+#         serializer = EmployeeSerializer(data=request.data)
+#         if serializer.is_valid():
+#             # Save the validated data to the database
+#             serializer.save()
+#             return Response(serializer.data, status=status.HTTP_201_CREATED)
+#         else:
+#             # Return validation errors if any
+#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 class EmployeeCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Deserialize and validate data
-        serializer = EmployeeSerializer(data=request.data)
-        if serializer.is_valid():
-            # Save the validated data to the database
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        else:
-            # Return validation errors if any
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Step 1: Resolve FLA employee safely
+        try:
+            fla = request.user.employee_profile
+        except Employee.DoesNotExist:
+            try:
+                fla = Employee.objects.get(email=request.user.email)
+            except Employee.DoesNotExist:
+                return Response(
+                    {"error": "FLA employee record not found. Contact admin."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Step 2: Inject FLA details
+        data = request.data.copy()
+        data["fla_name"] = fla.name
+        data["fla_employee_id"] = fla.employee_id
+        data["fla_email"] = fla.email
+
+        serializer = EmployeeSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(
+            {"message": "Employee added successfully"},
+            status=status.HTTP_201_CREATED
+        )
+
+
 
 import csv
 import io
@@ -5868,17 +5901,6 @@ class VmRequestAPIView(APIView):
                 vm_name = f"{data['vm_name']}"  # Concatenate employee_id and vm_name
                 print("vm-name---->", vm_name)
 
-                # VMInfo.objects.create(
-                # vm_name=vm_name,
-                # vm_access_from_date=data.get("login_enable_date"),
-                # vm_access_to_date=data.get("login_disable_date"),
-                # vm_access_from_time=data.get("login_enable_time"),
-                # vm_access_to_time=data.get("login_disable_time"),
-                # email=request.user.email,  # Assuming `request.user` has an `email` attribute
-                # creation_status="Requested"
-                # )
-                # print("SAVED TO VMInfo MODEL")
-
                 employee = Employee.objects.get(employee_id=data["employee_id"])
                 mail_data = {
                     "name": employee.name,
@@ -5888,16 +5910,39 @@ class VmRequestAPIView(APIView):
                 }
 
                 print("mail_data---->", mail_data)
-                subject = "VM creation Request"
-                message = f"Dear {employee.fla_name},\n\nVm request has been raised by {employee.name}\n\nKindly approve the request.\n\nThanks & Regards \n\nCloud Team"
-                from_email = "rakshanavg20@gmail.com"
-                to_email = [employee.fla_email]
+
+
+                subject = "VM Creation Request Approval Required"
+
+                message = f"""
+                Dear {employee.fla_name},
+
+                A new VM request has been submitted.
+
+                Requester Name : {employee.name}
+                Employee ID    : {employee.employee_id}
+                VM Name        : {vm_name}
+                Project        : {data.get('project_name')}
+                Purpose        : {data.get('purpose')}
+
+                Kindly login to the CMP dashboard and approve the request.
+
+                Regards,
+                Cloud Team
+                """
 
                 try:
-                    # send_mail(subject, message, from_email, to_email, fail_silently=False)
-                    print("email sent successfully on request", data["vm_name"])
+                    send_mail(
+                        subject=subject,
+                        message=message,
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[employee.fla_email],
+                        fail_silently=False,
+                    )
+                    print("Email sent successfully to FLA:", employee.fla_email)
+                    
                 except Exception as e:
-                    print(f"Error in sending email: {e}")
+                    print("Email sending failed:", str(e))
 
                 return Response(
                     {
@@ -5915,6 +5960,7 @@ class VmRequestAPIView(APIView):
 
 
 # -------------------------13 Feb 2025 ----------------------------
+
 class VmRequestUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -6470,75 +6516,81 @@ class ServiceRequestRejectionAPIView(APIView):
             )
 
 
+from django.contrib.auth.models import User
+
+def get_admin_emails():
+    return list(
+        User.objects.filter(is_superuser=True, is_active=True)
+        .exclude(email__isnull=True)
+        .exclude(email="")
+        .values_list("email", flat=True)
+    )
+
+
 class VmRequestStatusUpdateAPIView(APIView):
-    permission_classes = [IsAuthenticated]  # Add authentication permission
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        """
-        Update the status of a VM request
-        """
         try:
-            print("====================>")
-            # Extract the VM request ID and new status from the request data
             vm_request_id = request.data.get("vm_request_id")
-            print("vm_request_id", vm_request_id)
             new_status = request.data.get("status")
-            vm_creation_status = ""
+            rejection_reason = request.data.get("rejection_reason", "No reason provided")
 
-            # Check if the VM request ID and new status are provided
             if not vm_request_id or not new_status:
                 return Response(
-                    {"error 1": "VM request ID and status are required"},
+                    {"error": "VM request ID and status are required"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Validate the new status
             if new_status not in ["Accepted", "Rejected"]:
                 return Response(
-                    {
-                        "error 2": "Invalid status. Only 'Accepted' or 'Rejected' are allowed"
-                    },
+                    {"error": "Status must be Accepted or Rejected"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Fetch the VM request
-            vm_request = VmRequest.objects.get(id=vm_request_id)
-
-            # Check if the VM request exists
-            if not vm_request:
+            try:
+                vm_request = VmRequest.objects.get(id=vm_request_id)
+            except VmRequest.DoesNotExist:
                 return Response(
-                    {"error 3": "VM request not found"},
+                    {"error": "VM request not found"},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            fla_status = vm_request.fla_status
-            print("fla_status", fla_status)
-            if request.user.username == "admin@cdac.in":
-                print(request.user.username, "<----------")
-                if fla_status == "Pending" or fla_status == "Rejected":
+            employee = Employee.objects.get(employee_id=vm_request.employee_id)
+            admin_emails = get_admin_emails()
+
+            is_admin = request.user.is_superuser or request.user.is_staff
+
+            # =====================================================
+            # ================= ADMIN ACTION ======================
+            # =====================================================
+            if is_admin:
+
+                if vm_request.fla_status != "Accepted":
                     return Response(
-                        {"error": f"Your VM Request is {fla_status} contact your FLA."},
-                        status=status.HTTP_404_NOT_FOUND,
+                        {"error": "FLA approval pending or rejected"},
+                        status=status.HTTP_400_BAD_REQUEST,
                     )
+
+                # ---------- ADMIN ACCEPT ----------
                 if new_status == "Accepted":
                     vm_response = vm_approve_request(vm_request_id)
 
                     if not vm_response["status"]:
-                        # VM creation failed, keep pending and store error
                         vm_request.creation_status = "Failed"
                         vm_request.creation_error_message = vm_response.get(
-                            "message", "Unknown error"
+                            "message", "VM provisioning failed"
                         )
                         vm_request.save()
+
                         return Response(
                             {
                                 "error": "VM provisioning failed",
-                                "details": vm_response.get("message"),
+                                "details": vm_request.creation_error_message,
                             },
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         )
 
-                    # VM created successfully
                     vm_request.admin_status = "Accepted"
                     vm_request.creation_status = "Success"
                     vm_request.creation_error_message = None
@@ -6546,32 +6598,257 @@ class VmRequestStatusUpdateAPIView(APIView):
                     vm_request.admin_action_timestamp = timezone.now()
                     vm_request.save()
 
+                    # VM creation success email handled elsewhere
                     return Response(
-                        {"message": "VM status updated and VM created successfully."},
+                        {"message": "VM approved and created successfully"},
                         status=status.HTTP_200_OK,
                     )
 
-                else:
-                    vm_request.admin_status = "Rejected"
-                    vm_request.admin_action_timestamp = timezone.now()
+                # ---------- ADMIN REJECT ----------
+                vm_request.admin_status = "Rejected"
+                vm_request.admin_rejection_reason = rejection_reason
+                vm_request.admin_action_timestamp = timezone.now()
                 vm_request.save()
 
+                subject = "VM Request Rejected by Admin"
+                message = f"""
+Dear {employee.name},
+
+Your VM request has been rejected by the Admin.
+
+VM Name : {vm_request.vm_name}
+Reason  : {rejection_reason}
+
+Regards,
+Cloud Team
+                """
+
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [employee.email],
+                    fail_silently=False,
+                )
+
+                return Response(
+                    {"message": "VM request rejected by Admin and email sent"},
+                    status=status.HTTP_200_OK,
+                )
+
+            # =====================================================
+            # ================= FLA ACTION ========================
+            # =====================================================
             else:
                 vm_request.fla_status = new_status
                 vm_request.fla_approved_timestamp = timezone.now()
 
-            vm_request.save()
+                # ---------- FLA REJECT ----------
+                if new_status == "Rejected":
+                    vm_request.fla_rejection_reason = rejection_reason
+                    vm_request.save()
 
-            # Return the updated VM request
-            return Response(
-                {"message": "VM status updated successfully."},
-                status=status.HTTP_200_OK,
-            )
+                    subject = "VM Request Rejected by FLA"
+                    message = f"""
+Dear {employee.name},
+
+Your VM request has been rejected by your FLA.
+
+VM Name : {vm_request.vm_name}
+Reason  : {rejection_reason}
+
+Please contact your FLA for clarification.
+
+Regards,
+Cloud Team
+                    """
+
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [employee.email],
+                        fail_silently=False,
+                    )
+
+                    return Response(
+                        {"message": "VM request rejected by FLA and email sent"},
+                        status=status.HTTP_200_OK,
+                    )
+
+                # ---------- FLA ACCEPT ----------
+                vm_request.save()
+
+                subject = "VM Request Approved by FLA – Admin Action Required"
+                message = f"""
+Dear Admin,
+
+A VM request has been approved by FLA.
+
+Employee Name : {employee.name}
+Employee ID   : {employee.employee_id}
+VM Name       : {vm_request.vm_name}
+Project       : {vm_request.project_name}
+
+Please login to CMP dashboard and take action.
+
+Regards,
+Cloud Team
+                """
+
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    admin_emails,
+                    fail_silently=False,
+                )
+
+                return Response(
+                    {"message": "VM request approved by FLA and email sent to Admin"},
+                    status=status.HTTP_200_OK,
+                )
 
         except Exception as e:
             return Response(
-                {"error in admin": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+
+# class VmRequestStatusUpdateAPIView(APIView):
+#     permission_classes = [IsAuthenticated]  # Add authentication permission
+
+#     def post(self, request):
+#         """
+#         Update the status of a VM request
+#         """
+#         try:
+#             print("====================>")
+#             # Extract the VM request ID and new status from the request data
+#             vm_request_id = request.data.get("vm_request_id")
+#             print("vm_request_id", vm_request_id)
+#             new_status = request.data.get("status")
+#             vm_creation_status = ""
+
+#             # Check if the VM request ID and new status are provided
+#             if not vm_request_id or not new_status:
+#                 return Response(
+#                     {"error 1": "VM request ID and status are required"},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             # Validate the new status
+#             if new_status not in ["Accepted", "Rejected"]:
+#                 return Response(
+#                     {
+#                         "error 2": "Invalid status. Only 'Accepted' or 'Rejected' are allowed"
+#                     },
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             # Fetch the VM request
+#             vm_request = VmRequest.objects.get(id=vm_request_id)
+
+#             # Check if the VM request exists
+#             if not vm_request:
+#                 return Response(
+#                     {"error 3": "VM request not found"},
+#                     status=status.HTTP_404_NOT_FOUND,
+#                 )
+
+#             fla_status = vm_request.fla_status
+#             print("fla_status", fla_status)
+#             if request.user.username == "admin@cdac.in":
+#                 print(request.user.username, "<----------")
+#                 if fla_status == "Pending" or fla_status == "Rejected":
+#                     return Response(
+#                         {"error": f"Your VM Request is {fla_status} contact your FLA."},
+#                         status=status.HTTP_404_NOT_FOUND,
+#                     )
+#                 if new_status == "Accepted":
+#                     vm_response = vm_approve_request(vm_request_id)
+
+#                     if not vm_response["status"]:
+#                         # VM creation failed, keep pending and store error
+#                         vm_request.creation_status = "Failed"
+#                         vm_request.creation_error_message = vm_response.get(
+#                             "message", "Unknown error"
+#                         )
+#                         vm_request.save()
+#                         return Response(
+#                             {
+#                                 "error": "VM provisioning failed",
+#                                 "details": vm_response.get("message"),
+#                             },
+#                             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                         )
+
+#                     # VM created successfully
+#                     vm_request.admin_status = "Accepted"
+#                     vm_request.creation_status = "Success"
+#                     vm_request.creation_error_message = None
+#                     vm_request.admin_approved_timestamp = timezone.now()
+#                     vm_request.admin_action_timestamp = timezone.now()
+#                     vm_request.save()
+
+#                     return Response(
+#                         {"message": "VM status updated and VM created successfully."},
+#                         status=status.HTTP_200_OK,
+#                     )
+
+#                 else:
+#                     vm_request.admin_status = "Rejected"
+#                     vm_request.admin_action_timestamp = timezone.now()
+#                     vm_request.save()
+
+#             else:
+#                 vm_request.fla_status = new_status
+#                 vm_request.fla_approved_timestamp = timezone.now()
+#                 vm_request.save()
+
+#                 employee = Employee.objects.get(employee_id=vm_request.employee_id)
+
+#                 if new_status == "Rejected":
+#                     subject = "VM Request Rejected by FLA"
+#                     message = f"""
+#             Dear {employee.name},
+
+#             Your VM request has been rejected by your FLA.
+
+#             Reason:
+#             {reason}
+
+#             If required, please contact your FLA for clarification.
+
+#             Regards,
+#             Cloud Team
+#                     """
+
+#                     send_mail(
+#                         subject,
+#                         message,
+#                         settings.DEFAULT_FROM_EMAIL,
+#                         [employee.email],
+#                         fail_silently=False,
+#                     )
+
+#                     return Response(
+#                         {"message": "VM request rejected by FLA and email sent to employee."},
+#                         status=status.HTTP_200_OK,
+#                     )
+
+#             # Return the updated VM request
+#             return Response(
+#                 {"message": "VM status updated successfully."},
+#                 status=status.HTTP_200_OK,
+#             )
+
+#         except Exception as e:
+#             return Response(
+#                 {"error in admin": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
 
     # fetch All details of vm request with counts and pagination #-------------------------------------
 
