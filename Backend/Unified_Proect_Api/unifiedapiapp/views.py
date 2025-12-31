@@ -12,7 +12,10 @@ import secrets
 import string
 import urllib.parse
 from datetime import datetime, timedelta, timezone
-from time import sleep 
+
+from time import sleep
+from rest_framework_simplejwt.tokens import AccessToken
+
 import jwt
 import pyotp
 # --- Third-Party Libraries ---
@@ -73,7 +76,9 @@ from django.db import transaction
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
-
+import os
+import logging
+from openstack import connection
 
 from openstackoperations import (
     get_conn,
@@ -266,12 +271,20 @@ class IsAdminUserPermission(BasePermission):
         # Assuming the role is stored in the request's auth object
         return request.auth.get("role", "").upper() == "ADMIN"
 
+# Configure logging at the top of your module
+logging.basicConfig(
+    level=logging.INFO,  # INFO for deployment; DEBUG for dev
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
 
 def get_openstack_connection():
     """Establish a connection to OpenStack."""
-    print("AUTH_URL:", os.getenv("AUTH_URL"))
+    """Establish a connection to OpenStack."""
+    auth_url = os.getenv("AUTH_URL")  # assign first
+    logging.info("AUTH_URL: %s", auth_url)  # then log it
+
     return connection.Connection(
-        auth_url=os.getenv("AUTH_URL"),
+        auth_url=auth_url,
         project_name=os.getenv("PROJECT_NAME"),
         username="admin",
         password=os.getenv("PASSWORD"),
@@ -340,7 +353,7 @@ def test_token(request):
 @api_view(["POST"])
 def receive_metrics(request):
     metrics_data = request.data
-    print(request.data)
+    logging.info("Received metrics data: %s", metrics_data)  
     if isinstance(metrics_data, dict):
         for metric_name, value in metrics_data.items():
             Metric.objects.create(name=metric_name, value=value)
@@ -394,17 +407,18 @@ def parse_metrics(data):
     }
 
 
+
 @api_view(["POST"])
 def metrics_view(request):
     if request.method == "POST":
         try:
             # Load the JSON data
             data = json.loads(request.body)
+            logging.info("Received metrics payload: %s", data)
 
             # Parse the metrics
             metrics = parse_metrics(data)
-
-            print(metrics)
+            logging.info("Parsed metrics: %s", metrics)
 
             # Send the response
             return JsonResponse(
@@ -414,11 +428,12 @@ def metrics_view(request):
                     "Storage Usage": metrics["storage_usage"],
                 }
             )
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            logging.error("JSON decode error: %s", e)
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
+    logging.warning("Invalid request method: %s", request.method)
     return JsonResponse({"error": "Invalid request method"}, status=405)
-
 
 
 def get_admin_emails():
@@ -429,10 +444,10 @@ def get_admin_emails():
         .values_list("email", flat=True)
     )
 
+
 class UserRegistrationAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
-        # Create a registration entry
         serializer = RegistrationSerializer(data=request.data)
 
         if serializer.is_valid():
@@ -461,7 +476,6 @@ class UserRegistrationAPIView(APIView):
                     login_disable_datetime.date() if login_disable_datetime else None
                 )
 
-                # Extract time part and store in separate variables
                 login_enable_time_value = (
                     login_enable_datetime.time().strftime("%H:%M")
                     if login_enable_datetime
@@ -493,11 +507,9 @@ class UserRegistrationAPIView(APIView):
                     additional_storage=data.get("additional_storage"),
                 )
 
-                # Simulating user creation (use your function for real cases)
-                # For example, create_user_with_details(full_name, email, password)
-                print(f"User {data['full_name']} created")
+                logging.info("User %s created successfully", data["full_name"])
 
-                # Save VM information to the VMInfo model
+                # Save VM information
                 VMInfo.objects.create(
                     vm_name=data["full_name"],
                     vm_access_from_date=login_enable_date,
@@ -514,10 +526,11 @@ class UserRegistrationAPIView(APIView):
                 )
 
             except Exception as e:
+                logging.error("Error creating user %s: %s", data.get("full_name"), e)
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        logging.warning("Registration serializer errors: %s", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 # -------------------------------------------------------------------#
 
@@ -594,9 +607,60 @@ class RegistrationListCreateAPIView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+import openstack
+import os
+import logging
+from .serializers import FlavorSerializer
 
+logger = logging.getLogger(__name__)
 
-# -------------------------------4 june 2025---------------------------
+class ListFlavors(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Initialize OpenStack connection
+            conn = openstack.connect(
+                auth_url=os.getenv("AUTH_URL"),
+                project_name=os.getenv("PROJECT_NAME"),
+                username=os.getenv("OPENSTACK_UNAME"),
+                password=os.getenv("PASSWORD"),
+                user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+                project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
+            )
+            logger.info("OpenStack connection established")
+
+            # Fetch flavors generator and convert to list immediately
+            flavors = conn.compute.flavors()  # ✅ convert generator to list
+            flavor_list = []
+            flavor_name = request.query_params.get("name", None)
+
+            for flavor in flavors:
+                if flavor_name and flavor_name.lower() not in flavor.name.lower():
+                    continue
+
+                flavor_list.append({
+                    "id": flavor.id,
+                    "name": flavor.name,
+                    "ram": f"{flavor.ram // 1024} GB ({flavor.ram} MB) RAM",
+                    "vcpus": flavor.vcpus,
+                    "disk": flavor.disk,
+                    "swap": flavor.swap,
+                    "ephemeral": flavor.ephemeral,
+                    "public": flavor.is_public,
+                    "metadata": getattr(flavor, "metadata", {}),
+                })
+
+            serializer = FlavorSerializer(flavor_list, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.error("Error fetching flavors: %s", e, exc_info=True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class FlavorListAPIView(APIView):
@@ -676,7 +740,7 @@ class ListImages(APIView):
         token_payload = request.auth  # This contains the decoded token payload
 
         role = token_payload.get("role", "Unknown")
-        print("===Role===", role)
+        logging.info("User role: %s", role)
         try:
             # Initialize OpenStack connection
             conn = openstack.connect(
@@ -688,13 +752,14 @@ class ListImages(APIView):
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
             )
-            print(AUTH_URL)
+            logging.info("OpenStack connection established")
             # Fetch the list of images (adjust project_id as necessary)
             # project_id = '4e58cc2addbc4f228f3993ed381cf21c'
             images = conn.image.images()
-            print("===Images===", images)
+            logging.info("Fetched %d images", len(list(images)))
             # Get the 'name' query parameter if provided
             name_query = request.query_params.get("name", None)
+            logging.info("Filter images by name: %s", name_query)
             image_list = []
 
             for image in images:
@@ -731,6 +796,7 @@ class ListImages(APIView):
             return Response(image_list, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logging.error("Error fetching images: %s", e, exc_info=True)
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -1210,34 +1276,41 @@ class IsAdminUserPermission(BasePermission):
                 decoded_token = AccessToken(request.auth)
                 role = decoded_token.get("role", None)
             except Exception as e:
-                print("⚠️ Failed to decode token:", str(e))
+                logging.warning("Failed to decode token: %s", e, exc_info=True)
 
         # Case 3: If token is dict-like
         if not role and hasattr(request.auth, "get"):
             role = request.auth.get("role", None)
 
+        is_admin = str(role).upper() == "ADMIN"
+        logging.info("User role: %s, is_admin: %s", role, is_admin)
         return str(role).upper() == "ADMIN"
 
 
 def get_openstack_connection():
     """Establish a connection to OpenStack."""
-    print("AUTH_URL:", os.getenv("AUTH_URL"))
-    return connection.Connection(
-        auth_url=os.getenv("AUTH_URL"),
-        project_name=os.getenv("PROJECT_NAME"),
-        username="admin",
-        password=os.getenv("PASSWORD"),
-        user_domain_name=os.getenv("USER_DOMAIN_NAME"),
-        project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
-    )
+    auth_url = os.getenv("AUTH_URL")
+    project_name = os.getenv("PROJECT_NAME")
+    
+    logging.info("Establishing OpenStack connection")
+    logging.info("AUTH_URL: %s", auth_url)
+    logging.info("PROJECT_NAME: %s", project_name)
+    
+    try:
+        conn = connection.Connection(
+            auth_url=auth_url,
+            project_name=project_name,
+            username="admin",
+            password=os.getenv("PASSWORD"),
+            user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+            project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
+        )
+        logging.info("OpenStack connection established successfully")
+        return conn
+    except Exception as e:
+        logging.error("Failed to connect to OpenStack: %s", e, exc_info=True)
+        raise 
 
-
-# print("AUTH_URL:", os.getenv('AUTH_URL'))
-# print("PROJECT_NAME:", os.getenv('PROJECT_NAME'))
-# print("USERNAME:", os.getenv("OPENSTACK_UNAME"))
-# print("PASSWORD:", os.getenv("PASSWORD"))
-# print("USER_DOMAIN_NAME:", os.getenv('USER_DOMAIN_NAME'))
-# print("PROJECT_DOMAIN_NAME:", os.getenv('PROJECT_DOMAIN_NAME'))
 
 
 class CombinedFormView(APIView):
@@ -1298,11 +1371,13 @@ def test_token(request):
 @api_view(["POST"])
 def receive_metrics(request):
     metrics_data = request.data
-    print(request.data)
+    logger.info("Received metrics: %s", metrics_data)
+
     if isinstance(metrics_data, dict):
         for metric_name, value in metrics_data.items():
             Metric.objects.create(name=metric_name, value=value)
         return Response(status=status.HTTP_201_CREATED)
+    logger.warning("Invalid metrics format: %s", metrics_data)
     return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1358,11 +1433,11 @@ def metrics_view(request):
         try:
             # Load the JSON data
             data = json.loads(request.body)
-
+            logger.info("Raw metrics data received: %s", data)
             # Parse the metrics
             metrics = parse_metrics(data)
 
-            print(metrics)
+            logger.info("Parsed metrics: %s", metrics)
 
             # Send the response
             return JsonResponse(
@@ -1373,8 +1448,10 @@ def metrics_view(request):
                 }
             )
         except json.JSONDecodeError:
+            logger.error("JSON decode error: %s", str(e))
             return JsonResponse({"error": "Invalid JSON"}, status=400)
-
+        
+    logger.warning("Invalid request method: %s", request.method)
     return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
@@ -1444,7 +1521,8 @@ class UserRegistrationAPIView(APIView):
 
                 # Simulating user creation (use your function for real cases)
                 # For example, create_user_with_details(full_name, email, password)
-                print(f"User {data['full_name']} created")
+                logger.info("User %s created successfully", data['full_name'])
+
 
                 # Save VM information to the VMInfo model
                 VMInfo.objects.create(
@@ -1463,8 +1541,12 @@ class UserRegistrationAPIView(APIView):
                 )
 
             except Exception as e:
+                logger.error("Error creating user %s: %s", data.get("full_name"), str(e))
+
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+        
+        logger.warning("User registration validation failed: %s", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1543,56 +1625,62 @@ class RegistrationListCreateAPIView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-class ListFlavors(APIView):
-    permission_classes = [IsAuthenticated]
+# class ListFlavors(APIView):
+#     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        # try:
-        # Initialize OpenStack connection
-        conn = openstack.connect(
-            auth_url=os.getenv("AUTH_URL"),
-            project_name=os.getenv("PROJECT_NAME"),
-            username=os.getenv("OPENSTACK_UNAME"),
-            password=os.getenv("PASSWORD"),
-            user_domain_name=os.getenv("USER_DOMAIN_NAME"),
-            project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
-        )
-        print(conn)
-        # Fetch the list of flavors
-        flavors = conn.compute.flavors()
-        print("flavors", flavors)
-        flavor_list = []
+#     def get(self, request):
+#         # try:
+#         # Initialize OpenStack connection
+#         conn = openstack.connect(
+#             auth_url=os.getenv("AUTH_URL"),
+#             project_name=os.getenv("PROJECT_NAME"),
+#             username=os.getenv("OPENSTACK_UNAME"),
+#             password=os.getenv("PASSWORD"),
+#             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+#             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
+#         )
+#         logger.info("OpenStack connection established: %s", conn)
 
-        # Get the 'name' query parameter if provided
-        flavor_name = request.query_params.get("name", None)
+#         # Fetch the list of flavors
+#         flavors = conn.compute.flavors()
+#         logger.info("Fetched %d flavors", len(flavors))
+            
+#         flavor_list = []
 
-        for flavor in flavors:
-            # If flavor_name is provided, filter by name
-            if flavor_name and flavor_name.lower() not in flavor.name.lower():
-                continue  # Skip this flavor if it doesn't match
+#         # Get the 'name' query parameter if provided
+#         flavor_name = request.query_params.get("name", None)
+#         logger.debug("Flavor filter parameter: %s", flavor_name)
 
-            flavor_list.append(
-                {
-                    "id": flavor.id,
-                    "name": flavor.name,
-                    "ram": f"{flavor.ram // 1024} GB ({flavor.ram} MB) RAM",
-                    "vcpus": flavor.vcpus,
-                    "disk": flavor.disk,
-                    "swap": flavor.swap,
-                    "ephemeral": flavor.ephemeral,
-                    "public": flavor.is_public,
-                    "metadata": getattr(flavor, "metadata", {}),
-                    # 'metadata': flavor.metadata if flavor.metadata else "No Metadata"
-                }
-            )
 
-        # Serialize the flavor data
-        serializer = FlavorSerializer(flavor_list, many=True)
+#         for flavor in flavors:
+#             # If flavor_name is provided, filter by name
+#             if flavor_name and flavor_name.lower() not in flavor.name.lower():
+#                 continue  # Skip this flavor if it doesn't match
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
+#             flavor_list.append(
+#                 {
+#                     "id": flavor.id,
+#                     "name": flavor.name,
+#                     "ram": f"{flavor.ram // 1024} GB ({flavor.ram} MB) RAM",
+#                     "vcpus": flavor.vcpus,
+#                     "disk": flavor.disk,
+#                     "swap": flavor.swap,
+#                     "ephemeral": flavor.ephemeral,
+#                     "public": flavor.is_public,
+#                     "metadata": getattr(flavor, "metadata", {}),
+#                     # 'metadata': flavor.metadata if flavor.metadata else "No Metadata"
+#                 }
+#             )
 
-    # except Exception as e:
-    #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         # Serialize the flavor data
+#         serializer = FlavorSerializer(flavor_list, many=True)
+
+#         return Response(serializer.data, status=status.HTTP_200_OK)
+
+#     # except Exception as e:
+#         #   logger.error("Error fetching flavors: %s", str(e))
+
+#     #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # -------------------------------4 june 2025---------------------------
@@ -1675,7 +1763,7 @@ class ListImages(APIView):
         token_payload = request.auth  # This contains the decoded token payload
 
         role = token_payload.get("role", "Unknown")
-        print("===Role===", role)
+        logger.info("User role: %s", role)
         try:
             # Initialize OpenStack connection
             conn = openstack.connect(
@@ -1687,17 +1775,21 @@ class ListImages(APIView):
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
             )
-            print(AUTH_URL)
+            logger.info("OpenStack connection established.")
+
             # Fetch the list of images (adjust project_id as necessary)
             # project_id = '4e58cc2addbc4f228f3993ed381cf21c'
-            images = conn.image.images()
-            print("===Images===", images)
+            images = list(conn.image.images())  # convert generator to list
+            logger.info("Fetched %d images.", len(images))
+
+
             # Get the 'name' query parameter if provided
             name_query = request.query_params.get("name", None)
             image_list = []
 
             for image in images:
-                print("image--->", image)
+                logger.debug("Processing image: %s", getattr(image, "name", "Unknown"))
+
                 # Filter by name if a query parameter is provided
                 if name_query is None or name_query.lower() in image.name.lower():
                     # Handle the case where image.size might be None
@@ -1734,6 +1826,7 @@ class ListImages(APIView):
             return Response(image_list, status=status.HTTP_200_OK)
 
         except Exception as e:
+            logger.error("Error fetching images: %s", str(e))
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -1900,21 +1993,33 @@ from .models import VMInfo  # Make sure this is the correct model
 class HypervisorInstancesAPIView(APIView):
     def get(self, request, hostname):
         try:
+            logger.info("Fetching VMs for hypervisor hostname: %s", hostname)
             vms = VMInfo.objects.filter(host_name=hostname)
-            print("DEBUG: Hostname =", hostname)
-            print("DEBUG: VMs found =", list(vms.values("instance_name", "volume_id")))
-
+            logger.debug(
+                "VMs found for hostname %s: %s",
+                hostname,
+                list(vms.values("instance_name", "volume_id")),
+            )
             data = [
                 {"instance_name": vm.instance_name, "instance_id": vm.volume_id}
                 for vm in vms
             ]
 
+            logger.info(
+                "Total %d VM(s) returned for hostname %s", len(data), hostname
+            )
             return Response(
                 {"status": "success", "count": len(data), "data": data},
                 status=status.HTTP_200_OK,
             )
 
         except Exception as e:
+            logger.error(
+                "Error while fetching VMs for hostname %s: %s",
+                hostname,
+                str(e),
+                exc_info=True,
+            )
             return Response(
                 {"status": "error", "message": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1926,6 +2031,8 @@ class OpenStackOverviewAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        logger.info("Initializing OpenStack connection for overview API")
+
         # Authenticate with OpenStack
         conn = connection.Connection(
             auth_url=os.getenv("AUTH_URL"),
@@ -1936,40 +2043,42 @@ class OpenStackOverviewAPIView(APIView):
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
         )
 
-        print("auth url =", os.getenv("AUTH_URL"))
-        print("project_name=", os.getenv("PROJECT_NAME"))
-        print("username=", "admin")
-        print("password=", os.getenv("PASSWORD"))
-        print("user_domain_name=", os.getenv("USER_DOMAIN_NAME"))
-        print("project_domain_name=", os.getenv("PROJECT_DOMAIN_NAME"))
+         # ⚠️ NEVER log passwords in production
+        logger.debug("OpenStack AUTH_URL=%s", os.getenv("AUTH_URL"))
+        logger.debug("OpenStack PROJECT_NAME=%s", os.getenv("PROJECT_NAME"))
+        logger.debug("OpenStack USER_DOMAIN=%s", os.getenv("USER_DOMAIN_NAME"))
+        logger.debug("OpenStack PROJECT_DOMAIN=%s", os.getenv("PROJECT_DOMAIN_NAME"))
 
         try:
             # Compute details
             # hypervisors = conn.compute.hypervisors()
             instances = list(conn.compute.servers())  # Get all the instances
             total_instances = len(instances)  # Total number of instances
-            print("total instances", total_instances)
+            logger.info("Total instances found: %d", total_instances)
+
 
             hypervisors = list(conn.compute.hypervisors())  # Convert generator to list
-            print("hypervisors", hypervisors)
-            # print("attribute of hypervisor [0]",dir(hypervisors[0]))
-
+           
+           
             count_of_hypervisors = len(hypervisors)
-            # Print the count of hypervisors
-            print("Count of Hypervisors:", count_of_hypervisors)
-
+           
             hypervisor_names = [
                 hypervisor.name for hypervisor in hypervisors
             ]  # Extract the hypervisor hostnames
-            # Print the list of hypervisor names
-            print("Hypervisor Names:", hypervisor_names)
+            logger.info("Total hypervisors: %d", count_of_hypervisors)
+            logger.debug("Hypervisor names: %s", hypervisor_names)
+
 
             # Get resource usage
             usage = conn.compute.get_limits()
-            print(f"vCPUs Used: {usage['absolute']['totalCoresUsed']}")
-            print(f"vCPUs Total: {usage['absolute']['maxTotalCores']}")
-            print(f"RAM Used: {usage['absolute']['totalRAMUsed']} MB")
-            print(f"RAM Total: {usage['absolute']['maxTotalRAMSize']} MB")
+            logger.info(
+                "vCPU Used: %s / %s | RAM Used: %s MB / %s MB",
+                vcpu_used if 'vcpu_used' in locals() else 0,
+                vcpu_total if 'vcpu_total' in locals() else 0,
+                ram_used if 'ram_used' in locals() else 0,
+                ram_total if 'ram_total' in locals() else 0,
+            )
+
 
             vcpu_total = {usage["absolute"]["maxTotalCores"]}
             vcpu_used = {usage["absolute"]["totalCoresUsed"]}
@@ -1985,9 +2094,13 @@ class OpenStackOverviewAPIView(APIView):
                 "total_storage_gb": "80000",
                 "used_storage_gb": "20000",
             }
-            print("overview data", overview_data)
+            logger.debug("OpenStack overview response data: %s", overview_data)
+
         except Exception as e:
             # Handle any unexpected errors
+            logger.error(
+                "Failed to fetch OpenStack overview: %s", str(e), exc_info=True
+            )
             return Response({"error": str(e)}, status=500)
 
         # Return the data as JSON
@@ -2036,12 +2149,17 @@ class OpenStackOverviewAPIView1(APIView):
         )
         try:
             # OpenStack connection
+            logger.info(
+                "Fetching OpenStack overview for project: %s", project_name
+            )
             conn = get_openstack_connection1(project_name)
-            print("Connected to project:", project_name)
+            logger.debug("Connected to OpenStack project: %s", project_name)
 
             # Fetch instances
             instances = list(conn.compute.servers())
             total_instances = len(instances)
+            logger.info("Total instances: %d", total_instances)
+
 
             # Fetch resource usage (vCPUs, RAM, etc.)
             usage = conn.compute.get_limits()
@@ -2050,6 +2168,14 @@ class OpenStackOverviewAPIView1(APIView):
             ram_total = usage["absolute"]["maxTotalRAMSize"]
             ram_used = usage["absolute"]["totalRAMUsed"]
 
+            logger.info(
+                "vCPU Used %s/%s | RAM Used %s/%s MB",
+                vcpu_used,
+                vcpu_total,
+                ram_used,
+                ram_total,
+            )
+            
             # Volumes (Make sure to fetch volumes specific to the project)
             volumes = list(
                 conn.block_storage.volumes()
@@ -2059,16 +2185,26 @@ class OpenStackOverviewAPIView1(APIView):
                 volume.size for volume in volumes
             )  # Sum the size of the volumes
 
+            logger.info(
+                "Volumes: count=%d, total_size=%d GB",
+                total_volumes,
+                total_volume_size_gb,
+            )
             # Floating IPs: Get all floating IPs and filter by project
             floating_ips = list(conn.network.ips())
             used_fips = sum(
                 1 for ip in floating_ips if ip.fixed_ip_address
             )  # Count allocated IPs
             total_floating_ips = len(floating_ips)
-
+            logger.info(
+                "Floating IPs: used=%d / total=%d",
+                used_fips,
+                total_floating_ips,
+            )
             # Security Groups: Get all security groups and filter if needed
             security_groups = list(conn.network.security_groups())
             used_sg = len(security_groups)
+            logger.info("Security groups count: %d", used_sg)
 
             # Initialize response data
             overview_data = {
@@ -2087,12 +2223,60 @@ class OpenStackOverviewAPIView1(APIView):
                 "total_security_groups": len(security_groups),
                 "used_security_groups": used_sg,
             }
+            logger.debug(
+                "OpenStack overview response for %s: %s",
+                project_name,
+                overview_data,
+            )
 
         except Exception as e:
+            logger.error(
+                "Failed to fetch OpenStack overview for project %s: %s",
+                project_name,
+                str(e),
+                exc_info=True,
+            )
             return Response({"error": str(e)}, status=500)
 
         return Response(overview_data)
 
+
+def create_user_with_details(first_name, email, password):
+    """
+    Create a user with first name, email, and password in Django.
+
+    Parameters:
+    - first_name: First name of the user.
+    - email: Email address of the user.
+    - password: Password for the user.
+
+    Returns:
+    - User object if successful, None otherwise.
+    """
+    try:
+        # Create a new user using the create_user method
+        user = User.objects.create_user(
+            username=email,  # Using email as the username
+            email=email,
+            password=password,
+            first_name=first_name,
+        )
+
+        logger.info(
+            "User created successfully | email=%s | user_id=%s",
+            email,
+            user.id,
+        )
+        return user
+
+    except Exception as e:
+        logger.error(
+            "Error creating user | email=%s | error=%s",
+            email,
+            str(e),
+            exc_info=True,
+        )
+        return None
 
 
 
@@ -2578,6 +2762,7 @@ def get_employee_details(request):
     employee_id = request.GET.get("employee_id")
 
     if not employee_id:
+        logger.warning("Employee ID not provided in request")
         return JsonResponse({"error": "Employee ID is required"}, status=400)
 
     try:
@@ -2589,11 +2774,26 @@ def get_employee_details(request):
             "group": employee.group,
             "fla_name": employee.fla_name,
         }
-        print("Employee data Returned successfully", data)
+        logger.info(
+            "Employee data returned successfully | employee_id=%s",
+            employee_id,
+        )
         return JsonResponse(data, status=200)
     except Employee.DoesNotExist:
+        logger.warning(
+            "Employee not found | employee_id=%s",
+            employee_id,
+        )
         return JsonResponse({"error": "Employee not found"}, status=404)
-
+    
+    except Exception as e:
+        logger.error(
+            "Unexpected error while fetching employee details | employee_id=%s | error=%s",
+            employee_id,
+            str(e),
+            exc_info=True,
+        )
+        return JsonResponse({"error": "Internal server error"}, status=500)
 
 # class EmployeeCreateAPIView(APIView):
 #     permission_classes = [IsAuthenticated]
@@ -2962,7 +3162,7 @@ class EmployeeUpdateAPIView(APIView):
 #         try:
 #             # Get the selected project from the request
 #             selected_project = request.query_params.get('project_name')
-#             print("selected_project",selected_project)
+            # print("selected_project",selected_project)
 #             # Initialize the OpenStack connection for the selected project
 #             conn = get_openstack_connection()
 #             # Fetch server (instance) details
@@ -3008,10 +3208,9 @@ class EmployeeUpdateAPIView(APIView):
 
 class InstanceDetailsAPIView(APIView):
     permission_classes = [IsAuthenticated]
-
+    
     def get(self, request):
-        try:
-            POWER_STATE_MAP = {
+        POWER_STATE_MAP = {
                 0: "NOSTATE",
                 1: "Running",
                 3: "Paused",
@@ -3019,6 +3218,10 @@ class InstanceDetailsAPIView(APIView):
                 6: "Crashed",
                 7: "Suspended",
             }
+        logger.info("Fetching OpenStack instance details")
+        try:
+            
+            
             # Initialize the OpenStack connection
             conn = get_openstack_connection()
             # Fetch all server (instance) details
@@ -3034,7 +3237,7 @@ class InstanceDetailsAPIView(APIView):
             
 
             for server in servers:
-                print("server------->", server)
+                
 
                 db_instance = db_instance_map.get(server.name)
                 instance_internal_name = (
@@ -3070,7 +3273,11 @@ class InstanceDetailsAPIView(APIView):
                         if image:
                             image_name = image.name or "N/A"
                     except Exception:
-                        pass
+                        logger.warning(
+                            "Image lookup failed | image_id=%s | server=%s",
+                            image_id,
+                            server.name,
+                        )
 
                 # Case 2: Instance booted from volume
                 # --- Case 2: Booted from volume ---
@@ -3188,16 +3395,17 @@ class InstanceDetailsAPIView(APIView):
                         "Volumes Attached": volumes,
                     }
                 )
-                print(instances)
+                logger.info("Instance details fetched | count=%s", len(instances))
+            
             
             return Response(instances, status=200)
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response(
-                {"error": str(e)},
-                status=500
+            logger.error(
+                "Failed to fetch instance details",
+                exc_info=True,
             )
+            return Response({"error": "Failed to fetch instance details"}, status=500)
+
         
     def calculate_age(self, created_at):
         created_time = datetime.strptime(
@@ -3660,7 +3868,9 @@ class VMActionAPIView(APIView):
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
             )
-            print("password", os.getenv("PASSWORD"))
+            logger.info("OpenStack connection initialized successfully")
+
+
 
             # Extract data from the request
             instance_ids = request.data.get("instance_ids")
@@ -3809,7 +4019,7 @@ class CreateImageAPIView(APIView):
             min_ram = int(request.data.get("min_ram", 0))
             image_file = request.FILES.get("file")
 
-            if not name or not file:
+            if not name or not image_file:
                 return Response(
                     {"error": "Name and file are required"},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -3832,7 +4042,7 @@ class CreateImageAPIView(APIView):
             )
 
             # Create the image in OpenStack
-            print("[DEBUG] Creating image in OpenStack...")
+            logger.info("Creating image in OpenStack")
             image = conn.image.create_image(
                 name=name,
                 disk_format=disk_format,
@@ -3842,20 +4052,26 @@ class CreateImageAPIView(APIView):
                 min_ram=min_ram,
             )
 
-            print("[DEBUG] Uploading image data...")
+            logger.info("Uploading image data to OpenStack")
             with open(image_path, "rb") as image_data:
                 conn.image.upload_image(image, image_data)
 
             # Clean up the temporary file
             os.remove(image_path)
 
+
+            logger.info(
+                "Image created successfully",
+                extra={"image_id": image.id, "image_name": name},
+            )
             return Response(
                 {"message": "Image created successfully", "image_id": image.id},
                 status=status.HTTP_201_CREATED,
             )
 
         except Exception as e:
-            print(f"[ERROR] {str(e)}")
+            logger.exception("Failed to create image")
+
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -5189,7 +5405,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret, interval=300)  # 5 minutes validity
         otp = totp.now()
-        print(f"DEBUG 🔢 Generated OTP: {otp} (valid 5 min)")
+        logger.info("OTP generated for user; valid for 5 minutes")
+
         return otp, secret
 
     def send_otp_email(self, email, otp, username):
@@ -5210,7 +5427,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         Meghdoot CMP Security Team"""
 
         try:
-            print(f"DEBUG send_otp_email() got email --> [{email}]")
+            logger.debug("send_otp_email() called")
+
             send_mail(
                 subject=subject,
                 message=message,
@@ -5218,10 +5436,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 recipient_list=[email],
                 fail_silently=False,
             )
-            print(f"OTP email sent successfully to {email}")
+            logger.info("OTP email sent successfully")
             return True
         except Exception as e:
-            print(f"Error sending OTP email: {e}")
+            logger.error("Failed to send OTP email", exc_info=True)
             return False
 
     # ---------------------- MAIN POST METHOD ----------------------
@@ -5244,11 +5462,14 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 if encoded_password
                 else None
             )
-            print(
-                f"DEBUG 🔐 Decoded username: {username}, password: {'*' * len(password) if password else None}"
+            logger.debug(
+                "Decoded login credentials for username=%s, password_provided=%s",
+                username,
+                bool(password),
             )
+
         except (binascii.Error, UnicodeDecodeError) as e:
-            print(f"ERROR ⚠️ Failed to decode credentials: {e}")
+            logger.warning("Failed to decode Base64 credentials", exc_info=True) 
             return Response({"detail": "Invalid encoded credentials"}, status=400)
 
         # ====================================================
@@ -5350,7 +5571,11 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
             # TEST MODE: Allow ANY OTP
             if getattr(settings, "OTP_TEST_MODE", False):
-                print("⚠️ SECURITY WARNING: OTP validation bypassed from settings.")
+                logger.critical(
+                    "SECURITY WARNING: OTP validation bypassed (OTP_TEST_MODE=True). "
+                    "This must NEVER be enabled in production."
+                )
+
             else:
                 if otp != stored_data["otp"]:
                     return Response(
@@ -5367,7 +5592,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 response = super().post(request, *args, **kwargs)
             except Exception as e:
                 if settings.DEBUG:
-                    print("ERROR generating tokens:", e)
+                    logger.exception(
+                        "Token generation failed for username=%s",
+                        username,
+                    )
                 return Response({"detail": "Failed to generate tokens."}, status=500)
             # Check the token_response
             if response.status_code != 200:
@@ -5402,7 +5630,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 "role": token["role"],  # Uses same logic as serializer
                 "employee_id": token.get("employee_id"),
             }
-            print(f"DEBUG 🧾 user_data being sent in cookie: {user_data}")
+            logger.info(
+                "User login successful, setting user_data cookie | username=%s role=%s employee_id=%s",
+                user.username,
+                token.get("role"),
+                token.get("employee_id"),
+            )
+
 
             # Clean response body and set cookies
             response.data = {"detail": "Login successful"}
@@ -5464,12 +5698,12 @@ class CookieTokenRefreshView(APIView):
         refresh_cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "MDAUTH")
         refresh_token = request.COOKIES.get(refresh_cookie_name)
         if not refresh_token:
-            print("DEBUG ❌ No refresh token cookie found")
+            logger.warning("No refresh token cookie found")
             return Response(
                 {"detail": "No refresh token cookie found."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        print(f"DEBUG 🧩 Raw Refresh Token: {refresh_token[:50]}...")
+        logger.debug("Refresh token cookie received (masked)")
         try:
             # ✅ Step 1: Decode refresh token payload manually
             decoded_payload = jwt.decode(
@@ -5477,11 +5711,12 @@ class CookieTokenRefreshView(APIView):
                 settings.SECRET_KEY,
                 algorithms=["HS256"],
             )
-            print(f"DEBUG 🔍 Decoded Refresh Token Payload: {decoded_payload}")
+            logger.debug("Decoded refresh token payload successfully")
 
             # ✅ Step 2: Get user_id from payload and fetch from DB
             user_id = decoded_payload.get("user_id")
             if not user_id:
+                logger.error("Refresh token payload missing user_id")
                 return Response(
                     {"detail": "Invalid token payload."},
                     status=status.HTTP_400_BAD_REQUEST,
@@ -5493,8 +5728,10 @@ class CookieTokenRefreshView(APIView):
             try:
                 user = User.objects.get(id=user_id)
             except User.DoesNotExist:
+                logger.warning("User not found for refresh token | user_id=%s", user_id)
                 return Response(
-                    {"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND
+                    {"detail": "User not found."},
+                    status=status.HTTP_404_NOT_FOUND,
                 )
 
             # ✅ Step 3: Generate new tokens
@@ -5522,18 +5759,22 @@ class CookieTokenRefreshView(APIView):
                 response, access_token, refresh_token, user_data
             )
 
-            print("DEBUG ✅ Set new cookies successfully for:", user.username)
+            logger.info(
+                "Token refreshed successfully | username=%s role=%s",
+                user.username,
+                custom_token.get("role"),
+            )
             return response
 
         except TokenError as e:
-            print(f"DEBUG ❌ TokenError: {e}")
+            logger.warning("Invalid or expired refresh token | error=%s", str(e))
             return Response(
                 {"detail": "Invalid or expired refresh token."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
         except Exception as e:
-            print(f"DEBUG 💥 Unexpected error during refresh: {e}")
+            logger.exception("Unexpected error during token refresh")
             return Response(
                 {"detail": "Internal server error."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -5592,7 +5833,10 @@ class ForgotPasswordView(APIView):
             return Response({"error": "No account found with this email."}, status=404)
 
         otp, secret = CustomTokenObtainPairView().generate_otp()
-        print(f"🔐 Password Reset OTP for {email} → {otp}, secret: {secret}")
+        logger.info("Password Reset OTP generated for %s", email)
+        # For debugging purposes only, remove in production
+        logger.debug("Password Reset OTP: %s, secret: %s", otp, secret)
+
         CustomTokenObtainPairView().send_otp_email(user.email, otp, user.username)
 
         cache.set(f"reset_otp_{email}", {"otp": otp, "secret": secret}, timeout=300)
@@ -5886,18 +6130,18 @@ class VmRequestAPIView(APIView):
             data["fla_approved_timestamp"] = None
             data["admin_approved_timestamp"] = None
 
-            print("vm-name before concat---->", data["vm_name"])
-
+            logger.debug("vm-name before concat --> %s", data["vm_name"])
             data["vm_name"] = (
                 f"{data['employee_id']}_{data['vm_name']}"  # Concatenate employee_id and vm_name
             )
-            print("vm-name---->", data["vm_name"])
+            logger.debug("vm-name after concat --> %s", data["vm_name"])
+
             # Serialize and save the data
             serializer = VmRequestSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
                 vm_name = f"{data['vm_name']}"  # Concatenate employee_id and vm_name
-                print("vm-name---->", vm_name)
+                logger.debug("Saved vm-name --> %s", vm_name)
 
                 employee = Employee.objects.get(employee_id=data["employee_id"])
                 mail_data = {
@@ -5907,7 +6151,7 @@ class VmRequestAPIView(APIView):
                     "fla_email": employee.fla_email,
                 }
 
-                print("mail_data---->", mail_data)
+                logger.debug("mail_data --> %s", mail_data)
 
 
                 subject = "VM Creation Request Approval Required"
@@ -5937,10 +6181,9 @@ class VmRequestAPIView(APIView):
                         recipient_list=[employee.fla_email],
                         fail_silently=False,
                     )
-                    print("Email sent successfully to FLA:", employee.fla_email)
-                    
+                    logger.info("Email sent successfully to FLA: %s", employee.fla_email)
                 except Exception as e:
-                    print("Email sending failed:", str(e))
+                    logger.error("Email sending failed: %s", str(e))
 
                 return Response(
                     {
@@ -6033,68 +6276,54 @@ class VmRequestUpdateAPIView(APIView):
 
 # ------------------------11 feb 2025-----------------------------
 
-
 class CheckVMNameAPIView(APIView):
     """
-    API to check if a VM instance name already exists in OpenStack.
+    API to check if a VM instance name already exists in OpenStack or in the local DB.
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        conn = get_openstack_connection()
-
-        # Get VM name from request parameters
-        vm_name = request.query_params.get("vm_name")
-        print("vm_name---->", vm_name)
+        vm_name = request.query_params.get("vm_name", "").strip()
         if not vm_name:
             return Response(
                 {"error": "VM name is required"}, status=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            # ✅ Get all VM names from VMRequest model
+            conn = get_openstack_connection()
+
+            # Get all VM names from the database
             existing_vm_names = list(
                 VmRequest.objects.values_list("vm_name", flat=True)
-            )  # Fetch all names
-            print("existing vm names ---->", existing_vm_names)
+            )
+            logger.debug("Existing VM names from DB: %s", existing_vm_names)
 
-            # ✅ Extract the part after the last underscore
-            stripped_vm_names = [
-                name.split("_")[-1].lower() for name in existing_vm_names
-            ]
-
-            print("Stripped VM names---->", stripped_vm_names)
-
-            # ✅ Check if the given VM name exists in the stripped list
-            if vm_name.lower() in stripped_vm_names:
+            # Check if VM name exists in DB (full name comparison)
+            if vm_name.lower() in [name.lower() for name in existing_vm_names]:
                 return Response(
-                    {"exists": True, "message": f"VM name '{vm_name}' already exists."},
+                    {"exists": True, "message": f"VM name '{vm_name}' already exists in DB."},
                     status=status.HTTP_200_OK,
                 )
 
-            # ✅ If not found in VMRequest, check in OpenStack
-            conn = get_openstack_connection()
-            existing_vms = conn.compute.servers()
-            print("existing_vms---->", existing_vms)
-            for vm in existing_vms:
-                print(vm.name)
-                if vm.name.lower() == vm_name.lower():
-                    return Response(
-                        {
-                            "exists": True,
-                            "message": f"VM name '{vm_name}' already exists in OpenStack.",
-                        },
-                        status=status.HTTP_200_OK,
-                    )
+            # Check if VM name exists in OpenStack
+            existing_vms = list(conn.compute.servers())  # convert generator to list
+            logger.debug("Existing VMs from OpenStack: %s", [vm.name for vm in existing_vms])
 
-            # ✅ If not found in either, VM name is available
+            if vm_name.lower() in [vm.name.lower() for vm in existing_vms]:
+                return Response(
+                    {"exists": True, "message": f"VM name '{vm_name}' already exists in OpenStack."},
+                    status=status.HTTP_200_OK,
+                )
+
+            # If not found anywhere
             return Response(
                 {"exists": False, "message": "VM name is available."},
                 status=status.HTTP_200_OK,
             )
 
         except Exception as e:
+            logger.error("Error checking VM name: %s", str(e), exc_info=True)
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -6213,17 +6442,19 @@ class FlaVmRequestAPIView(APIView):
         Fetch all VM request details related to FLA
         """
         try:
-            print(request.user)
+            logger.debug("Requesting user: %s", request.user)
             current_emp_id = Employee.objects.get(email=request.user)
             fla_related_emp_ids = Employee.objects.filter(
                 fla_employee_id=current_emp_id
             ).values_list("employee_id", flat=True)
-            print(fla_related_emp_ids, "========")
+            logger.debug("FLA related employee IDs: %s", list(fla_related_emp_ids))
+
             vm_requests = VmRequest.objects.filter(employee_id__in=fla_related_emp_ids)
             serializer = VmRequestSerializer(vm_requests, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
-            print("Error in fla vm requests", e)
+            logger.error("Error fetching FLA VM requests: %s", str(e))
+            
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -6268,7 +6499,7 @@ class EmployeeVmRequestAPIView(APIView):
             )
         except Exception as e:
             # Handle any other exceptions and log the error
-            print("Error in fetching VM requests:", e)
+            logger.error("Error in fetching VM requests: %s", e, exc_info=True)
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -7229,7 +7460,7 @@ class OpenStackProjectUserAPIView(APIView):
             try:
                 employee = Employee.objects.get(employee_id=employee_id)
                 employee_name = employee.name  # Get the employee name
-                print(employee_name, "<==========")
+                logger.debug("Fetched employee name: %s for employee_id: %s", employee_name, employee_id)
             except Employee.DoesNotExist:
                 return Response(
                     {"error": f"Employee with employee_id {employee_id} not found."},
@@ -7329,8 +7560,8 @@ class CreateRouterAPIView(APIView):
                 "availability_zones", ["nova"]
             )  # Optional
 
-            print(
-                "Form Data: ",
+            logger.debug(
+                "Form Data - external_network_name: %s, enable_snat: %s, availability_zones: %s, project_id: %s",
                 external_network_name,
                 enable_snat,
                 availability_zones,
@@ -7408,8 +7639,7 @@ class EditRouterAPIView(APIView):
             # Parse form data
             new_router_name = request.data.get("name")
             admin_state_up = request.data.get("admin_state_up")
-            print("new_router_name", new_router_name)
-            # Validate the router ID
+            logger.debug("New router name: %s", new_router_name)            # Validate the router ID
             router = conn.network.get_router(router_id)
             if not router:
                 return Response(
@@ -7520,16 +7750,16 @@ class ListRoutersView(APIView):
         try:
             # Initialize OpenStack connection
             conn = get_openstack_connection()
-            print("Inside list router")
+            logger.debug("Inside list router")
 
             # Fetch all routers
             routers = conn.network.routers()
-            print("routers", routers)
+            logger.debug("Routers fetched: %s", routers)
 
             # Prepare response data
             router_list = []
             for router in routers:
-                print("router", router)
+                logger.debug("Processing router: %s", router)
 
                 # Get associated network details
                 external_gateway_info = router.external_gateway_info or {}
@@ -7555,7 +7785,7 @@ class ListRoutersView(APIView):
                 # Get project name from project ID
                 project_name = None
                 if router.project_id:
-                    print("router.project_id", router.project_id)
+                    logger.debug("Router project_id: %s", router.project_id)
                     try:
                         # Attempt to fetch the project using the project_id
                         project = conn.identity.get_project(router.project_id)
@@ -7565,8 +7795,10 @@ class ListRoutersView(APIView):
                             project_name = "Unknown Project"  # Default value if project fetch fails silently
                     except Exception as e:
                         # Handle case where the project does not exist or cannot be retrieved
-                        print(
-                            f"Error fetching project for ID {router.project_id}: {str(e)}"
+                        logger.error(
+                            "Error fetching project for ID %s: %s",
+                            router.project_id,
+                            str(e),
                         )
                         project_name = "Deleted Project"  # Default value for deleted or inaccessible projects
                 else:
@@ -7614,7 +7846,7 @@ class DeleteRouterAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, router_ids):
-        print("router_ids", router_ids)
+        logger.debug("router_ids: %s", router_ids)
         try:
             # Validate the router IDs
             if not router_ids:
@@ -7753,8 +7985,8 @@ class ProjectUsageAPIView(APIView):
             start_date = datetime(2024, 12, 28)
             end_date = datetime(2024, 12, 29)
 
-            print("start_date", start_date)
-            print("end_date", end_date)
+            logger.debug("start_date", start_date)
+            logger.debug("end_date", end_date)
 
             # Iterate over all projects
             for project in conn.identity.projects():
@@ -8573,7 +8805,7 @@ class ServiceMonitorView(APIView):
     def get(self, request):
         # URL of the service monitor
         SERVICE_MONITOR_URL = f"{SERVER_URL}/service-monitor"
-        print(SERVICE_MONITOR_URL)
+        logger.debug(SERVICE_MONITOR_URL)
         try:
             logger.info(f"Sending request to {SERVICE_MONITOR_URL}")
 
@@ -8825,7 +9057,7 @@ class ListGroupMembersAPIView(APIView):
                             }
                         )
                 except Exception as check_error:
-                    print(f"Error checking user {user.id}: {check_error}")
+                    logger.error(f"Error checking user {user.id}: {check_error}")
 
             return Response(
                 {"group": group.name, "members": members}, status=status.HTTP_200_OK
@@ -8900,7 +9132,7 @@ class ComputeServicesView(APIView):
             # Prepare response data
             service_list = []
             for service in services:
-                print(service)
+                logger.debug(service)
                 service_list.append(
                     {
                         "Name": service.binary,
@@ -8925,11 +9157,11 @@ class BlockStorageServicesView(APIView):
 
             # Fetch block storage service details
             services = conn.block_storage.services()
-            print(services)
+            logger.debug(services)
             # Prepare response data
             service_list = []
             for service in services:
-                print(service)
+                logger.debug(service)
                 service_list.append(
                     {
                         "Name": service.binary,
@@ -9002,7 +9234,7 @@ class NetworkAgentsView(APIView):
             # Prepare response data
             agent_list = []
             for agent in agents:
-                print(agent)
+                logger.debug(agent)
                 # Create a base dictionary for each agent
                 agent_data = {
                     "Type": agent.agent_type,
@@ -9083,7 +9315,7 @@ class ApprovedVMsAPIView(APIView):
             conn = get_conn()
             return conn.compute.get_server(vm_id)
         except Exception as e:
-            print("OpenStack Fetch Error:", e)
+            logger.error("OpenStack Fetch Error:", e)
             return None
 
     def get(self, request):
@@ -9202,7 +9434,7 @@ class ApprovedVMsAPIView(APIView):
             )
 
         except Exception as e:
-            print(f"❌ Error in ApprovedVMsAPIView: {str(e)}")
+            logger.error(f"❌ Error in ApprovedVMsAPIView: {str(e)}")
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -9292,7 +9524,7 @@ class VMDeleteAdminApprovalAPIView(APIView):
             connection_id = vm_info.connection_id
             guac_username = vm_info.username
             authToken = get_guac_token()
-            print("AUTH TOKEN IN DELETE FLOW:", authToken)
+            logger.debug("AUTH TOKEN IN DELETE FLOW:", authToken)
 
             if not authToken:
                  return Response({"message": "Failed to get Guacamole token"}, status=500)
@@ -9329,13 +9561,13 @@ class VMDeleteAdminApprovalAPIView(APIView):
                 delete_conn_resp = delete_connection(connection_id, authToken)
 
                 if delete_conn_resp.status_code in [200, 204]:
-                    print(f"Guacamole Connection Deleted: {connection_id}")
+                    logger.info("Guacamole Connection Deleted: {connection_id}")
                 else:
-                    print("Guacamole connection deletion failed:",
+                    logger.error("Guacamole connection deletion failed:",
                       getattr(delete_conn_resp, "text", delete_conn_resp))
                     
   
-                print(f"Skipping deletion of Guacamole user '{guac_username}' as requested")
+                logger.info("Skipping deletion of Guacamole user '{guac_username}' as requested")
 
 
             # -----------------------------------
@@ -9345,9 +9577,9 @@ class VMDeleteAdminApprovalAPIView(APIView):
                 conn = get_conn()
                 if vm_info.vm_id:
                     conn.compute.delete_server(vm_info.vm_id, ignore_missing=True)
-                print("OpenStack VM Deleted:", vm_info.vm_id)
+                logger.info("OpenStack VM Deleted:", vm_info.vm_id)
             except Exception as e:
-                print("Error deleting VM from OpenStack:", e)
+                logger.error("Error deleting VM from OpenStack:", e)
 
             # -----------------------------------
             # 4️⃣ DELETE DB RECORDS
@@ -9864,7 +10096,7 @@ class OpenStackImageDownloadView(APIView):
     def get(self, request, image_id):
         try:
             img_record = ImageRecord.objects.get(image_id=image_id)
-            print(img_record.file_path)
+            logger.debug(img_record.file_path)
             if os.path.exists(img_record.file_path):
                 return FileResponse(
                     open(img_record.file_path, "rb"),
@@ -9942,7 +10174,7 @@ class AssociateFloatingIPView(APIView):
             floating_ip = request.data.get("floating_ip")  # Optional
             description = request.data.get("description", "")
 
-            print(
+            logger.debug(
                 "network_pool:",
                 network_pool,
                 "project_name:",
@@ -10277,7 +10509,7 @@ class ListVolumesAPIView(APIView):
         try:
             conn = get_openstack_connection()
             volumes = conn.block_storage.volumes(details=True)
-            print(volumes)
+            logger.debug(volumes)
             volume_list = []
             for vol in volumes:
                 # print(vol)
@@ -11566,7 +11798,7 @@ class OpenStackDataView(View):
             response.raise_for_status()
             return response.headers.get("X-Subject-Token")
         except requests.RequestException as e:
-            print(f"Error fetching token: {e}")
+            logger.error("Error fetching token: {e}")
             return None
 
     def fetch_data(self, url, token):
@@ -11576,7 +11808,7 @@ class OpenStackDataView(View):
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
-            print(f"Error fetching data from {url}: {e}")
+            logger.error("Error fetching data from {url}: {e}")
             return None
 
     def get(self, request):
@@ -11759,7 +11991,7 @@ class KubernetesDeploymentsAPIView(APIView):
         try:
             BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # Get the directory of the app
             KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")  # Path to admin.conf
-            print("KUBECONFIG_PATH",KUBECONFIG_PATH)
+            logger.info("KUBECONFIG_PATH",KUBECONFIG_PATH)
             # Load Kubernetes configuration securely
             kube_config_path =  KUBECONFIG_PATH  # Use env variable
             config.load_kube_config(config_file=kube_config_path)
@@ -11798,7 +12030,7 @@ kube_config_path = os.getenv("KUBE_CONFIG_PATH", KUBECONFIG_PATH)  # Use env var
 try:
     config.load_kube_config(config_file=kube_config_path)
 except Exception as e:
-    print(f"⚠️ Error loading kubeconfig: {e}")
+    logger.warning(f"⚠️ Error loading kubeconfig: {e}")
 
 # Create Kubernetes API client
 v1 = client.CoreV1Api()
@@ -11935,7 +12167,7 @@ def get_service_nodeport(service_name, namespace="default"):
             if p.node_port:
                 return p.node_port
     except Exception as e:
-        print("Error fetching nodePort:", e)
+        logger.error("Error fetching nodePort:", e)
     return None
 
 
@@ -12039,7 +12271,7 @@ class DeployNginxHAAPIView(APIView):
         node_port = get_service_nodeport(service_name, namespace)
 
         # Debug print
-        print(f"🔵 NodePort assigned by Kubernetes: {node_port}")
+        logger.info(f"🔵 NodePort assigned by Kubernetes: {node_port}")
         logger.info(f"🔵 NodePort assigned by Kubernetes: {node_port}")
 
         # ---------------------------
@@ -12196,7 +12428,7 @@ def get_available_node():
         max_cpu_available = 0
 
         for node in nodes:
-            print("node", node)
+            logger.debug("node", node)
             node_name = node.metadata.name
             allocatable = node.status.allocatable
 
@@ -12205,7 +12437,7 @@ def get_available_node():
                 allocatable["cpu"].replace("m", "")
             )  # Convert CPU from millicores
             memory_available = allocatable["memory"]
-            print("cpu_available", cpu_available, "memory_available", memory_available)
+            logger.info("cpu_available", cpu_available, "memory_available", memory_available)
             logger.info(
                 f"Node: {node_name}, CPU: {cpu_available}m, Memory: {memory_available}"
             )
@@ -12469,11 +12701,11 @@ class DeployPodAPIView(APIView):
                 logger.info(
                     f"✅ Pod '{app_name}-pod' is now Running on {current_node}."
                 )
-                print(f"✅ Pod '{app_name}-pod' is now Running on {current_node}.")
+                logger.info("✅ Pod '{app_name}-pod' is now Running on {current_node}.")
                 return "Running", current_node
 
             if restart_count >= 2:
-                print("restart count", restart_count)
+                logger.debug("restart count", restart_count)
                 logger.warning(
                     f"⚠️ Pod '{app_name}-pod' restarted {restart_count} times on {node_name}. Moving to another node."
                 )
@@ -13365,11 +13597,11 @@ class VMExpiryNotificationAPIView(APIView):
         today = timezone.now().date()
         seven_days_later = today + timedelta(days=7)
 
-        print(f"Current logged-in user: {current_user}")
+        logger.info(f"Current logged-in user: {current_user}")
 
         # Get user role from token
         user_role = self.get_user_role_from_token(request)
-        print(f"User role: {user_role}")
+        logger.debug(f"User role: {user_role}")
 
 
         # Base query for VMs expiring within the next 7 days
@@ -13381,27 +13613,27 @@ class VMExpiryNotificationAPIView(APIView):
                 login_disable_date__gte=today,
                 login_disable_date__lte=seven_days_later,
             )
-            print(f"Admin role: Found {vms.count()} VMs expiring soon")
+            logger.info("Admin role: Found {vms.count()} VMs expiring soon")
 
         elif user_role.upper() == "FLA":
-            print("Processing FLA role")
+            logger.info("Processing FLA role")
             # For FLA, get their own VMs plus VMs of reporting employees
             try:
                 # Get the current employee record
                 current_emp = Employee.objects.get(email=current_user)
-                print(f"Found employee record for FLA: {current_emp.employee_id}")
+                logger.info(f"Found employee record for FLA: {current_emp.employee_id}")
 
                 # Get all employees reporting to this FLA
                 fla_related_emp_ids = Employee.objects.filter(
                     fla_employee_id=current_emp
                 ).values_list("employee_id", flat=True)
-                print(f"Employees reporting to this FLA: {list(fla_related_emp_ids)}")
+                logger.info(f"Employees reporting to this FLA: {list(fla_related_emp_ids)}")
 
                 # Get the email addresses of these employees
                 reporting_employees = Employee.objects.filter(
                     employee_id__in=fla_related_emp_ids
                 ).values_list("email", flat=True)
-                print(f"Reporting employee emails: {list(reporting_employees)}")
+                logger.info(f"Reporting employee emails: {list(reporting_employees)}")
 
                 # First, get VMs for the FLA themselves
                 own_vms = VmRequest.objects.filter(
@@ -13411,7 +13643,7 @@ class VMExpiryNotificationAPIView(APIView):
                     login_disable_date__gte=today,
                     login_disable_date__lte=seven_days_later,
                 )
-                print(f"FLA's own VMs count: {own_vms.count()}")
+                logger.info(f"FLA's own VMs count: {own_vms.count()}")
 
                 # Then, get VMs for reporting employees
                 reporting_vms = VmRequest.objects.filter(
@@ -13421,14 +13653,14 @@ class VMExpiryNotificationAPIView(APIView):
                     login_disable_date__gte=today,
                     login_disable_date__lte=seven_days_later,
                 )
-                print(f"Reporting employees' VMs count: {reporting_vms.count()}")
+                logger.info(f"Reporting employees' VMs count: {reporting_vms.count()}")
 
                 # Combine both querysets
                 vms = own_vms.union(reporting_vms)
-                print(f"Total VMs for FLA: {vms.count()}")
+                logger.info(f"Total VMs for FLA: {vms.count()}")
 
             except Employee.DoesNotExist:
-                print(f"No employee record found for FLA: {current_user}")
+                logger.error(f"No employee record found for FLA: {current_user}")
                 # If employee record not found, just show their own VMs
                 vms = VmRequest.objects.filter(
                     email=current_user,
@@ -13437,7 +13669,7 @@ class VMExpiryNotificationAPIView(APIView):
                     login_disable_date__gte=today,
                     login_disable_date__lte=seven_days_later,
                 )
-                print(f"FLA's own VMs (fallback): {vms.count()}")
+                logger.error(f"FLA's own VMs (fallback): {vms.count()}")
 
         else:
             # For regular users, get only their VMs
@@ -13448,7 +13680,7 @@ class VMExpiryNotificationAPIView(APIView):
                 login_disable_date__gte=today,
                 login_disable_date__lte=seven_days_later,
             )
-            print(f"Regular user: Found {vms.count()} VMs expiring soon")
+            logger.info(f"Regular user: Found {vms.count()} VMs expiring soon")
 
         vm_details = [
             {"vm_name": vm.vm_name, "expiry_date": vm.login_disable_date} for vm in vms
@@ -13470,7 +13702,7 @@ class VMExpiryNotificationAPIView(APIView):
                     send_mail(subject, message, "rakshana@cdac.in", [vm.email])
                     notified.append(vm.vm_name)
                 except Exception as e:
-                    print(f"Failed to notify {vm.email}: {e}")
+                    logger.error("Failed to notify {vm.email}: {e}")
 
         return Response(
             {"message": "Notifications sent.", "notified_vms": vm_details},
@@ -13541,7 +13773,7 @@ class RejectedVMRequestsAPIView(APIView):
 
         # Get user role from token
         user_role = self.get_user_role_from_token(request)
-        print(f"Current logged-in user: {current_user}, Role: {user_role}")
+        logger.info(f"Current logged-in user: {current_user}, Role: {user_role}")
 
         # Get rejected VM requests based on user role
         if user_role.upper() == "ADMIN":
@@ -13588,7 +13820,7 @@ class RejectedVMRequestsAPIView(APIView):
         # Serialize the rejected VM requests
         rejected_vm_details = []
         for vm in rejected_vms:
-            print(vm)
+            logger.debug(vm)
             # Determine reason based on who rejected
             rejection_reason = self.get_rejection_reason(vm)
             if rejection_reason == "Rejected by FLA":
@@ -13660,29 +13892,30 @@ class ListVolumeTypesAPIView(APIView):
     def get(self, request):
         try:
             conn = get_openstack_connection()
-            volume_types = conn.block_storage.types()
+            # Convert generator to list immediately
+            volume_types = list(conn.block_storage.types())  # ✅ Fixes generator issue
+            logging.info("Fetched %d volume types", len(volume_types))
 
             result = []
             for vtype in volume_types:
                 qos_specs_id = getattr(vtype, "qos_specs_id", None)
 
+                # Fetch encryption info safely
                 encryption = conn.block_storage.get_type_encryption(vtype.id)
                 encryption_info = None
                 if encryption:
                     encryption_info = {
                         "cipher": getattr(encryption, "cipher", None),
-                        "control_location": getattr(
-                            encryption, "control_location", None
-                        ),
+                        "control_location": getattr(encryption, "control_location", None),
                         "key_size": getattr(encryption, "key_size", None),
                         "provider": getattr(encryption, "provider", None),
                     }
 
                 result.append(
                     {
-                        "id": vtype.id,  # <--- ADD THIS
-                        "name": vtype.name,
-                        "description": vtype.description,
+                        "id": getattr(vtype, "id", None),
+                        "name": getattr(vtype, "name", ""),
+                        "description": getattr(vtype, "description", ""),  # avoids missing attr
                         "qos_spec": qos_specs_id,
                         "encryption": encryption_info,
                         "is_public": getattr(vtype, "is_public", None),
@@ -13692,9 +13925,8 @@ class ListVolumeTypesAPIView(APIView):
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            logging.error("Error fetching volume types: %s", e, exc_info=True)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ---------------------16 May 2025-----------------------------------------------
@@ -13818,7 +14050,7 @@ class OpenStackRequestsByDateAPIView(APIView):
             "creation_status",
             "designation",
         )
-        print("Table Data:", list(table_data))
+        logger.info("Table Data:", list(table_data))
         return Response({
             "date": selected_date,
             "pending": pending_qs.count(),
@@ -13874,7 +14106,7 @@ class K8sRequestsByDateAPIView(APIView):
             "deployment_status",    
             "request_timestamp",
         )
-        print("Table Data:", list(table_data))
+        logger.info("Table Data:", list(table_data))
         return Response({
             "date": selected_date,
             "pending": pending_qs.count(),
@@ -14175,7 +14407,7 @@ class FlaServiceRequestAPIView(APIView):
             )
 
         except Exception as e:
-            print("Error in fla service requests:", e)
+            logger.error("Error in fla service requests:", e)
             return Response(
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -15457,12 +15689,12 @@ class ServiceRequestPendingAdminAPIView(APIView):
             # Validate pod_name against RFC 1123 DNS label
             if not re.match(r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", pod_name):
                 pod_name = "default-name"
-                print("Pod name invalid, set to default:", pod_name)
+                logger.info("Pod name invalid, set to default:", pod_name)
 
             # Get Kubernetes clients
             apps_v1, core_v1 = get_k8s_client3()
-            print("ngix function")
-            print("service name:", service_request.service_name)
+            logger.info("ngix function")
+            logger.debug("service name:", service_request.service_name)
 
             def get_available_node_port(core_v1):
                 """Find an available NodePort in the 30000-32767 range."""
@@ -15480,7 +15712,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 raise Exception("No available NodePort found in the 30000-32767 range.")
 
             apps_v1, core_v1 = get_k8s_client3()
-            print("service name:", service_request.service_name)
+            logger.info("service name:", service_request.service_name)
             if service_request.service_name.lower() == "nginx":
                 # if not pod_name or not isinstance(pod_name, str):
                 #     pod_name = service_request.service_name + "nginx"
@@ -15533,7 +15765,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
 
                 # ⭐ Retrieve the assigned NodePort
                 node_port = created_service.spec.ports[0].node_port
-                print("Assigned NodePort:", node_port)
+                logger.debug("Assigned NodePort:", node_port)
 
                 # Save to DB or return to frontend
                 service_request.node_port = node_port
@@ -15556,7 +15788,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 node_ip = os.getenv("node_ip")
                 deployment_url = f"http://{node_ip}:{service_request.node_port}/"
 
-                print("Deployment marked as Deployed")
+                logger.info("Deployment marked as Deployed")
                 return Response(
                     {
                         "message": "Service request status updated successfully by admin",
@@ -15756,7 +15988,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         status=500,
                     )
 
-                print(f"PostgreSQL deployment and service created for {app_name}.")
+                logger.info(f"PostgreSQL deployment and service created for {app_name}.")
 
             elif service_request.service_name.lower() == "mysql":
                 # Extract data from the service request record
@@ -15840,7 +16072,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
 
                 port_changed = False
                 if node_port in used_ports:
-                    print(
+                    logger.warning(
                         f"⚠ NodePort {node_port} is already in use. Letting Kubernetes assign a free one."
                     )
                     node_port = None  # Kubernetes will auto-assign
@@ -15874,11 +16106,11 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 assigned_port = created_service.spec.ports[0].node_port
 
                 if port_changed:
-                    print(
+                    logger.info(
                         f"✅ Requested port was busy. Assigned free port: {assigned_port}"
                     )
                 else:
-                    print(f"✅ Port {assigned_port} assigned as requested.")
+                    logger.info(f"✅ Port {assigned_port} assigned as requested.")
 
                 # Update the model with the assigned port
                 service_request.node_port = assigned_port
@@ -16002,7 +16234,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 service_request.deployment_status = "Deployed"
                 service_request.save()
 
-                print(f"🔥 NGINX-HA Deployed: {deployment_name}, NodePort={node_port}")
+                logger.info(f"🔥 NGINX-HA Deployed: {deployment_name}, NodePort={node_port}")
 
                 # Send deployment success email
                 employee = Employee.objects.get(employee_id=service_request.employee_id)
@@ -16126,7 +16358,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         status=500,
                     )
 
-                print(
+                logger.info(
                     f"CouchDB deployment and service created for {app_name} on port {node_port}."
                 )
 
@@ -16232,7 +16464,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         status=500,
                     )
 
-                print(
+                logger.info(
                     f"MariaDB deployment and service created for {app_name} on port {node_port}."
                 )
 
@@ -16295,15 +16527,15 @@ Meghdoot CMP Cloud Team
             recipient_list=[email],
             fail_silently=False,
         )
-        print(f"Deployment email sent successfully to {email}")
+        logger.info(f"Deployment email sent successfully to {email}")
         return True
     except Exception as e:
-        print("Error sending deployment email:", e)
+        logger.error("Error sending deployment email:", e)
         return False
         return True
 
     except Exception as e:
-        print("Error sending deployment email:", e)
+        logger.error("Error sending deployment email:", e)
         return False
 
 
@@ -18821,7 +19053,7 @@ class DeployNginxHAAPIView(APIView):
         node_port = get_service_nodeport(service_name, namespace)
 
         # Debug print
-        print(f"🔵 NodePort assigned by Kubernetes: {node_port}")
+        logger.debug(f"🔵 NodePort assigned by Kubernetes: {node_port}")
         logger.info(f"🔵 NodePort assigned by Kubernetes: {node_port}")
 
         # ---------------------------
@@ -18935,7 +19167,7 @@ logger = logging.getLogger(__name__)
 class DeployPodOnKnode2APIView(APIView):
     def post(self, request):
         logger.info("🔹 Received request to deploy a pod on knode2.")
-        print(request.data)
+        logger.debug(request.data)
         appln_name = request.data.get("appln_name")
         appln_type = request.data.get("appln_type")
 
@@ -19063,7 +19295,7 @@ class ListKubernetesEventsAPIView(APIView):
 
         # Get namespace from query parameters (optional)
         namespace = request.query_params.get("namespace", None)
-        print("namespace", namespace)
+        logger.info("namespace", namespace)
 
         try:
             # Fetch events
@@ -19294,14 +19526,14 @@ class CreateReplicaSetAPIView(APIView):
 
     def post(self, request):
         """Create a ReplicaSet from an existing pod."""
-        print("\n📌 Received request to create a ReplicaSet...")
+        logger.info("\n📌 Received request to create a ReplicaSet...")
 
         pod_name = request.data.get("pod_name")
         namespace = request.data.get("namespace")
         replicas = request.data.get("replicas", 1)
 
         if not pod_name or not namespace:
-            print("❌ Missing required fields: 'pod_name' and 'namespace'")
+            logger.error("❌ Missing required fields: 'pod_name' and 'namespace'")
             return Response(
                 {"error": "Both 'pod_name' and 'namespace' are required"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -19310,13 +19542,13 @@ class CreateReplicaSetAPIView(APIView):
         try:
             replicas = int(replicas)
             if replicas < 1:
-                print("❌ Replica count must be greater than 0!")
+                logger.error("❌ Replica count must be greater than 0!")
                 return Response(
                     {"error": "Replica count must be greater than 0"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         except ValueError:
-            print("❌ Invalid replica count!")
+            logger.error("❌ Invalid replica count!")
             return Response(
                 {"error": "Invalid replica count. Must be an integer."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -19326,7 +19558,7 @@ class CreateReplicaSetAPIView(APIView):
             # Get the existing pod details
             pod = self.v1.read_namespaced_pod(name=pod_name, namespace=namespace)
         except Exception as e:
-            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
+            logger.error(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
             return Response(
                 {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -19356,13 +19588,13 @@ class CreateReplicaSetAPIView(APIView):
         try:
             # Create the ReplicaSet using self.apps_v1
             self.apps_v1.create_namespaced_replica_set(namespace=namespace, body=rs_manifest)
-            print(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
+            logger.info(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
             return Response(
                 {"message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"},
                 status=status.HTTP_201_CREATED,
             )
         except Exception as e:
-            print(f"❌ Error creating ReplicaSet: {str(e)}")
+            logger.error(f"❌ Error creating ReplicaSet: {str(e)}")
             return Response(
                 {"error": "Failed to create ReplicaSet"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -19370,7 +19602,7 @@ class CreateReplicaSetAPIView(APIView):
 
     def get(self, request):
         """List all available pods in all namespaces."""
-        print("\n📌 Fetching available pods...")
+        logger.info("\n📌 Fetching available pods...")
 
         try:
             pods = v1.list_pod_for_all_namespaces(watch=False)
@@ -19383,26 +19615,26 @@ class CreateReplicaSetAPIView(APIView):
                 for pod in pods.items
             ]
         except Exception as e:
-            print(f"❌ Error fetching pods: {str(e)}")
+            logger.error(f"❌ Error fetching pods: {str(e)}")
             return Response({"error": "Failed to fetch pods"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not pod_list:
-            print("⚠️ No pods found in the cluster!")
+            logger.warning("⚠️ No pods found in the cluster!")
             return Response({"message": "No pods found in the cluster"}, status=status.HTTP_404_NOT_FOUND)
 
-        print(f"✅ Found {len(pod_list)} pods.")
+        logger.info(f"✅ Found {len(pod_list)} pods.")
         return Response({"pods": pod_list}, status=status.HTTP_200_OK)
 
     def post(self, request):
         """Create a ReplicaSet from an existing pod."""
-        print("\n📌 Received request to create a ReplicaSet...")
+        logger.info("\n📌 Received request to create a ReplicaSet...")
 
         pod_name = request.data.get("pod_name")
         namespace = request.data.get("namespace")
         replicas = request.data.get("replicas", 1)
 
         if not pod_name or not namespace:
-            print("❌ Missing required fields: 'pod_name' and 'namespace'")
+            logger.error("❌ Missing required fields: 'pod_name' and 'namespace'")
             return Response(
                 {"error": "Both 'pod_name' and 'namespace' are required"},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -19411,13 +19643,13 @@ class CreateReplicaSetAPIView(APIView):
         try:
             replicas = int(replicas)
             if replicas < 1:
-                print("❌ Replica count must be greater than 0!")
+                logger.error("❌ Replica count must be greater than 0!")
                 return Response(
                     {"error": "Replica count must be greater than 0"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
         except ValueError:
-            print("❌ Invalid replica count!")
+            logger.error("❌ Invalid replica count!")
             return Response(
                 {"error": "Invalid replica count. Must be an integer."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -19427,7 +19659,7 @@ class CreateReplicaSetAPIView(APIView):
             # Get the existing pod details
             pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
         except Exception as e:
-            print(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
+            logger.error(f"❌ Error retrieving pod '{pod_name}': {str(e)}")
             return Response(
                 {"error": f"Pod '{pod_name}' not found in namespace '{namespace}'"},
                 status=status.HTTP_404_NOT_FOUND,
@@ -19457,13 +19689,13 @@ class CreateReplicaSetAPIView(APIView):
         try:
             # Create the ReplicaSet
             apps_v1.create_namespaced_replica_set(namespace=namespace, body=rs_manifest)
-            print(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
+            logger.info(f"✅ Successfully created ReplicaSet '{pod_name}-rs' with {replicas} replicas in namespace '{namespace}'")
             return Response(
                 {"message": f"ReplicaSet '{pod_name}-rs' created with {replicas} replicas"},
                 status=status.HTTP_201_CREATED,
             )
         except Exception as e:
-            print(f"❌ Error creating ReplicaSet: {str(e)}")
+            logger.error(f"❌ Error creating ReplicaSet: {str(e)}")
             return Response(
                 {"error": "Failed to create ReplicaSet"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -19471,7 +19703,7 @@ class CreateReplicaSetAPIView(APIView):
 
     def clean_pod_spec(self, pod_spec):
         """Remove unwanted fields like 'serviceAccount' and 'kube-api-access' volume mounts."""
-        print("🔹 Cleaning pod spec...")
+        logger.info("🔹 Cleaning pod spec...")
 
         for container in pod_spec.containers:
             if container.volume_mounts:
