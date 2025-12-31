@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AiOutlineKubernetes, AiOutlineLogout } from "react-icons/ai";
 import { SiOpenstack } from "react-icons/si";
-import { useAuth } from "../Pages/Authentication/authContext";
+import { useAuth } from "../Pages/Authentication/useAuth";
 
 import {
   Switch,
@@ -90,7 +90,6 @@ const Navbar = () => {
 
   const { logout, user } = useAuth();
   const userRole = user?.role;
-  console.log("User Role in Navbar:", userRole);
   const navigate = useNavigate();
 
   const [profileAnchor, setProfileAnchor] = useState(null);
@@ -151,7 +150,7 @@ const Navbar = () => {
       } catch (err) {
         console.error("Notification fetch failed", err);
       }
-    };
+    }; 
 
  useEffect(() => {
   fetchNotifications();

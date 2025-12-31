@@ -40,7 +40,7 @@ urlpatterns = [
     # 3️⃣ OpenStack APIs
     # -------------------------------
     # Flavors
-    path("api/flavors/", views.ListFlavors.as_view(), name="get_flavor_list"),
+    path("api/flavors/", ListFlavors.as_view(), name="get_flavor_list"),
     path("api/flavors/delete/", DeleteFlavorAPIView.as_view(), name="delete_flavor"),
     path("api/flavors/create/", CreateFlavorAPIView.as_view(), name="create_flavor"),
     path("flavors/metadata/<str:flavor_id>/", UpdateFlavorMetadataAPIView.as_view(), name="update-flavor-metadata"),
@@ -242,6 +242,8 @@ urlpatterns = [
     path("api/metrics/", get_metrics, name="get_metrics"),
     path("api/employee-details/", get_employee_details, name="employee-details"),
     path("api/employees/", EmployeeCreateAPIView.as_view(), name="employee-create"),
+    path("api/employees/groups/", GroupListAPIView.as_view(), name="employee-groups"),
+    path("api/employees/fla-list/", FLAListAPIView.as_view(), name="fla-list"),
     path("api/employees/bulk-upload/", EmployeeBulkUploadAPIView.as_view(), name="bulk-employee-create"),
     path("api/employees/delete/<str:employee_id>/", EmployeeDeleteAPIView.as_view(), name="delete-employee"),
     path("api/employees/update/<str:employee_id>/", EmployeeUpdateAPIView.as_view(), name="update-employee"),

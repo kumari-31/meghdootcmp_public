@@ -12,8 +12,7 @@ import secrets
 import string
 import urllib.parse
 from datetime import datetime, timedelta, timezone
-from time import sleep
-
+from time import sleep 
 import jwt
 import pyotp
 # --- Third-Party Libraries ---
@@ -56,7 +55,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 
 from .ceph import *
-from .launchvm import vm_approve_request
+from .launchvm import vm_approve_request ,create_user_with_details
 # --- Project-Specific Imports ---
 from .models import (CdacProject, CdVerifierAndNonce, Employee, ImageRecord,
                      Metric, Registration, ServiceRequest, Ticket,
@@ -595,57 +594,6 @@ class RegistrationListCreateAPIView(APIView):
         return paginator.get_paginated_response(serializer.data)
 
 
-class ListFlavors(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        # try:
-        # Initialize OpenStack connection
-        conn = openstack.connect(
-            auth_url=os.getenv("AUTH_URL"),
-            project_name=os.getenv("PROJECT_NAME"),
-            username=os.getenv("OPENSTACK_UNAME"),
-            password=os.getenv("PASSWORD"),
-            user_domain_name=os.getenv("USER_DOMAIN_NAME"),
-            project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
-        )
-        print(conn)
-        # Fetch the list of flavors
-        flavors = conn.compute.flavors()
-        print("flavors", flavors)
-        flavor_list = []
-
-        # Get the 'name' query parameter if provided
-        flavor_name = request.query_params.get("name", None)
-        print("flavor_name", flavor_name)
-
-        for flavor in flavors:
-            # If flavor_name is provided, filter by name
-            if flavor_name and flavor_name.lower() not in flavor.name.lower():
-                continue  # Skip this flavor if it doesn't match
-
-            flavor_list.append(
-                {
-                    "id": flavor.id,
-                    "name": flavor.name,
-                    "ram": f"{flavor.ram // 1024} GB ({flavor.ram} MB) RAM",
-                    "vcpus": flavor.vcpus,
-                    "disk": flavor.disk,
-                    "swap": flavor.swap,
-                    "ephemeral": flavor.ephemeral,
-                    "public": flavor.is_public,
-                    "metadata": getattr(flavor, "metadata", {}),
-                    # 'metadata': flavor.metadata if flavor.metadata else "No Metadata"
-                }
-            )
-
-        # Serialize the flavor data
-        serializer = FlavorSerializer(flavor_list, many=True)
-
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    # except Exception as e:
-    #     return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # -------------------------------4 june 2025---------------------------
@@ -1617,7 +1565,6 @@ class ListFlavors(APIView):
 
         # Get the 'name' query parameter if provided
         flavor_name = request.query_params.get("name", None)
-        print("flavor_name", flavor_name)
 
         for flavor in flavors:
             # If flavor_name is provided, filter by name
@@ -2147,34 +2094,6 @@ class OpenStackOverviewAPIView1(APIView):
         return Response(overview_data)
 
 
-def create_user_with_details(first_name, email, password):
-    """
-    Create a user with first name, email, and password in Django.
-
-    Parameters:
-    - first_name: First name of the user.
-    - email: Email address of the user.
-    - password: Password for the user.
-
-    Returns:
-    - User object if successful, None otherwise.
-    """
-    try:
-        # Create a new user using the create_user method
-        user = User.objects.create_user(
-            username=email,  # Using email as the username
-            email=email,
-            password=password,
-            first_name=first_name,
-        )
-
-        print(f"User '{email}' created successfully with ID: {user.id}")
-        return user
-
-    except Exception as e:
-        print(f"Error creating user: {e}")
-        return None
-
 
 
 
@@ -2680,46 +2599,128 @@ def get_employee_details(request):
 #     permission_classes = [IsAuthenticated]
 
 #     def post(self, request):
-#         # Deserialize and validate data
-#         serializer = EmployeeSerializer(data=request.data)
-#         if serializer.is_valid():
-#             # Save the validated data to the database
-#             serializer.save()
-#             return Response(serializer.data, status=status.HTTP_201_CREATED)
-#         else:
-#             # Return validation errors if any
-#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+#         # Step 1: Resolve FLA employee safely
+#         try:
+#             fla = request.user.employee_profile
+#         except Employee.DoesNotExist:
+#             try:
+#                 fla = Employee.objects.get(email=request.user.email)
+#             except Employee.DoesNotExist:
+#                 return Response(
+#                     {"error": "FLA employee record not found. Contact admin."},
+#                     status=status.HTTP_400_BAD_REQUEST
+#                 )
+
+#         # Step 2: Inject FLA details
+#         data = request.data.copy()
+#         data["fla_name"] = fla.name
+#         data["fla_employee_id"] = fla.employee_id
+#         data["fla_email"] = fla.email
+
+#         serializer = EmployeeSerializer(data=data)
+#         serializer.is_valid(raise_exception=True)
+#         serializer.save()
+
+#         return Response(
+#             {"message": "Employee added successfully"},
+#             status=status.HTTP_201_CREATED
+#         )
+
+
+class FLAListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        flas = (
+            Employee.objects
+            .filter(fla_employee_id__isnull=False)
+            .values(
+                "fla_employee_id",
+                "fla_name",
+                "fla_email",
+                "group",
+            )
+            .distinct("fla_employee_id")   # 🔑 IMPORTANT
+        )
+
+        return Response(list(flas))
+
+    
+class GroupListAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        groups = (
+            Employee.objects
+            .exclude(group__isnull=True)
+            .exclude(group="")
+            .values_list("group", flat=True)
+            .distinct()
+        )
+        return Response(groups)
+
 
 class EmployeeCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        # Step 1: Resolve FLA employee safely
-        try:
-            fla = request.user.employee_profile
-        except Employee.DoesNotExist:
-            try:
-                fla = Employee.objects.get(email=request.user.email)
-            except Employee.DoesNotExist:
+        user = request.user
+        data = request.data.copy()
+        is_admin = user.is_staff or user.is_superuser
+
+        # -----------------------------
+        # ADMIN FLOW
+        # -----------------------------
+        if is_admin:
+            # Admin MUST choose reporting officer from dropdown
+            reporting_id = data.get("fla_employee_id")
+
+            if not reporting_id:
                 return Response(
-                    {"error": "FLA employee record not found. Contact admin."},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"fla_employee_id": "Reporting officer is required"},
+                    status=400
                 )
 
-        # Step 2: Inject FLA details
-        data = request.data.copy()
-        data["fla_name"] = fla.name
-        data["fla_employee_id"] = fla.employee_id
-        data["fla_email"] = fla.email
+            try:
+                reporting = Employee.objects.get(
+                    employee_id=reporting_id
+                )
+            except Employee.DoesNotExist:
+                return Response(
+                    {"fla_employee_id": "Invalid reporting officer"},
+                    status=400
+                )
+
+            # Auto-fill reporting fields
+            data["fla_name"] = reporting.name
+            data["fla_email"] = reporting.email
+
+        # -----------------------------
+        # FLA FLOW
+        # -----------------------------
+        else:
+            try:
+                fla = Employee.objects.get(user=user)
+            except Employee.DoesNotExist:
+                return Response(
+                    {"error": "FLA record not found"},
+                    status=400
+                )
+
+            # Force employee under self
+            data["fla_employee_id"] = fla.employee_id
+            data["fla_name"] = fla.name
+            data["fla_email"] = fla.email
 
         serializer = EmployeeSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
         return Response(
-            {"message": "Employee added successfully"},
-            status=status.HTTP_201_CREATED
+            {"message": "Employee created successfully"},
+            status=201
         )
+
 
 
 
@@ -5539,12 +5540,6 @@ class CookieTokenRefreshView(APIView):
             )
 
 
-from django.shortcuts import redirect
-
-
-
-
-
 # =========================================================
 # Logout View (Deletes Cookies + Optional Blacklist)
 # =========================================================
@@ -6234,42 +6229,6 @@ class FlaVmRequestAPIView(APIView):
             )
 
 
-# ===========================27 Jan 2025====================
-# class EmployeeVmRequestAPIView(APIView):
-#     permission_classes = [IsAuthenticated]  # Ensures only authenticated users can access the view
-
-#     def get(self, request):
-#         """
-#         Fetch all VM requests for the logged-in employee.
-#         """
-#         try:
-#             # Fetch the employee object for the currently logged-in user
-#             current_employee = Employee.objects.get(email=request.user.email)
-
-#             # Fetch VM requests associated with the current employee's ID
-#             vm_requests = VmRequest.objects.filter(employee_id=current_employee.employee_id)
-
-#             # Serialize the VM requests data
-#             serializer = VmRequestSerializer(vm_requests, many=True)
-
-#             # Return serialized data with HTTP 200 response
-#             return Response(serializer.data, status=status.HTTP_200_OK)
-
-#         except Employee.DoesNotExist:
-#             # If the employee is not found in the Employee model, return an error response
-#             return Response(
-#                 {"error": "Employee not found."},
-#                 status=status.HTTP_404_NOT_FOUND
-#             )
-#         except Exception as e:
-#             # Handle any other exceptions and log the error
-#             print("Error in fetching VM requests:", e)
-#             return Response(
-#                 {"error": str(e)},
-#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-
-
 class EmployeeVmRequestAPIView(APIView):
     permission_classes = [
         IsAuthenticated
@@ -6392,7 +6351,6 @@ class VmRequestBulkApproveAPIView(APIView):
 
     def post(self, request):
         vm_request_ids = request.data.get("vm_request_ids", [])
-
         results = []
 
         for req_id in vm_request_ids:
@@ -6407,6 +6365,7 @@ class VmRequestBulkApproveAPIView(APIView):
                     })
                     continue
 
+                employee = Employee.objects.get(employee_id=vm_request.employee_id)
                 vm_request.admin_status = "Processing"
                 vm_request.save()
 
@@ -6415,6 +6374,33 @@ class VmRequestBulkApproveAPIView(APIView):
                 if response["status"]:
                     vm_request.admin_status = "Accepted"
                     vm_request.creation_status = "Success"
+
+                                        # ✅ SEND MAIL TO EMPLOYEE
+                    subject = "VM Created Successfully"
+                    message = f"""
+Dear {employee.name},
+
+Your VM request has been approved and the VM has been created successfully.
+
+VM Name : {vm_request.vm_name}
+Project : {vm_request.project_name}
+Flavor : {vm_request.flavor}
+Image  : {vm_request.image}
+
+Please login to CMP dashboard for details.
+
+Regards,
+Cloud Team
+                    """
+
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [employee.email],
+                        fail_silently=False,
+                    )
+                # ---- FAILURE ----
                 else:
                     vm_request.admin_status = "Pending"
                     vm_request.creation_status = "Failed"
@@ -19671,7 +19657,7 @@ class ServiceRequestBulkAdminApproveAPIView(APIView):
             try:
                 service_request = ServiceRequest.objects.get(id=req_id)
 
-                # ---- Eligibility Checks ----
+                # ---------- ELIGIBILITY CHECKS ----------
                 if service_request.fla_status != "Accepted":
                     results.append({
                         "id": req_id,
@@ -19688,22 +19674,58 @@ class ServiceRequestBulkAdminApproveAPIView(APIView):
                     })
                     continue
 
-                # ---- Mark Admin Approved ----
+                # ---------- ADMIN APPROVAL ----------
                 service_request.admin_status = "Accepted"
                 service_request.admin_action_timestamp = timezone.now()
                 service_request.admin_approved_timestamp = timezone.now()
                 service_request.save()
 
-                # ---- Deploy Service ----
+                # ---------- DEPLOY SERVICE ----------
                 deploy_result = deploy_service_request(service_request)
 
+                # ---------- SUCCESS ----------
                 if deploy_result["success"]:
+                    service_request.deployment_status = "Deployed"
+                    service_request.node_port = deploy_result.get("node_port")
+                    service_request.save()
+
+                    # ✅ SEND MAIL TO EMPLOYEE
+                    subject = "Service Deployed Successfully"
+                    message = f"""
+Dear {service_request.name},
+
+Your service request has been approved and deployed successfully.
+
+Service Name : {service_request.service_name}
+Application  : {service_request.app_name}
+Project      : {service_request.project_name}
+Node Port    : {deploy_result.get("node_port")}
+
+Please login to CMP dashboard for access details.
+
+Regards,
+Cloud Team
+                    """
+
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [service_request.email],
+                        fail_silently=False,
+                    )
+
                     results.append({
                         "id": req_id,
                         "status": "Accepted",
                         "node_port": deploy_result.get("node_port"),
                     })
+
+                # ---------- FAILURE ----------
                 else:
+                    service_request.deployment_status = "Failed"
+                    service_request.save()
+
                     results.append({
                         "id": req_id,
                         "status": "Failed",
@@ -19730,3 +19752,4 @@ class ServiceRequestBulkAdminApproveAPIView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+

@@ -31,6 +31,7 @@ class Employee(models.Model):
     fla_name = models.CharField(max_length=100)
     fla_employee_id = models.CharField(max_length=10)
     fla_email = models.EmailField(null=True, blank=True)
+    is_fla = models.BooleanField(default=False)
     phone_number = models.CharField(blank=True, null=True, max_length=15)
     designation = models.CharField(max_length=100, blank=True, null=True)
 

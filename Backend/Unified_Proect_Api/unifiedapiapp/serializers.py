@@ -289,49 +289,38 @@ import datetime
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     @classmethod
     def get_token(cls, user):
-        print("===", user)
-        emp_id = Employee.objects.filter(email=user.email).values_list(
-            "employee_id", flat=True
-        )
-        print("===", emp_id, "=======")
-        is_fla = Employee.objects.filter(fla_employee_id__in=emp_id)
-        print("===", is_fla)
+
+        employee = Employee.objects.filter(email=user.email).first()
+
         role = "ADMIN"
         employee_id = None
-        if is_fla.exists():
-            employee_id = (
-                Employee.objects.filter(email=user.email)
-                .values_list("employee_id", flat=True)
-                .first()
-            )
-            role = "FLA"
-        elif emp_id.exists():
-            employee_id = (
-                Employee.objects.filter(email=user.email)
-                .values_list("employee_id", flat=True)
-                .first()
-            )
-            role = "EMPLOYEE"
+
+        # ------------------------
+        # ADMIN
+        # ------------------------
+        if user.is_staff or user.is_superuser:
+            role = "ADMIN"
+
+        # ------------------------
+        # EMPLOYEE / FLA
+        # ------------------------
+        elif employee:
+            employee_id = employee.employee_id
+            role = "FLA" if employee.is_fla else "EMPLOYEE"
 
         token = super().get_token(user)
 
-        # Add custom claims
+        # Custom claims
         token["email"] = user.email
         token["first_name"] = user.first_name
         token["role"] = role
         token["employee_id"] = employee_id
-        print("Token:", token)
+
         return token
 
     def validate(self, attrs):
-        print("Input data:", attrs)
-        try:
-            data = super().validate(attrs)
-            print("Validated data:", data)
-        except AuthenticationFailed as e:
-            print("Authentication failed:", e)
-            raise
-        return data
+        return super().validate(attrs)
+
 
 
 class CustomTokenRefreshSerializer(TokenRefreshSerializer):

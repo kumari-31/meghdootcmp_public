@@ -1,5 +1,14 @@
 #!/bin/bash
+set -e
 
+ENV_FILE="/home/boss/Desktop/Cmp19nov25/Backend/Unified_Proect_Api/.env"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+    echo "ENV file not found: $ENV_FILE"
+    exit 1
+fi
+
+source "$ENV_FILE"
 # Collect command-line arguments (VM names)
 vms=("$@")
 
@@ -23,9 +32,9 @@ for vm in "${vms[@]}"; do
 
     # Determine host IP based on host name
     if [[ "$host" == "fspcloud" ]]; then
-        hostip="10.184.43.17"
+        hostip="$HOST_FSPCLOUD_IP"
     else
-        hostip="10.184.49.18"
+        hostip="$HOST_DEFAULT_IP"
     fi
 
     vnc=$(ssh -o 'StrictHostKeyChecking=no' cloud@"$hostip" \

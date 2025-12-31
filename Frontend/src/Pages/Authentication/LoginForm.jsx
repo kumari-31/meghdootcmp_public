@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // import { saveTokens, getAccessToken } from "./auth";
-import { useAuth } from "./authContext";
+import { useAuth } from "./useAuth";
 import {
   Dialog,
   DialogTitle,

@@ -1,17 +1,13 @@
 import os
 from pathlib import Path
-
 from corsheaders.defaults import default_headers
 from dotenv import load_dotenv
 
-load_dotenv()  # Load environment variables from .env file
+load_dotenv()  
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = "django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45"
@@ -20,10 +16,10 @@ SECRET_KEY = "django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45
 DEBUG = True
 
 os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# Application definition
 
-X_FRAME_OPTIONS = "ALLOWALL"
-SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+
+# X_FRAME_OPTIONS = "ALLOWALL"
+# SECURE_CROSS_ORIGIN_OPENER_POLICY = None
 
 
 INSTALLED_APPS = [
@@ -100,13 +96,6 @@ WSGI_APPLICATION = "Unified_Proect_Api.wsgi.application"
 
 from datetime import timedelta
 
-# SIMPLE_JWT = {
-#     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
-#     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
-#     'ROTATE_REFRESH_TOKENS': False,
-#     'BLACKLIST_AFTER_ROTATION': True,
-#     'UPDATE_LAST_LOGIN': False,
-# }
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=25),  # short-lived access token
@@ -186,10 +175,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 OTP_TEST_MODE = True
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -225,31 +212,28 @@ OPENSTACK_MEMBER_ROLE = (
     "member"  # Replace "member" with the actual role in your OpenStack setup
 )
 
+# Email settings
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend"
+)
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-# EMAIL_HOST = "smtp.gmail.com"
-# EMAIL_USE_TLS = False
-# EMAIL_USE_SSL = True
-# EMAIL_PORT = 465
-# # EMAIL_HOST_USER = "rakshanavg20@gmail.com"
-# EMAIL_HOST_USER = "tejascdac97@gmail.com"
-# # EMAIL_HOST_PASSWORD = "irhz wkcy gtav eocb "
-# EMAIL_HOST_PASSWORD = "aqdx gfas pghz snqi "
-# DEFAULT_FROM_EMAIL = "tejascdac97@gmail.com"
-# SERVER_EMAIL = "tejascdac97@gmail.com"
-EMAIL_HOST = "smtp.cdac.in"
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
-EMAIL_PORT = 587
-EMAIL_HOST_USER = "cloud-chn@cdac.in"
-EMAIL_HOST_PASSWORD = "MeghdooT"
-DEFAULT_FROM_EMAIL = "cloud-chn@cdac.in"
-SERVER_EMAIL = "cloud-chn@cdac.in"
+EMAIL_HOST = os.getenv("EMAIL_HOST")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL") == "True"
 
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 
-ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
-ZABBIX_USER = "Admin"
-ZABBIX_PASSWORD = "zabbix"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+SERVER_EMAIL = os.getenv("SERVER_EMAIL")
+
+# Zabbix settings
+ZABBIX_URL = os.getenv("ZABBIX_URL")
+ZABBIX_USER = os.getenv("ZABBIX_USER")
+ZABBIX_PASSWORD = os.getenv("ZABBIX_PASSWORD")
+
 
 
 

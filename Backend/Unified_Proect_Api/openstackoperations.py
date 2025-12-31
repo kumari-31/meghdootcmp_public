@@ -1,38 +1,50 @@
 import json
 import os
-import subprocess
 import time
-import token
-
 from async_timeout import timeout
 import requests
-from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from dotenv import load_dotenv
 from openstack import connection
 from openstack.exceptions import HttpException, ResourceNotFound
-from rest_framework import status
-from rest_framework.response import Response
-from rest_framework.views import APIView
-
 from unifiedapiapp.models import VMInfo, VmRequest
 
 load_dotenv()
 
 guacamole_base_url = os.getenv("GUACAMOLE_BASE_URL")
 guacamole_uname = os.getenv("GUACAMOLE_UNAME")
-# guacamole_pwd = os.getenv('GUACAMOLE_PWD')
-guacamole_pwd = "CHN@VL0987&*"
+guacamole_pwd = os.getenv('GUACAMOLE_PWD')
+# guacamole_pwd = "CHN@VL0987&*"
+HOST_FSPCLOUD_IP = os.getenv("HOST_FSPCLOUD_IP")
+HOST_DEFAULT_IP = os.getenv("HOST_DEFAULT_IP")
+VM_INFO_API_URL = os.getenv("VM_INFO_API_URL")
+EMAIL_FROM = os.getenv("EMAIL_FROM")
+PORTAL_URL = os.getenv("PORTAL_URL")
 
-# Load environment variables from .env file
-load_dotenv()
+# SCRIPT_RELATIVE_DIR = os.getenv("SCRIPT_RELATIVE_DIR")
+# SHELL_SCRIPT_NAME = os.getenv("SHELL_SCRIPT_NAME", "script.sh")
 
-network_name = "demo_net"
+# if not SCRIPT_RELATIVE_DIR:
+#     raise RuntimeError("SCRIPT_RELATIVE_DIR not set in .env")
+
+# # Get user's home directory dynamically
+# HOME_DIR = os.path.expanduser("~")
+
+# # Build full path dynamically
+# SCRIPT_DIR = os.path.join(HOME_DIR, SCRIPT_RELATIVE_DIR)
+
+# shell_script_path = os.path.join(SCRIPT_DIR, SHELL_SCRIPT_NAME)
+
+# if not os.path.isfile(shell_script_path):
+#     raise FileNotFoundError(f"Shell script not found: {shell_script_path}")
+
+# print("Resolved shell script path:", shell_script_path)
+
 
 conn = connection.Connection(
     auth_url=os.getenv("AUTH_URL"),
     project_name=os.getenv("PROJECT_NAME"),
-    username="admin",
+    username=os.getenv("OPENSTACK_UNAME"),
     password=os.getenv("PASSWORD"),
     user_domain_name=os.getenv("USER_DOMAIN_NAME"),
     project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -93,33 +105,6 @@ def wait_for_volume_status(
     raise TimeoutError(
         f"Volume '{volume_id}' did not reach '{target_status}' within {timeout} seconds"
     )
-
-# def wait_for_volume_status(
-#     conn, volume_id, target_status="available", retries=3600, delay=5
-# ):
-#     """
-#     Wait for the volume to reach the target status.
-
-#     Parameters:
-#     - conn: OpenStack connection object.
-#     - volume_id: The ID of the volume.
-#     - target_status: The desired status (default is 'available').
-#     - retries: Number of retries before giving up (default is 10).f
-#     - delay: Delay in seconds between retries (default is 5).
-#     """
-#     for attempt in range(retries):
-#         volume = conn.block_store.get_volume(volume_id)
-#         if volume.status == target_status:
-#             print(f"Volume '{volume_id}' is now in '{target_status}' state.")
-#             return True
-#         else:
-#             print(f"Volume '{volume_id}' is in '{volume.status}' state. Waiting...")
-#             time.sleep(delay)
-#     print(
-#         f"Volume '{volume_id}' did not reach '{target_status}' status after {retries} attempts."
-#     )
-#     return False
-
 
 def delete_volume(conn, volume_id):
     """
@@ -257,7 +242,7 @@ def create_bootable_volume(
                 created_volume_id,
                 flavor_id,
                 image_id,
-                network_name,
+                network_id, 
                 timeout=600,
             )
 
@@ -404,19 +389,19 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
     vm_names = [vm["vm_name"] for vm in vms]
     print("vmname++++++", vm_names)
     # base_path = os.getenv('BASE_DIR', '/Desktop/SDC_Portal')
-    base_path = (
-        "/home/rakshana/Desktop/Unified Dashboard API/Unified_Proect_Api/unifiedapiapp"
-    )
-    shell_script_path = os.path.join(base_path, "script.sh")
+    base_path = "/home/boss/Desktop/Cmp19nov25/Backend/Unified_Proect_Api/unifiedapiapp/script.sh"
+    shell_script_path = os.path.join(base_path, 'script.sh')
     # shell_script_path = os.path.join(os.getcwd(), 'vdiapp', 'script.sh')
     print("shell script path================>>>>>>>", shell_script_path)
+
+  
 
     # PRE-DEFINE VARIABLES SO THEY EXIST EVEN IF EXCEPTION OCCURS
     host_name = instance_name = vnc_display = u_name = None
 
     try:
         # lines=[]
-        api_url = "http://10.184.49.18:8001/fetch-vm-info"  # Change this to the actual URL of your Flask API
+        api_url = VM_INFO_API_URL # Change this to the actual URL of your Flask API
 
         # Prepare the data to send in the POST request
         payload = {"vms": vm_names}
@@ -462,7 +447,7 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
 
             vm_name, host_raw, parsed_instance_name, vnc_raw = fields
 
-            host_name = "10.184.43.17" if host_raw == "fspcloud" else "10.184.49.18"
+            host_name = HOST_FSPCLOUD_IP if host_raw == "fspcloud" else HOST_DEFAULT_IP
             vnc_display = f"59{vnc_raw}" if len(vnc_raw) == 2 else f"590{vnc_raw}"
             u_name = vmtime.get("username")
             user_mail = vmtime.get("email")
@@ -548,7 +533,7 @@ Dear {u_name},
 Your VM has been successfully created.
 
 Access link:
-https://virtuallab.bosschn.in/
+{PORTAL_URL}
 
 Login:
 Username: {u_name}
@@ -559,7 +544,7 @@ Cloud Team
                 """
 
                 if user_created:
-                    send_mail(subject, message, "noreply@cloud.com", [user_mail])
+                    send_mail(subject, message, EMAIL_FROM, [user_mail])
                     print("Email sent.")
                 else:
                     print(f"No email sent because '{u_name}' already existed.")
@@ -610,50 +595,14 @@ def update_ip_by_vmname(vm_name):
 
 def get_guac_token():
     url = f"{guacamole_base_url}/tokens"
-    print("guacamole uname and pwd", guacamole_uname, guacamole_pwd)
-    print("url in get token", url)
     # payload=f"username={guacamole_uname}&password={guacamole_pwd}"
     payload = {"username": guacamole_uname, "password": guacamole_pwd}
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    print("HEADERS SENT:", headers)
-    print("PAYLOAD SENT:", payload)
     # response = requests.request("POST", url, headers=headers, data=payload)
     response = requests.post(url, data=payload, headers=headers)
-    print("Token response code:", response.status_code)
-    print("Token response body:", response.text)
-
     if response.status_code != 200:
         return None # Failed to get token
     return response.json().get("authToken")
-
-# def get_guac_token():
-
-#     print("GUAC URL:", guacamole_base_url)
-#     print("GUAC USER:", guacamole_uname)
-#     print("GUAC PWD:", guacamole_pwd)
-    
-#     url = f"{guacamole_base_url}/tokens"
-#     payload = {"username": guacamole_uname, "password": guacamole_pwd}
-#     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-
-#     try:
-#         response = requests.post(url, data=payload, headers=headers)
-#         print("Token response code:", response.status_code)
-#         print("Token response body:", response.text)
-
-#         if response.status_code == 200:
-#             # Return only the token string
-#             return response.json().get("authToken")
-#         else:
-#             print("Failed to get Guacamole token")
-#             return None
-
-#     except Exception as e:
-#         print("Exception while getting Guacamole token:", e)
-#         return None
-
-
-
 
 def delete_connection(connection_id, authToken):
     url = f"{guacamole_base_url}/session/data/mysql/connections/{connection_id}?token={authToken}"
@@ -667,8 +616,6 @@ def delete_guac_user(username, authToken):
     headers = {"X-Guacamole-Token": authToken}  # optional
     response = requests.delete(url, headers=headers)
     return response
-
-
 
 def create_connection(name, port, hostname, authToken):
     url = f"{guacamole_base_url}/session/data/mysql/connections?token=" + authToken
@@ -888,9 +835,8 @@ def update_guacamole_user_date_time(username, from_date, to_date, from_time, to_
         print(response.text)
 
 
-#
+#############
 
-############
 import csv
 import sys
 import traceback
@@ -912,8 +858,11 @@ def read_csv_file(csv_file_path):
             for row in csv_reader:
                 vm = row["VMname"]
                 hostname = (
-                    "10.184.43.17" if row["Hostname"] == "fspcloud" else "10.184.49.18"
-                )
+                HOST_FSPCLOUD_IP
+                if row.get("Hostname") == "fspcloud"
+                else HOST_DEFAULT_IP
+            )
+
                 vnc_display = f"59{row['VNC Display']}"
                 username = row["username"]
  
@@ -964,79 +913,3 @@ if __name__ == "__main__":
         csv_file_path = sys.argv[1]
         read_csv_file(csv_file_path)
 
-
-# def create_vm1(conn, name, created_volume_id,flavor_id, image_id, network_name,timeout=600):
-
-#     try:
-#         print("created_volume_id",created_volume_id)
-#         print(name,created_volume_id,flavor_id, image_id, network_name,timeout, "=====>")
-#         # Find the network by name
-#         network = conn.network.find_network(network_name)
-#         network_id = network.id
-#         print("network id",network_id)
-#         server = conn.compute.create_server(
-#             name=name,
-#             flavor_id=flavor_id,
-#             block_device_mapping_v2=[
-#                 {
-#                     'uuid': created_volume_id,
-#                     'source_type': 'volume',
-#                     'destination_type': 'volume',
-#                     'boot_index': 0,
-#                     'delete_on_termination': False,
-#                 }
-#             ],
-#             # image_id=image_id,
-#             networks=[{"uuid": network_id}]
-#         )
-
-
-#         # Wait for the VM to be active
-#           # Wait for the VM to be active
-#         conn.compute.wait_for_server(server,status='ACTIVE', wait=timeout)
-#         print(name," is in the Active state")
-#         print(f"VM ----->'{name}' created successfully")
-#         return {'server_id': server.id, 'status': True}
-#     except Exception as e:
-#         print("An error occurred  create vm openstackoperations:", str(e))
-#         return {'server_id': None, 'status': False, 'error': str(e)}
-
-# def create_vm1(conn, name, created_volume_id, flavor_id, image_id, network_name, timeout=600):
-#     try:
-#         print("created_volume_id:", created_volume_id)
-#         print("name ---", name, "created volume is ---",created_volume_id, "flavor_id is ---", flavor_id, "image_id is ---", image_id, "network_name is ---", network_name, "timeout is ---", timeout)
-
-#         # Find the network by name
-#         network = conn.network.find_network(network_name)
-#         network_id = network.id
-#         print("Network ID:", network_id)
-
-#         # Check volume status
-#         volume = conn.block_storage.get_volume(created_volume_id)
-#         print("Volume Status:", volume.status)
-#         if volume.status != 'available':
-#             raise Exception(f"Volume {created_volume_id} is not available. Current status: {volume.status}")
-
-#         server = conn.compute.create_server(
-#             name=name,
-#             flavor_id=flavor_id,
-#             block_device_mapping_v2=[
-#                 {
-#                     'uuid': created_volume_id,
-#                     'source_type': 'volume',
-#                     'destination_type': 'volume',
-#                     'boot_index': 0,
-#                     'delete_on_termination': False,
-#                 }
-#             ],
-#             networks=[{"uuid": network_id}]
-#         )
-
-#         # Wait for the VM to be active
-#         conn.compute.wait_for_server(server, status='ACTIVE', wait=timeout)
-#         print(name, "is in the Active state")
-#         print(f"VM -----> '{name}' created successfully")
-#         return {'server_id': server.id, 'status': True}
-#     except Exception as e:
-#         print("An error occurred while creating VM in OpenStack operations:", str(e))
-#         return {'server_id': None, 'status': False, 'error': str(e)}

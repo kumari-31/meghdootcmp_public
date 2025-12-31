@@ -35,7 +35,6 @@ apiClient.interceptors.response.use(
             {},
             { withCredentials: true }
           );
-          console.log("🔄 Access token refreshed successfully");
         } catch (refreshError) {
           console.error("❌ Token refresh failed:", refreshError);
           isRefreshing = false;

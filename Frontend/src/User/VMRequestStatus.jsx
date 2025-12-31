@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useAuth } from "../Pages/Authentication/authContext";
+import { useAuth } from "../Pages/Authentication/useAuth";
 import apiClient from "../Axios";
 import {
   Container,

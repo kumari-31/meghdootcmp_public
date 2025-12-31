@@ -8,7 +8,7 @@ def get_openstack_connection():
     return connection.Connection(
         auth_url=os.getenv("AUTH_URL"),
         project_name=os.getenv("PROJECT_NAME"),
-        username="admin",
+        username=os.getenv("OPENSTACK_UNAME"),
         password=os.getenv("PASSWORD"),
         user_domain_name=os.getenv("USER_DOMAIN_NAME"),
         project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),

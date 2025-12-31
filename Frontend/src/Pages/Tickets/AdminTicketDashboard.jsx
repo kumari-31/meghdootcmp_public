@@ -42,12 +42,12 @@ const AdminTicketDashboard = () => {
   };
 
   const handleUpdate = (id) => {
-    console.log("Updating ticket", {
-      id,
-      status: statuses[id],
-      reply: replies[id] || "",
-    });
-    // Send to API
+    // console.log("Updating ticket", {
+    //   id,
+    //   status: statuses[id],
+    //   reply: replies[id] || "",
+    // });
+   
   };
 
   return (

@@ -1,18 +1,43 @@
-# createvmdash
-
 from datetime import datetime
 from pyexpat.errors import messages
-
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from rest_framework import status
 from rest_framework.response import Response
-from django.utils import timezone
-
 from openstackoperations import *
+from .models import Employee, Registration, VMInfo, VmRequest
 
-from .models import CdacProject, Employee, Metric, Registration, VMInfo, VmRequest
 
+
+
+
+def create_user_with_details(first_name, email, password):
+    """
+    Create a user with first name, email, and password in Django.
+
+    Parameters:
+    - first_name: First name of the user.
+    - email: Email address of the user.
+    - password: Password for the user.
+
+    Returns:
+    - User object if successful, None otherwise.
+    """
+    try:
+        # Create a new user using the create_user method
+        user = User.objects.create_user(
+            username=email,  # Using email as the username
+            email=email,
+            password=password,
+            first_name=first_name,
+        )
+
+        print(f"User '{email}' created successfully with ID: {user.id}")
+        return user
+
+    except Exception as e:
+        print(f"Error creating user: {e}")
+        return None
 
 def user_registeration_dashboard(request):
 
@@ -84,28 +109,6 @@ def user_registeration_dashboard(request):
                 else None
             )
 
-            # Save form data to the database using the Registration model
-            print("User Submitted Data:")
-            print(f"Full Name: {full_name}")
-            print(f"Organization: {organization}")
-            print(f"Designation: {designation}")
-            print(f"Email: {email}")
-            print(f"Phone Number: {phone_number}")
-            print(f"Password: {password}")
-            print(f"Confirm Password: {confirm_password}")
-            print(f"VDI Required: {vdi_required}")
-            print(f"Image: {image}")
-            print(f"Flavor: {flavor}")
-            print(f"Login Enable date: {login_enable_date[0]}")
-            print(f"Login Disable date: {login_disable_date[0]}")
-            print(f"Login Enable Time: {login_enable_time}")
-            print(f"Login Disable Time: {login_disable_time}")
-            print(f"Storage Required: {storage_required}")
-            print(f"Additional Storage: {additional_storage}")
-
-            print("-=-=--", storage_required)
-
-            # return redirect('/vm/createvm')
 
             registration = Registration(
                 full_name=full_name,
@@ -179,24 +182,12 @@ def combined_view(request):
                     "name": registration.full_name,
                     "email": registration.email,
                     "designation": registration.designation,
-                    # 'image':  get_image_name(conn, registration.image),
-                    # 'flavor': get_flavor_name(conn,registration.flavor),
                     "image": registration.image,
                     "flavor": registration.flavor,
                     "vdi_required": registration.vdi_required,
                     "creation_status": vm_info.creation_status,
                 }
             )
-        # if not vm_infos:
-        #     # Handle case where there is no corresponding VMInfo for the email with creation_status 'Requested'
-        #     combined_data.append({
-        #         'name': registration.full_name,
-        #         'email': registration.email,
-        #         'image': registration.image,
-        #         'flavor': registration.flavor,
-        #         'vdi_required': registration.vdi_required,
-        #         'creation_status': 'No VMInfo found with Requested status'
-        #     })
     return render(request, "vm_response_display.html", {"combined_data": combined_data})
 
 
@@ -502,8 +493,8 @@ def vm_approve_request(id):
             # Create a new connection for each VM
             new_conn = connection.Connection(
                 auth_url=os.getenv("AUTH_URL"),
-                project_name=vm_req.project_name,
-                username="admin",
+                project_name=os.getenv("PROJECT_NAME"),
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -579,185 +570,6 @@ def vm_approve_request(id):
         print(f"Error processing VM request: {e}")
         return {"status": False, "message": str(e)}
 
-
-
-# def vm_approve_request(id):
-#         try:
-#             print("Inside vm approve request id--->", id)
-
-#             print("vmid====>", id)
-#             vm_req = VmRequest.objects.get(id=int(id))
-#             print(f"Registration object: {vm_req}")
-
-
-#             print("vm_count====>", vm_req.count_of_vms)
-#             print("vm_name====>", vm_req.vm_name)
-#             vm_names = generate_vm_names(vm_req.vm_name, vm_req.count_of_vms)
-#             print("Generated VM Names:", vm_names)
-#             vm_info = VMInfo.objects.get(vm_name=vm_req.vm_name)
-#             print(f"VMInfo object: {vm_info}")
-
-#             # return
-#             # Fetch the Registration object based on the email
-
-
-#             # image_id = '95c8e0ad-3b19-41b9-bd38-c57d8af57bb9'
-#             network_name = 'External Network'  # Replace with your network name
-#             print("network_name",network_name)
-#             # Establish the OpenStack connection using your credentials
-#             flv_id = conn.compute.find_flavor(vm_req.flavor)
-#             print(vm_req.flavor)
-#             print(vm_req.image)
-#             img_id = conn.compute.find_image(vm_req.image)
-
-#             print("flv_id",flv_id.id)
-#             print("img_id",img_id.id)
-
-#             if flv_id is None:
-#                 return Response({"error": "Unable to find flavor ID. Please check the provided flavor."}, status=status.HTTP_400_BAD_REQUEST)
-
-#             if img_id is None:
-#                 return Response({"error": "Unable to find image ID. Please check the provided image."}, status=status.HTTP_400_BAD_REQUEST)
-
-
-#             flavor_id = flv_id.id  # Replace with your flavor ID
-#             image_id = img_id.id
-
-#             vm_details = []
-#             name=vm_req.vm_name
-#             print("name",name)
-#             employee_id = vm_req.vm_name.split('_')[0]  # This will extract "348063"
-#             try:
-#                 # Fetch the employee with the extracted employee_id
-#                 employee = Employee.objects.get(employee_id=employee_id)
-#                 employee_email = employee.email
-#                 print(f"Employee Email: {employee_email}")
-#             except Employee.DoesNotExist:
-#                 print(f"No employee found with employee ID {employee_id}")
-
-#             full_name = employee_email.split('@')[0]
-#             print(f"Full Name:======= {full_name}")
-
-#             vm_details.append({"vm_name": vm_info.vm_name, "username": full_name,"vm_access_from_date": vm_info.vm_access_from_date,"vm_access_to_date": vm_info.vm_access_to_date,"vm_access_from_time": vm_info.vm_access_from_time,"vm_access_to_time": vm_info.vm_access_to_time, "email": vm_info.email})
-#             print("========================storageReuired======================================",vm_req.storage_required)
-#             print("vmdetails",vm_details)
-
-#             if vm_req.designation != 'Student':
-#                 print(vm_req.designation)
-#                 if vm_req.vdi_required:
-#                     print(vm_req.vdi_required)
-#                     auth_url=os.getenv('AUTH_URL'),
-#                     project_name=os.getenv('PROJECT_NAME'),
-#                     username="admin",
-#                     password=os.getenv('PASSWORD'),
-
-#                     # auth_url = 'http://10.184.49.18:5000/v3/'
-#                     # project_name = 'admin'
-#                     # username = 'admin'
-#                     # password = 'Meghd@@t123'
-#                     # volume_name = vm_req.full_name + "_volume"
-#                     volume_name = vm_req.vm_name + "_volume"
-#                     print("volume_name",volume_name)
-#                     os_size = conn.image.find_image(image_id)
-#                     print(os_size, os_size.size / (1024 ** 3),"++++++++++=")
-#                     # size_gb = math.ceil(os_size.size / (1024 ** 3))
-#                     size_gb = 20
-
-#                     if vm_req.designation in ['HR', 'Finance','Senior Management']:
-#                         volume_type = 'CEPH'
-#                         print("volume_type",volume_type)
-#                     else:
-#                         volume_type = '__DEFAULT__'  # Default volume type
-#                         print("volume_type",volume_type)
-
-#                     # volume_type = '__DEFAULT__'  # Change this to the desired volume type name
-#                     # volume_type = 'CEPH'
-#                     # image_id = 'ed949f3d-0134-4784-a8a9-a4523f4bde2e'  # Replace with the actual ID of the image you want to use
-#                     vm_name = vm_req.vm_name
-#                     # flavor_id = "01ba557f-39c2-4a50-ac8a-ff0135011252 "
-#                     network_name = "External Network"
-
-#                     created_bootable, vm_instance_id = create_bootable_volume(auth_url, project_name, username, password, volume_name, size_gb, volume_type, image_id, vm_req.vm_name, flavor_id)
-#                     volume_id = ""
-#                     if created_bootable:
-#                         print("additional storage",vm_req.additional_storage)
-#                         if vm_req.storage_required  and int(vm_req.additional_storage) > 0:
-#                             if vm_req.designation in ['HR', 'Finance','Senior Management']:
-#                                 data_volume_type = 'CEPH'
-#                             else:
-#                                 data_volume_type = '__DEFAULT__'
-#                             volume_id = create_data_volume(int(vm_req.additional_storage), vm_req.vm_name + '_data_volume',data_volume_type)
-#                             print(f"Volume '{vm_req.vm_name + '_data_volume'}' created with ID: {volume_id}")
-
-#                             # Attach the volume to a VM
-#                             attach_volume_to_vm(vm_req.vm_name, volume_id)
-#                             # print(f"Volume attached to VM '{reg.full_name}'")
-
-#                         res = run_shell_script_to_save_vm_details(vm_details, False)
-#                         context = {"status": res['status'], "message": res['message']}
-#                         if res['status']:
-#                             vm_info.creation_status = "Approved"
-#                             vm_info.host_name = res["host_name"]
-#                             vm_info.username = res["username"]
-#                             vm_info.instance_name = res["instance_name"]
-#                             vm_info.vnc_display = res["vnc_display"]
-#                             vm_info.ip = update_ip_by_vmname(vm_info.vm_name)
-#                             vm_info.data_volume_id = volume_id
-#                             vm_info.volume_id = created_bootable
-#                             vm_info.vm_id = vm_instance_id
-#                             vm_info.save()
-#                             # messages.success(request, res['message'])
-#                             # convert as json response
-#                             return {"status": res['status'], "message": res['message']}
-#                         else:
-#                             # messages.error(request, res['message'])
-#                             return {"status": res['status'], "message": res['message']}
-
-#             else:
-
-#                 print('img',flavor_id)
-#                 print('flv',image_id)
-
-#                 # Loop to create the specified number of VMs
-#                 print("====VM details=====",vm_details)
-#                 for i in vm_details:
-#                     name = i['vm_name']
-#                     print("=====vm name===",name)
-#                     # i['ip_addr'] =
-#                     # create_vm(conn, name, flavor_id, image_id, network_name)
-#                     new_conn = connection.Connection(
-#                         auth_url=os.getenv('AUTH_URL'),
-#                         project_name=vm_req.project_name,
-#                         username="admin",
-#                         password=os.getenv('PASSWORD'),
-#                         user_domain_name=os.getenv('USER_DOMAIN_NAME'),
-#                         project_domain_name=os.getenv('PROJECT_DOMAIN_NAME')
-#                     )
-#                     server = create_vm(conn, name, flavor_id, image_id, network_name)
-
-#                     print(server, "VM created for name: ", name)
-
-#                 res = run_shell_script_to_save_vm_details(vm_details, False)
-#                 if res['status']:
-#                     vm_info.creation_status = "Approved"
-#                     vm_info.host_name = res["host_name"]
-#                     vm_info.instance_name = res["instance_name"]
-#                     vm_info.vnc_display = res["vnc_display"]
-#                     vm_info.username = res["username"]
-#                     vm_info.ip = update_ip_by_vmname(vm_info.vm_name)
-#                     vm_info.save()
-#                     # messages.success(request, res['message'])
-#                     # convert as json response
-#                     return {"status": res['status'], "message": res['message']}
-#                 else:
-#                     # messages.error(request, res['message'])
-#                     return {"status": res['status'], "message": res['message']}
-
-
-#         except Exception as e:
-#             print(f"Error processing file 1161: {e}")
-#             # messages.error(request, str(e))
-#             return {"status": False, "message": str(e)}
 
 # --------------------vm reject-----------------------
 

@@ -1,7 +1,7 @@
 // useApi.js
 import { useMemo } from 'react';
 import { createApiClient } from './apiClient';
-import { useAuth } from './authContext';
+import { useAuth } from './useAuth';
 
 export function useApi() {
   const { accessToken, setAccessToken } = useAuth();

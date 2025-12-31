@@ -6,7 +6,7 @@ import {
   Typography,
   Stack,
 } from "@mui/material";
-import { useAuth } from "../Authentication/authContext";
+import { useAuth } from "../Authentication/useAuth";
 import apiClient from "../../Axios"; 
 
 const TicketCreationForm = () => {
