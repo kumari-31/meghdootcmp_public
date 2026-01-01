@@ -11,6 +11,7 @@ import {
   DialogContent,
   DialogActions,
   MenuItem,
+   Checkbox, FormControlLabel
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -26,6 +27,7 @@ const AddEmployee = () => {
     fla_name: "",
     fla_email: "",
     fla_employee_id: "",
+    is_fla: false, 
   });
   const [alertDialog, setAlertDialog] = useState({
     open: false,
@@ -261,7 +263,19 @@ Failed: ${response.data.failed_count}`,
     )}
   />
 </Grid2>
-
+<Grid2 item xs={12} sm={6}>
+  <FormControlLabel
+    control={
+      <Checkbox
+        checked={formData.is_fla}
+        onChange={(e) =>
+          setFormData((prev) => ({ ...prev, is_fla: e.target.checked }))
+        }
+      />
+    }
+    label="Mark as FLA"
+  />
+</Grid2>
 
 
     {/* Submit */}

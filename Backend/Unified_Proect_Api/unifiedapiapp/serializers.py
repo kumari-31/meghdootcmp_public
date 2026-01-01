@@ -189,6 +189,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "fla_name",
             "fla_email",
             "fla_employee_id",
+            "is_fla",
         ]
 
     def validate_email(self, value):

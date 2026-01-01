@@ -2279,15 +2279,11 @@ def create_user_with_details(first_name, email, password):
         return None
 
 
-
-
-
 class EmployeeRegisterAPIView(APIView):
     permission_classes = []
 
     def post(self, request, employee_id):
         try:
-            # 🔍 Fetch employee
             employee = Employee.objects.get(employee_id=employee_id)
 
             if employee.user:
@@ -2299,43 +2295,35 @@ class EmployeeRegisterAPIView(APIView):
             password = request.data.get("password")
             confirm_password = request.data.get("confirm_password")
 
-            # 🚫 Prevent empty registration
-            clean_data = request.data.copy()
-            clean_data.pop("password", None)
-            clean_data.pop("confirm_password", None)
+            # Remove password fields from update data
+            update_data = request.data.copy()
+            update_data.pop("password", None)
+            update_data.pop("confirm_password", None)
 
-            if not clean_data and not password:
+            if not update_data and not password:
                 return Response(
                     {"error": "No data provided for registration or update."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
             with transaction.atomic():
-
-                # 🔐 Password validation
+                # -------------------
+                # Password / User Creation
+                # -------------------
                 if password:
                     if password != confirm_password:
                         return Response(
                             {"error": "Password and confirm password do not match."},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
-
                     try:
                         validate_password(password)
                     except ValidationError as e:
-                        return Response(
-                            {"error": e.messages},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
+                        return Response({"error": e.messages}, status=status.HTTP_400_BAD_REQUEST)
 
-                    # 📧 Ensure unique user
                     if User.objects.filter(username=employee.email).exists():
-                        return Response(
-                            {"error": "User already exists."},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
+                        return Response({"error": "User already exists."}, status=status.HTTP_400_BAD_REQUEST)
 
-                    # 👤 Create user
                     user = User.objects.create(
                         username=employee.email,
                         email=employee.email,
@@ -2343,52 +2331,35 @@ class EmployeeRegisterAPIView(APIView):
                     )
                     user.set_password(password)
                     user.save()
-
                     employee.user = user
-                    employee.save()
 
-                # 📦 Serializer validation
-                serializer = EmployeeUpdateSerializer(
-                    employee, data=clean_data, partial=True
-                )
+                # -------------------
+                # Update Employee Fields (phone_number, designation)
+                # -------------------
+                serializer = EmployeeUpdateSerializer(employee, data=update_data, partial=True)
                 serializer.is_valid(raise_exception=True)
+                serializer.save()  # Now designation and phone_number are saved correctly
 
-                new_fields = {}
-                updated_fields = {}
+                # -------------------
+                # Final save to ensure user relation & FLA flag persist
+                # -------------------
+                employee.save()
 
-                for field, value in serializer.validated_data.items():
-                    current_value = getattr(employee, field, None)
-                    if not current_value:
-                        new_fields[field] = value
-                    elif current_value != value:
-                        updated_fields[field] = value
+                # Prepare response details
+                updated_fields = {
+                    field: serializer.validated_data[field]
+                    for field in serializer.validated_data
+                }
 
-                if new_fields or updated_fields:
-                    serializer.save()
-
-                    if new_fields and updated_fields:
-                        message = "Employee registered and updated successfully!"
-                    elif new_fields:
-                        message = "Employee registered successfully!"
-                    else:
-                        message = "Employee updated successfully!"
-
-                    return Response(
-                        {
-                            "message": message,
-                            "new_fields": new_fields,
-                            "updated_fields": updated_fields,
-                            "employee_id": employee.employee_id,
-                            "employee_name": employee.name,
-                        },
-                        status=status.HTTP_200_OK,
-                    )
+                message = "Employee registered successfully!" if password else "Employee updated successfully!"
 
                 return Response(
                     {
-                        "message": "No changes detected. Data already up-to-date.",
+                        "message": message,
                         "employee_id": employee.employee_id,
                         "employee_name": employee.name,
+                        "updated_fields": updated_fields,
+                        "is_fla": employee.is_fla,
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -2398,6 +2369,131 @@ class EmployeeRegisterAPIView(APIView):
                 {"error": f"Employee with ID {employee_id} not found."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        except Exception as e:
+            return Response(
+                {"error": f"Internal server error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+
+# class EmployeeRegisterAPIView(APIView):
+#     permission_classes = []
+
+#     def post(self, request, employee_id):
+#         try:
+#             # 🔍 Fetch employee
+#             employee = Employee.objects.get(employee_id=employee_id)
+
+#             if employee.user:
+#                 return Response(
+#                     {"error": "Employee is already registered."},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             password = request.data.get("password")
+#             confirm_password = request.data.get("confirm_password")
+
+#             # 🚫 Prevent empty registration
+#             clean_data = request.data.copy()
+#             clean_data.pop("password", None)
+#             clean_data.pop("confirm_password", None)
+
+#             if not clean_data and not password:
+#                 return Response(
+#                     {"error": "No data provided for registration or update."},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             with transaction.atomic():
+
+#                 # 🔐 Password validation
+#                 if password:
+#                     if password != confirm_password:
+#                         return Response(
+#                             {"error": "Password and confirm password do not match."},
+#                             status=status.HTTP_400_BAD_REQUEST,
+#                         )
+
+#                     try:
+#                         validate_password(password)
+#                     except ValidationError as e:
+#                         return Response(
+#                             {"error": e.messages},
+#                             status=status.HTTP_400_BAD_REQUEST,
+#                         )
+
+#                     # 📧 Ensure unique user
+#                     if User.objects.filter(username=employee.email).exists():
+#                         return Response(
+#                             {"error": "User already exists."},
+#                             status=status.HTTP_400_BAD_REQUEST,
+#                         )
+
+#                     # 👤 Create user
+#                     user = User.objects.create(
+#                         username=employee.email,
+#                         email=employee.email,
+#                         first_name=employee.name,
+#                     )
+#                     user.set_password(password)
+#                     user.save()
+
+#                     employee.user = user
+#                     employee.save()
+
+#                 # 📦 Serializer validation
+#                 serializer = EmployeeUpdateSerializer(
+#                     employee, data=clean_data, partial=True
+#                 )
+#                 serializer.is_valid(raise_exception=True)
+#                 serializer.save()
+
+#                 new_fields = {}
+#                 updated_fields = {}
+
+#                 for field, value in serializer.validated_data.items():
+#                     current_value = getattr(employee, field, None)
+#                     if not current_value:
+#                         new_fields[field] = value
+#                     elif current_value != value:
+#                         updated_fields[field] = value
+
+#                 if new_fields or updated_fields:
+#                     serializer.save()
+
+#                     if new_fields and updated_fields:
+#                         message = "Employee registered and updated successfully!"
+#                     elif new_fields:
+#                         message = "Employee registered successfully!"
+#                     else:
+#                         message = "Employee updated successfully!"
+
+#                     return Response(
+#                         {
+#                             "message": message,
+#                             "new_fields": new_fields,
+#                             "updated_fields": updated_fields,
+#                             "employee_id": employee.employee_id,
+#                             "employee_name": employee.name,
+#                         },
+#                         status=status.HTTP_200_OK,
+#                     )
+
+#                 return Response(
+#                     {
+#                         "message": "No changes detected. Data already up-to-date.",
+#                         "employee_id": employee.employee_id,
+#                         "employee_name": employee.name,
+#                     },
+#                     status=status.HTTP_200_OK,
+#                 )
+
+#         except Employee.DoesNotExist:
+#             return Response(
+#                 {"error": f"Employee with ID {employee_id} not found."},
+#                 status=status.HTTP_404_NOT_FOUND,
+#             )
 
 class NewEmployeeRegisterAPIView(APIView):
     permission_classes = []
@@ -2795,36 +2891,7 @@ def get_employee_details(request):
         )
         return JsonResponse({"error": "Internal server error"}, status=500)
 
-# class EmployeeCreateAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
 
-#     def post(self, request):
-#         # Step 1: Resolve FLA employee safely
-#         try:
-#             fla = request.user.employee_profile
-#         except Employee.DoesNotExist:
-#             try:
-#                 fla = Employee.objects.get(email=request.user.email)
-#             except Employee.DoesNotExist:
-#                 return Response(
-#                     {"error": "FLA employee record not found. Contact admin."},
-#                     status=status.HTTP_400_BAD_REQUEST
-#                 )
-
-#         # Step 2: Inject FLA details
-#         data = request.data.copy()
-#         data["fla_name"] = fla.name
-#         data["fla_employee_id"] = fla.employee_id
-#         data["fla_email"] = fla.email
-
-#         serializer = EmployeeSerializer(data=data)
-#         serializer.is_valid(raise_exception=True)
-#         serializer.save()
-
-#         return Response(
-#             {"message": "Employee added successfully"},
-#             status=status.HTTP_201_CREATED
-#         )
 
 
 class FLAListAPIView(APIView):
@@ -2860,6 +2927,9 @@ class GroupListAPIView(APIView):
         return Response(groups)
 
 
+import json
+from urllib.parse import unquote
+
 class EmployeeCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -2882,9 +2952,7 @@ class EmployeeCreateAPIView(APIView):
                 )
 
             try:
-                reporting = Employee.objects.get(
-                    employee_id=reporting_id
-                )
+                reporting = Employee.objects.get(employee_id=reporting_id)
             except Employee.DoesNotExist:
                 return Response(
                     {"fla_employee_id": "Invalid reporting officer"},
@@ -2894,23 +2962,32 @@ class EmployeeCreateAPIView(APIView):
             # Auto-fill reporting fields
             data["fla_name"] = reporting.name
             data["fla_email"] = reporting.email
+            data["fla_employee_id"] = reporting.employee_id
+            data["is_fla"] = data.get("is_fla", False)
 
         # -----------------------------
-        # FLA FLOW
+        # FLA FLOW (from cookie/user data)
         # -----------------------------
         else:
-            try:
-                fla = Employee.objects.get(user=user)
-            except Employee.DoesNotExist:
-                return Response(
-                    {"error": "FLA record not found"},
-                    status=400
-                )
+            # Expecting UD cookie contains JSON data of user
+            
+            ud_cookie = request.COOKIES.get("UD")
+            if not ud_cookie:
+                return Response({"error": "User data cookie missing"}, status=400)
 
-            # Force employee under self
-            data["fla_employee_id"] = fla.employee_id
-            data["fla_name"] = fla.name
-            data["fla_email"] = fla.email
+            try:
+                ud_data = json.loads(unquote(ud_cookie))
+            except json.JSONDecodeError:
+                return Response({"error": "Invalid cookie data"}, status=400)
+
+            if ud_data.get("role") != "FLA":
+                return Response({"error": "Only FLA users can create employee"}, status=403)
+
+            # Fill FLA details from cookie
+            data["fla_employee_id"] = ud_data.get("employee_id")
+            data["fla_name"] = ud_data.get("username")  # or map to proper name field
+            data["fla_email"] = ud_data.get("email")
+            data["is_fla"] = False  # employees created by FLA are not themselves FLA
 
         serializer = EmployeeSerializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -2920,6 +2997,7 @@ class EmployeeCreateAPIView(APIView):
             {"message": "Employee created successfully"},
             status=201
         )
+
 
 
 
@@ -5550,15 +5628,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     "test_otp": otp,  # REMOVE in production
                 }
             )
-
-        # ---------- OTP VERIFICATION ----------
-        # if otp:
-        #     stored_data = cache.get(f'otp_{username}')
-        #     if not stored_data:
-        #         return Response({'detail': 'OTP expired or invalid'}, status=status.HTTP_400_BAD_REQUEST)
-
-        #     if otp != stored_data['otp']:
-        #         return Response({'detail': 'Invalid OTP. Please try again.'}, status=status.HTTP_400_BAD_REQUEST)
 
         # ----------Test OTP VERIFICATION ----------
         if otp:
