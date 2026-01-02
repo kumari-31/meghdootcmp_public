@@ -3012,7 +3012,8 @@ class EmployeeCreateAPIView(APIView):
 
 import csv, io
 
-class EmployeeBulkUploadAPIView(APIView):
+
+class EmployeeBulkPreviewAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     REQUIRED_FIELDS = [
@@ -3031,49 +3032,183 @@ class EmployeeBulkUploadAPIView(APIView):
             return Response({"error": "Admin only"}, status=403)
 
         file = request.FILES.get("file")
-        if not file or not file.name.endswith(".csv"):
-            return Response({"error": "Valid CSV required"}, status=400)
+        if not file:
+            return Response({"error": "CSV required"}, status=400)
 
         reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
-        created, failed = 0, []
+
+        preview = []
+        errors = []
+        seen_employee_ids = set()
 
         for row_num, row in enumerate(reader, start=2):
-            try:
-                # -------------------------
-                # REQUIRED FIELD CHECK
-                # -------------------------
-                for field in self.REQUIRED_FIELDS:
-                    if not row.get(field):
-                        raise ValueError(f"{field} is required")
+            row_errors = []
 
-                # -------------------------
-                # TYPE NORMALIZATION
-                # -------------------------
-                row["is_fla"] = row["is_fla"].strip().lower() == "true"
-                row["phone_number"] = row.get("phone_number") or None
-                row["designation"] = row.get("designation") or None
+            # Required fields
+            for field in self.REQUIRED_FIELDS:
+                if not row.get(field):
+                    row_errors.append(f"{field} is required")
 
-                serializer = EmployeeSerializer(data=row)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
+            emp_id = row.get("employee_id")
 
-                created += 1
+            # Duplicate in CSV
+            if emp_id in seen_employee_ids:
+                row_errors.append("Duplicate employee_id in CSV")
+            seen_employee_ids.add(emp_id)
 
-            except Exception as e:
-                failed.append({
+            # Duplicate in DB
+            if Employee.objects.filter(employee_id=emp_id).exists():
+                row_errors.append("employee_id already exists in database")
+
+            preview.append({
+                "row": row_num,
+                "employee_id": emp_id,
+                "data": row,
+                "errors": row_errors,
+                "valid": len(row_errors) == 0,
+            })
+
+            if row_errors:
+                errors.append({
                     "row": row_num,
-                    "employee_id": row.get("employee_id"),
-                    "error": str(e),
+                    "employee_id": emp_id,
+                    "errors": row_errors,
                 })
 
-        return Response(
-            {
-                "created_count": created,
-                "failed_count": len(failed),
-                "errors": failed,
-            },
-            status=207 if failed else 201,
-        )
+        return Response({
+            "total": len(preview),
+            "valid_rows": sum(1 for r in preview if r["valid"]),
+            "invalid_rows": len(errors),
+            "rows": preview,
+        })
+
+
+from django.db import transaction
+
+class EmployeeBulkUploadAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"error": "Admin only"}, status=403)
+
+        file = request.FILES.get("file")
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+
+        created = 0
+        errors = []
+        rows = list(reader)
+
+        employee_ids = [r["employee_id"] for r in rows]
+
+        # ❌ Block if any employee already exists
+        existing = Employee.objects.filter(employee_id__in=employee_ids)
+        if existing.exists():
+            return Response({
+                "error": "Duplicate employee_id found",
+                "existing_ids": list(existing.values_list("employee_id", flat=True))
+            }, status=400)
+
+        try:
+            with transaction.atomic():
+                for row in rows:
+                    # Normalize
+                    row["is_fla"] = row["is_fla"].lower() == "true"
+                    row["phone_number"] = row.get("phone_number") or None
+                    row["designation"] = row.get("designation") or None
+
+                    # Ensure FLA exists
+                    fla_id = row["fla_employee_id"]
+                    fla = Employee.objects.filter(employee_id=fla_id).first()
+
+                    if not fla:
+                        fla = Employee.objects.create(
+                            name=row["fla_name"],
+                            employee_id=row["fla_employee_id"],
+                            email=row["fla_email"],
+                            group=row["group"],
+                            fla_employee_id=row["fla_employee_id"],
+                            fla_name=row["fla_name"],
+                            fla_email=row["fla_email"],
+                            is_fla=True,
+                        )
+
+                    serializer = EmployeeSerializer(data=row)
+                    serializer.is_valid(raise_exception=True)
+                    serializer.save()
+                    created += 1
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=400)
+
+        return Response({
+            "created_count": created,
+            "message": "Bulk upload successful"
+        }, status=201)
+
+
+# class EmployeeBulkUploadAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     REQUIRED_FIELDS = [
+#         "name",
+#         "employee_id",
+#         "email",
+#         "group",
+#         "fla_employee_id",
+#         "fla_name",
+#         "fla_email",
+#         "is_fla",
+#     ]
+
+#     def post(self, request):
+#         if not (request.user.is_staff or request.user.is_superuser):
+#             return Response({"error": "Admin only"}, status=403)
+
+#         file = request.FILES.get("file")
+#         if not file or not file.name.endswith(".csv"):
+#             return Response({"error": "Valid CSV required"}, status=400)
+
+#         reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+#         created, failed = 0, []
+
+#         for row_num, row in enumerate(reader, start=2):
+#             try:
+#                 # -------------------------
+#                 # REQUIRED FIELD CHECK
+#                 # -------------------------
+#                 for field in self.REQUIRED_FIELDS:
+#                     if not row.get(field):
+#                         raise ValueError(f"{field} is required")
+
+#                 # -------------------------
+#                 # TYPE NORMALIZATION
+#                 # -------------------------
+#                 row["is_fla"] = row["is_fla"].strip().lower() == "true"
+#                 row["phone_number"] = row.get("phone_number") or None
+#                 row["designation"] = row.get("designation") or None
+
+#                 serializer = EmployeeSerializer(data=row)
+#                 serializer.is_valid(raise_exception=True)
+#                 serializer.save()
+
+#                 created += 1
+
+#             except Exception as e:
+#                 failed.append({
+#                     "row": row_num,
+#                     "employee_id": row.get("employee_id"),
+#                     "error": str(e),
+#                 })
+
+#         return Response(
+#             {
+#                 "created_count": created,
+#                 "failed_count": len(failed),
+#                 "errors": failed,
+#             },
+#             status=207 if failed else 201,
+#         )
 
 
 class EmployeeCSVTemplateAPIView(APIView):
