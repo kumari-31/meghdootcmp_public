@@ -186,6 +186,7 @@ function RegistrationForm() {
         `/employee/register/${employeeId}/`,
         {
           phone_number: phone,
+          designation: designation, 
           password: password,
           confirm_password: confirmPassword,
         }

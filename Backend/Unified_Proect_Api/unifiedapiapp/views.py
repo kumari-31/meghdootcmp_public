@@ -2295,10 +2295,13 @@ class EmployeeRegisterAPIView(APIView):
             password = request.data.get("password")
             confirm_password = request.data.get("confirm_password")
 
+            allowed_fields = ["phone_number", "designation"]
             # Remove password fields from update data
-            update_data = request.data.copy()
-            update_data.pop("password", None)
-            update_data.pop("confirm_password", None)
+            update_data = {
+                field: request.data.get(field)
+                for field in allowed_fields
+                if request.data.get(field) is not None
+            }
 
             if not update_data and not password:
                 return Response(
