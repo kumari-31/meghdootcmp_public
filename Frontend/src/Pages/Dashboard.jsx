@@ -10,7 +10,12 @@ import {
   useTheme,
   Collapse,
   TableContainer,
-  Table,TableHead,TableCell,TableRow,TableBody,TablePagination
+  Table,
+  TableHead,
+  TableCell,
+  TableRow,
+  TableBody,
+  TablePagination,
 } from "@mui/material";
 import {
   ResponsiveContainer,
@@ -34,8 +39,8 @@ import CloudIcon from "@mui/icons-material/Cloud";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 // import TrendingUpIcon from "@mui/icons-material/TrendingUp";
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import apiClient from "../Axios";
 import dayjs from "dayjs";
 import isToday from "dayjs/plugin/isToday";
@@ -58,9 +63,7 @@ const getLast7DaysDailySentRequests = (requests = []) => {
       if (!req.request_timestamp) return false;
 
       const createdAt = dayjs(req.request_timestamp);
-      const approvedAt = req.approved_at
-        ? dayjs(req.approved_at)
-        : null;
+      const approvedAt = req.approved_at ? dayjs(req.approved_at) : null;
 
       // ✅ created on this calendar day
       if (createdAt.isBefore(dayStart) || createdAt.isAfter(dayEnd)) {
@@ -84,9 +87,6 @@ const getLast7DaysDailySentRequests = (requests = []) => {
 
   return result;
 };
-
-
-
 
 // const getLast7DaysPendingTrend = (requests = []) => {
 //   const result = [];
@@ -127,7 +127,6 @@ const getLast7DaysDailySentRequests = (requests = []) => {
 //   return result;
 // };
 
-
 const getLast7DaysFinalStatusTrend = (data = [], status) => {
   const today = dayjs().startOf("day");
   const days = [];
@@ -150,8 +149,6 @@ const getLast7DaysFinalStatusTrend = (data = [], status) => {
 
   return days;
 };
-
-
 
 const GlassCard = ({ children, sx = {}, ...rest }) => (
   <Card
@@ -206,18 +203,17 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
         {/* Sparkline */}
         <Box sx={{ width: "100%", height: 44 }}>
           <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={sparkData}>
-          <XAxis dataKey="date" hide />
-          <ReTooltip />
-          <Area
-            type="monotone"
-            dataKey="value"
-            stroke="rgba(124,77,255,0.95)"
-            fill="rgba(124,77,255,0.12)"
-            dot={false}
-          />
-        </AreaChart>
-
+            <AreaChart data={sparkData}>
+              <XAxis dataKey="date" hide />
+              <ReTooltip />
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke="rgba(124,77,255,0.95)"
+                fill="rgba(124,77,255,0.12)"
+                dot={false}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </Box>
       </Stack>
@@ -225,8 +221,7 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
   );
 };
 
-
-  // Prepare sparkData for Recharts (array of {value})
+// Prepare sparkData for Recharts (array of {value})
 //   const chartData = sparkData.length
 //     ? sparkData.map((v, i) => ({ x: i, value: v }))
 //     : Array.from({ length: 12 }).map((_, i) => ({
@@ -435,10 +430,10 @@ function parseRGB(rgbStr) {
 
 export default function Dashboard() {
   const theme = useTheme();
-const [osPage, setOSPage] = useState(0);
-const [k8sPage, setK8sPage] = useState(0);
-const [showOS, setShowOS] = useState(false);
-const [showK8s, setShowK8s] = useState(false);
+  const [osPage, setOSPage] = useState(0);
+  const [k8sPage, setK8sPage] = useState(0);
+  const [showOS, setShowOS] = useState(false);
+  const [showK8s, setShowK8s] = useState(false);
   const [overview, setOverview] = useState({
     total_instances: 0,
     total_vcpus: 0,
@@ -482,88 +477,85 @@ const [showK8s, setShowK8s] = useState(false);
   const [date, setDate] = useState(new Date());
 
   const [selectedDate, setSelectedDate] = useState(null);
-const [osData, setOsData] = useState([]);
-const [kubeData, setKubeData] = useState([]);
+  const [osData, setOsData] = useState([]);
+  const [kubeData, setKubeData] = useState([]);
 
-const [osCounts, setOsCounts] = useState({
-  pending: 0,
-  accepted: 0,
-  rejected: 0,
-});
+  const [osCounts, setOsCounts] = useState({
+    pending: 0,
+    accepted: 0,
+    rejected: 0,
+  });
 
-const [k8sCounts, setK8sCounts] = useState({
-  pending: 0,
-  accepted: 0,
-  rejected: 0,
-});
+  const [k8sCounts, setK8sCounts] = useState({
+    pending: 0,
+    accepted: 0,
+    rejected: 0,
+  });
 
+  const openstackPaged = openstackReq.raw?.slice(osPage * 5, (osPage + 1) * 5);
+  const handleOSPageChange = (_, newPage) => setOSPage(newPage);
 
-const openstackPaged = openstackReq.raw?.slice(osPage * 5, (osPage + 1) * 5);
-const handleOSPageChange = (_, newPage) => setOSPage(newPage);
+  const k8sPaged = k8sReq.raw?.slice(k8sPage * 5, (k8sPage + 1) * 5);
+  const handleK8sPageChange = (_, newPage) => setK8sPage(newPage);
 
-const k8sPaged = k8sReq.raw?.slice(k8sPage * 5, (k8sPage + 1) * 5);
-const handleK8sPageChange = (_, newPage) => setK8sPage(newPage);
+  const fetchDashboardData = async (date) => {
+    const formatted = date ? dayjs(date).format("YYYY-MM-DD") : null;
 
+    try {
+      const osRes = await apiClient.get(
+        `/openstack/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+      );
 
-const fetchDashboardData = async (date) => {
-  const formatted = date ? dayjs(date).format("YYYY-MM-DD") : null;
+      const k8sRes = await apiClient.get(
+        `/kubernetes/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+      );
 
-  try {
-    const osRes = await apiClient.get(
-      `/openstack/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
-    );
+      // -------------------------
+      // OPENSTACK (DATE-BASED)
+      // -------------------------
+      setOsCounts({
+        pending: osRes.data.pending || 0,
+        accepted: osRes.data.approved || 0,
+        rejected: osRes.data.rejected || 0,
+      });
 
-    const k8sRes = await apiClient.get(
-      `/kubernetes/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
-    );
+      setOpenstackReq((prev) => ({
+        ...prev,
+        raw: osRes.data.records || [],
+      }));
 
-    // -------------------------
-    // OPENSTACK (DATE-BASED)
-    // -------------------------
-    setOsCounts({
-      pending: osRes.data.pending || 0,
-      accepted: osRes.data.approved || 0,
-      rejected: osRes.data.rejected || 0,
-    });
+      // -------------------------
+      // KUBERNETES (DATE-BASED)
+      // -------------------------
+      setK8sCounts({
+        pending: k8sRes.data.pending || 0,
+        accepted: k8sRes.data.approved || 0,
+        rejected: k8sRes.data.rejected || 0,
+      });
 
-    setOpenstackReq((prev) => ({
-      ...prev,
-      raw: osRes.data.records || [],
-    }));
+      setK8sReq((prev) => ({
+        ...prev,
+        raw: k8sRes.data.records || [],
+      }));
 
-    // -------------------------
-    // KUBERNETES (DATE-BASED)
-    // -------------------------
-    setK8sCounts({
-      pending: k8sRes.data.pending || 0,
-      accepted: k8sRes.data.approved || 0,
-      rejected: k8sRes.data.rejected || 0,
-    });
+      // Reset pagination
+      setOSPage(0);
+      setK8sPage(0);
+    } catch (error) {
+      console.error("Date filtered dashboard error:", error);
+    }
+  };
 
-    setK8sReq((prev) => ({
-      ...prev,
-      raw: k8sRes.data.records || [],
-    }));
+  useEffect(() => {
+    fetchDashboardData(selectedDate);
+  }, [selectedDate]);
 
-    // Reset pagination
-    setOSPage(0);
-    setK8sPage(0);
-
-  } catch (error) {
-    console.error("Date filtered dashboard error:", error);
-  }
-};
-
-useEffect(() => {
-  fetchDashboardData(selectedDate);
-}, [selectedDate]);
-
-// --------------------------------------------
-// DATE CHANGE HANDLER (Calendar Picker)
-// --------------------------------------------
-const handleDateChange = (newValue) => {
-  setSelectedDate(newValue);
-};
+  // --------------------------------------------
+  // DATE CHANGE HANDLER (Calendar Picker)
+  // --------------------------------------------
+  const handleDateChange = (newValue) => {
+    setSelectedDate(newValue);
+  };
 
   // Fetch overview (your /overview)
   useEffect(() => {
@@ -583,16 +575,17 @@ const handleDateChange = (newValue) => {
       try {
         // If no date selected, fetch overall
         const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
-  
+
         // Fetch data from API
         const data = await fetchVmRequests({ date: dateString });
-  
+
         // Optional: calculate today count only when no date filter
         const todayCount =
           !dateString && data.raw.length
-            ? data.raw.filter(vm => dayjs(vm.request_timestamp).isToday()).length
+            ? data.raw.filter((vm) => dayjs(vm.request_timestamp).isToday())
+                .length
             : 0;
-  
+
         // Update state
         setOpenstackReq({
           ...data,
@@ -603,8 +596,6 @@ const handleDateChange = (newValue) => {
       }
     })();
   }, [date]); // <--- Important: re-run whenever 'date' changes
-  
-  
 
   // K8s service requests
   // Kubernetes Service Requests (Pending etc.)
@@ -640,8 +631,6 @@ const handleDateChange = (newValue) => {
       }
     })();
   }, []);
-
-
 
   // quick composite health metric (example: weighted)
   const systemHealth = useMemo(() => {
@@ -685,68 +674,65 @@ const handleDateChange = (newValue) => {
 
   // Last 7 days snapshot trend for all statuses
   // OpenStack
-// Pending (dynamic, day-wise)
-// const openstackTrendPending =
-//   useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
+  // Pending (dynamic, day-wise)
+  // const openstackTrendPending =
+  //   useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
 
+  const openstackTrendPending = useMemo(
+    () => getLast7DaysDailySentRequests(openstackReq.raw),
+    [openstackReq.raw]
+  );
 
-const openstackTrendPending =  useMemo(
-  () => getLast7DaysDailySentRequests(openstackReq.raw),
-  [openstackReq.raw]
-);
+  const k8sTrendPending = useMemo(
+    () => getLast7DaysDailySentRequests(k8sReq.raw),
+    [k8sReq.raw]
+  );
 
-const k8sTrendPending = useMemo(
-  () => getLast7DaysDailySentRequests(k8sReq.raw),
-  [k8sReq.raw]
-);
+  // const openstackTrendPending = useMemo(
+  //   () => getLast7DaysDailyPendingSnapshot(openstackReq.raw),
+  //   [openstackReq.raw]
+  // );
 
-// const openstackTrendPending = useMemo(
-//   () => getLast7DaysDailyPendingSnapshot(openstackReq.raw),
-//   [openstackReq.raw]
-// );
+  // const k8sTrendPending = useMemo(
+  //   () => getLast7DaysDailyPendingSnapshot(k8sReq.raw),
+  //   [k8sReq.raw]
+  // );
 
-// const k8sTrendPending = useMemo(
-//   () => getLast7DaysDailyPendingSnapshot(k8sReq.raw),
-//   [k8sReq.raw]
-// );
+  // const k8sTrendPending =
+  //   useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
 
-// const k8sTrendPending =
-//   useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
+  const openstackTrendAccepted = useMemo(
+    () => getLast7DaysFinalStatusTrend(openstackReq.raw, "Accepted"),
+    [openstackReq.raw]
+  );
 
-const openstackTrendAccepted =
-  useMemo(() => getLast7DaysFinalStatusTrend(openstackReq.raw, "Accepted"), [openstackReq.raw]);
+  const openstackTrendRejected = useMemo(
+    () => getLast7DaysFinalStatusTrend(openstackReq.raw, "Rejected"),
+    [openstackReq.raw]
+  );
 
-const openstackTrendRejected =
-  useMemo(() => getLast7DaysFinalStatusTrend(openstackReq.raw, "Rejected"), [openstackReq.raw]);
+  // const openstackTrendPending =
+  //   getLast7DaysPendingTrend(openstackReq.raw);
 
+  // const k8sTrendPending =
+  //   getLast7DaysPendingTrend(k8sReq.raw);
 
-// const openstackTrendPending =
-//   getLast7DaysPendingTrend(openstackReq.raw);
+  // Accepted (finalized per day)
 
-// const k8sTrendPending =
-//   getLast7DaysPendingTrend(k8sReq.raw);
+  const k8sTrendAccepted = useMemo(
+    () => getLast7DaysFinalStatusTrend(k8sReq.raw, "Accepted"),
+    [k8sReq.raw]
+  );
 
-// Accepted (finalized per day)
+  // Rejected (finalized per day)
 
-
-const k8sTrendAccepted =
-  getLast7DaysFinalStatusTrend(k8sReq.raw, "Accepted");
-
-// Rejected (finalized per day)
-
-
-const k8sTrendRejected =
-  getLast7DaysFinalStatusTrend(k8sReq.raw, "Rejected");
-
-  
-
+  const k8sTrendRejected = getLast7DaysFinalStatusTrend(k8sReq.raw, "Rejected");
 
   // const openstackPendingTrend =
   // getLast7DaysPendingTrend(openstackReq.raw);
 
-// const k8sPendingTrend =
-//   getLast7DaysPendingTrend(k8sReq.raw);
-
+  // const k8sPendingTrend =
+  //   getLast7DaysPendingTrend(k8sReq.raw);
 
   const getDailyTrend = (data = [], status) => {
     const days = 7;
@@ -798,43 +784,40 @@ const k8sTrendRejected =
     { value: 100 - usage, fill: "#ddd" }, // Remaining portion
   ];
 
-const tableStyles = {
-  "& .MuiTable-root": {
-    borderCollapse: "separate",
-    borderSpacing: "0 6px",
-  },
-  "& .MuiTableCell-root": {
-    borderBottom: "none !important",
-  },
-  "& .MuiTableRow-root": (theme) => ({
-    background:
-      theme.palette.mode === "dark"
-        ? "rgba(40,40,40,0.75)"
-        : "rgba(255,255,255,0.65)",
-    borderRadius: "10px",
-    transition: "0.2s ease",
-  }),
-  "& .MuiTableRow-root:hover": (theme) => ({
-    background:
-      theme.palette.mode === "dark"
-        ? "rgba(70,70,70,0.9)"
-        : "rgba(255,255,255,0.9)",
-    boxShadow:
-      theme.palette.mode === "dark"
-        ? "0 2px 12px rgba(0,0,0,0.45)"
-        : "0 2px 12px rgba(6, 8, 35, 0.08)",
-  }),
-  "& .MuiTableHead-root .MuiTableRow-root": (theme) => ({
-    background:
-      theme.palette.mode === "dark"
-        ? "rgba(60,60,60,0.85)"
-        : "rgba(240,240,255,0.85)",
-    fontWeight: 600,
-  }),
-};
-
-
-
+  const tableStyles = {
+    "& .MuiTable-root": {
+      borderCollapse: "separate",
+      borderSpacing: "0 6px",
+    },
+    "& .MuiTableCell-root": {
+      borderBottom: "none !important",
+    },
+    "& .MuiTableRow-root": (theme) => ({
+      background:
+        theme.palette.mode === "dark"
+          ? "rgba(40,40,40,0.75)"
+          : "rgba(255,255,255,0.65)",
+      borderRadius: "10px",
+      transition: "0.2s ease",
+    }),
+    "& .MuiTableRow-root:hover": (theme) => ({
+      background:
+        theme.palette.mode === "dark"
+          ? "rgba(70,70,70,0.9)"
+          : "rgba(255,255,255,0.9)",
+      boxShadow:
+        theme.palette.mode === "dark"
+          ? "0 2px 12px rgba(0,0,0,0.45)"
+          : "0 2px 12px rgba(6, 8, 35, 0.08)",
+    }),
+    "& .MuiTableHead-root .MuiTableRow-root": (theme) => ({
+      background:
+        theme.palette.mode === "dark"
+          ? "rgba(60,60,60,0.85)"
+          : "rgba(240,240,255,0.85)",
+      fontWeight: 600,
+    }),
+  };
 
   return (
     <Box sx={{ width: "100%", p: { xs: 2, sm: 3, md: 4 } }}>
@@ -855,8 +838,10 @@ const tableStyles = {
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
-          <IconButton aria-label="notifications" size="large"
-          onClick={() => window.location.reload()}
+          <IconButton
+            aria-label="notifications"
+            size="large"
+            onClick={() => window.location.reload()}
           >
             <HourglassEmptyIcon />
           </IconButton>
@@ -867,26 +852,23 @@ const tableStyles = {
       <Grid container spacing={2} sx={{ mb: 2 }}>
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion}>
-          <StatTile
-            title="OpenStack Request Pending"
-            value={osCounts.pending}          // ✅ today only
-            sparkData={openstackTrendPending} // ✅ historical snapshot
-            color="var(--openstack-color)"
-          />
-
-
+            <StatTile
+              title="OpenStack Request Pending"
+              value={osCounts.pending} // ✅ today only
+              sparkData={openstackTrendPending} // ✅ historical snapshot
+              color="var(--openstack-color)"
+            />
           </motion.div>
         </Grid>
 
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.05 }}>
-          <StatTile
-            title="Kubernetes Request Pending"
-            value={k8sCounts.pending}     // ✅ stays SAME
-            sparkData={k8sTrendPending}   // ✅ FIXED
-            color="var(--k8s-color)"
-          />
-
+            <StatTile
+              title="Kubernetes Request Pending"
+              value={k8sCounts.pending} // ✅ stays SAME
+              sparkData={k8sTrendPending} // ✅ FIXED
+              color="var(--k8s-color)"
+            />
           </motion.div>
         </Grid>
 
@@ -932,7 +914,7 @@ const tableStyles = {
 
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.15 }}>
-            <GlassCard sx={{ p: 2, height: "100%", }}>
+            <GlassCard sx={{ p: 2, height: "100%" }}>
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -942,59 +924,56 @@ const tableStyles = {
               </Typography>
 
               <Stack
-              direction="row"
-              justifyContent="space-around"
-              spacing={5}   // 👈 reduce/increase this number
-              sx={{ mt: 1.2 ,mb: 1.5 }}
-            >
-              {/* OpenStack */}
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar
-                  sx={{
-                    bgcolor: "var(--openstack-color)",
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <CloudIcon fontSize="small" />
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    OpenStack
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    {openstackReq.raw?.length || 0}
-                  </Typography>
-                </Box>
-              </Stack>
+                direction="row"
+                justifyContent="space-around"
+                spacing={5} // 👈 reduce/increase this number
+                sx={{ mt: 1.2, mb: 1.5 }}
+              >
+                {/* OpenStack */}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: "var(--openstack-color)",
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    <CloudIcon fontSize="small" />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      OpenStack
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                      {openstackReq.raw?.length || 0}
+                    </Typography>
+                  </Box>
+                </Stack>
 
-              {/* Kubernetes */}
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Avatar
-                  sx={{
-                    bgcolor: "var(--k8s-color)",
-                    width: 32,
-                    height: 32,
-                  }}
-                >
-                  <CloudIcon fontSize="small" />
-                </Avatar>
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Kubernetes
-                  </Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                    {k8sReq.raw?.length || 0}
-                  </Typography>
-                </Box>
+                {/* Kubernetes */}
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Avatar
+                    sx={{
+                      bgcolor: "var(--k8s-color)",
+                      width: 32,
+                      height: 32,
+                    }}
+                  >
+                    <CloudIcon fontSize="small" />
+                  </Avatar>
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Kubernetes
+                    </Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                      {k8sReq.raw?.length || 0}
+                    </Typography>
+                  </Box>
+                </Stack>
               </Stack>
-            </Stack>
-
             </GlassCard>
           </motion.div>
         </Grid>
-
-
       </Grid>
 
       {/* Middle row: Segmented Gauge + Activity list + Compact Calendar */}
@@ -1225,7 +1204,7 @@ const tableStyles = {
         <Grid item xs={12} md={3}>
           <GlassCard sx={{ p: 2, minHeight: 220 }}>
             <Typography variant="subtitle2" color="text.secondary">
-              Maintenance  Calendar
+              Maintenance Calendar
             </Typography>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
               Planned maintenance
@@ -1254,30 +1233,30 @@ const tableStyles = {
         {/* OpenStack Accepted */}
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion}>
-            
-        <StatTile
-          icon={<CheckCircleIcon />}
-          title="OpenStack Accepted Request"
-          value={osCounts.accepted} 
-          sparkData={openstackTrendAccepted} 
-          delta={osCounts.accepted > 0 ? "+3%" : "-"}
-          color="var(--openstack-color)"
-        />
+            <StatTile
+              icon={<CheckCircleIcon />}
+              title="OpenStack Accepted Request"
+              value={osCounts.accepted}
+              sparkData={openstackTrendAccepted}
+              delta={osCounts.accepted > 0 ? "+3%" : "-"}
+              color="var(--openstack-color)"
+            />
           </motion.div>
         </Grid>
 
         {/* Kubernetes Accepted */}
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.05 }}>
+            
             <StatTile
               icon={<CheckCircleIcon />}
               title="Kubernetes Accepted Request"
               value={k8sCounts.accepted}
-              sparkData={getDailyTrend(k8sReq.raw, "Accepted")}
-              delta={k8sReq.accepted > 0 ? "+2%" : "-"}
+              sparkData={k8sTrendAccepted}
+              delta={k8sCounts.accepted > 0 ? "+2%" : "-"}
               color="var(--k8s-color)"
-              badge="KUBERNETES"
             />
+
           </motion.div>
         </Grid>
 
@@ -1311,157 +1290,151 @@ const tableStyles = {
           </motion.div>
         </Grid>
       </Grid>
- 
-{/* OpenStack + Kubernetes Tables */}
-<Grid container spacing={2} sx={{ mt: 2 }}>
 
-  {/* OpenStack Table */}
-  <Grid item xs={12} md={6}>
-    <GlassCard className="glass-card" sx={{ p: 1, borderRadius: 3 }}>
+      {/* OpenStack + Kubernetes Tables */}
+      <Grid container spacing={2} sx={{ mt: 2 }}>
+        {/* OpenStack Table */}
+        <Grid item xs={12} md={6}>
+          <GlassCard className="glass-card" sx={{ p: 1, borderRadius: 3 }}>
+            {/* Clickable Header */}
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ px: 1, py: 1.2, cursor: "pointer" }}
+              onClick={() => setShowOS(!showOS)}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                OpenStack Requests
+              </Typography>
+              {showOS ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </Stack>
 
-      {/* Clickable Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ px: 1, py: 1.2, cursor: "pointer" }}
-        onClick={() => setShowOS(!showOS)}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          OpenStack Requests
-        </Typography>
-        {showOS ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-      </Stack>
+            <Collapse in={showOS}>
+              <TableContainer
+                sx={{
+                  maxHeight: 230,
+                  mt: 1,
+                  overflowY: "auto",
+                  pr: 1,
+                  ...tableStyles,
+                }}
+              >
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>EMP ID</TableCell>
+                      <TableCell>VM</TableCell>
+                      <TableCell>Project</TableCell>
+                      <TableCell>Req Date</TableCell>
+                      <TableCell>Designation</TableCell>
+                      <TableCell>Admin</TableCell>
+                      <TableCell>creation status</TableCell>
+                    </TableRow>
+                  </TableHead>
 
-      <Collapse in={showOS}>
-        <TableContainer
-          sx={{
-            maxHeight: 230,
-            mt: 1,
-            overflowY: "auto",
-            pr: 1,
-            ...tableStyles,
-          }}
-        >
-          <Table stickyHeader size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>EMP ID</TableCell>
-                <TableCell>VM</TableCell>
-                <TableCell>Project</TableCell>
-                <TableCell>Req Date</TableCell>
-                <TableCell>Designation</TableCell>
-                <TableCell>Admin</TableCell>
-                <TableCell>creation status</TableCell>
+                  <TableBody>
+                    {openstackPaged.map((r) => (
+                      <TableRow key={r.id} hover>
+                        <TableCell>{r.employee_id}</TableCell>
+                        <TableCell>
+                          {r.vm_name.split("_").slice(1).join("_")}
+                        </TableCell>
+                        <TableCell>{r.project_name}</TableCell>
+                        <TableCell>
+                          {dayjs(r.request_timestamp).format("DD MMM")}
+                        </TableCell>
+                        <TableCell>{r.designation}</TableCell>
+                        <TableCell>{r.admin_status}</TableCell>
+                        <TableCell>{r.creation_status}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-              </TableRow>
-            </TableHead>
+              {/* Pagination */}
+              <TablePagination
+                component="div"
+                count={openstackReq.raw?.length || 0}
+                page={osPage}
+                onPageChange={handleOSPageChange}
+                rowsPerPage={5}
+                rowsPerPageOptions={[]}
+                sx={{ px: 1 }}
+              />
+            </Collapse>
+          </GlassCard>
+        </Grid>
 
-            <TableBody>
-              {openstackPaged.map((r) => (
-                <TableRow key={r.id} hover>
-                  <TableCell>{r.employee_id}</TableCell>
-                  <TableCell>{r.vm_name.split("_").slice(1).join("_")}</TableCell>
-                  <TableCell>{r.project_name}</TableCell>
-                  <TableCell>{dayjs(r.request_timestamp).format("DD MMM")}</TableCell>
-                  <TableCell>{r.designation}</TableCell>
-                  <TableCell>{r.admin_status}</TableCell>
-                  <TableCell>{r.creation_status}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
+        {/* Kubernetes Table */}
+        <Grid item xs={12} md={6}>
+          <GlassCard className="glass-card" sx={{ p: 1, borderRadius: 3 }}>
+            {/* Clickable Header */}
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ px: 1, py: 1.2, cursor: "pointer" }}
+              onClick={() => setShowK8s(!showK8s)}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                Kubernetes Requests
+              </Typography>
+              {showK8s ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </Stack>
 
-          </Table>
-        </TableContainer>
+            <Collapse in={showK8s}>
+              <TableContainer
+                sx={{
+                  maxHeight: 230,
+                  mt: 1,
+                  overflowY: "auto",
+                  pr: 1,
+                  ...tableStyles,
+                }}
+              >
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>EMP ID</TableCell>
+                      <TableCell>Project</TableCell>
+                      <TableCell>Service</TableCell>
+                      <TableCell>Designation</TableCell>
+                      <TableCell>Admin</TableCell>
+                      <TableCell>Deploy</TableCell>
+                    </TableRow>
+                  </TableHead>
 
-        {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={openstackReq.raw?.length || 0}
-          page={osPage}
-          onPageChange={handleOSPageChange}
-          rowsPerPage={5}
-          rowsPerPageOptions={[]}
-          sx={{ px: 1 }}
-        />
-      </Collapse>
-    </GlassCard>
-  </Grid>
+                  <TableBody>
+                    {k8sPaged.map((r) => (
+                      <TableRow key={r.id} hover>
+                        <TableCell>{r.employee_id}</TableCell>
+                        <TableCell>{r.project_name}</TableCell>
+                        <TableCell>{r.service_name}</TableCell>
+                        <TableCell>{r.designation}</TableCell>
+                        <TableCell>{r.admin_status}</TableCell>
+                        <TableCell>{r.deployment_status}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
 
-  {/* Kubernetes Table */}
-  <Grid item xs={12} md={6}>
-    <GlassCard className="glass-card" sx={{ p: 1, borderRadius: 3 }}>
-
-      {/* Clickable Header */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ px: 1, py: 1.2, cursor: "pointer" }}
-        onClick={() => setShowK8s(!showK8s)}
-      >
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          Kubernetes Requests
-        </Typography>
-        {showK8s ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-      </Stack>
-
-      <Collapse in={showK8s}>
-        <TableContainer
-          sx={{
-            maxHeight: 230,
-            mt: 1,
-            overflowY: "auto",
-            pr: 1,
-            ...tableStyles,
-          }}
-        >
-          <Table stickyHeader size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>EMP ID</TableCell>
-                <TableCell>Project</TableCell>
-                <TableCell>Service</TableCell>
-                <TableCell>Designation</TableCell>
-                <TableCell>Admin</TableCell>
-                <TableCell>Deploy</TableCell>
-              </TableRow>
-            </TableHead>
-
-            <TableBody>
-              {k8sPaged.map((r) => (
-                <TableRow key={r.id} hover>
-                  <TableCell>{r.employee_id}</TableCell>
-                  <TableCell>{r.project_name}</TableCell>
-                  <TableCell>{r.service_name}</TableCell>
-                  <TableCell>{r.designation}</TableCell>
-                  <TableCell>{r.admin_status}</TableCell>
-                  <TableCell>{r.deployment_status}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-
-          </Table>
-        </TableContainer>
-
-        {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={k8sReq.raw?.length || 0}
-          page={k8sPage}
-          onPageChange={handleK8sPageChange}
-          rowsPerPage={5}
-          rowsPerPageOptions={[]}
-          sx={{ px: 1 }}
-        />
-      </Collapse>
-    </GlassCard>
-  </Grid>
-
-</Grid>
-
-
-
+              {/* Pagination */}
+              <TablePagination
+                component="div"
+                count={k8sReq.raw?.length || 0}
+                page={k8sPage}
+                onPageChange={handleK8sPageChange}
+                rowsPerPage={5}
+                rowsPerPageOptions={[]}
+                sx={{ px: 1 }}
+              />
+            </Collapse>
+          </GlassCard>
+        </Grid>
+      </Grid>
 
       {/* Footer / quick notes */}
       <Box sx={{ mt: 3 }}>
