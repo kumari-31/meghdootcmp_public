@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   TextField,
   Button,
@@ -13,6 +13,11 @@ import {
   MenuItem,
   Checkbox,
   FormControlLabel,
+  Table,
+  TableHead,
+  TableRow,
+  TableCell,
+  TableBody,
 } from "@mui/material";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorIcon from "@mui/icons-material/Error";
@@ -30,25 +35,64 @@ const AddEmployee = () => {
     fla_employee_id: "",
     is_fla: false,
   });
+  const [csvFile, setCsvFile] = useState(null);
+  const [groups, setGroups] = useState([]);
+  const [flaList, setFlaList] = useState([]);
+  const [previewData, setPreviewData] = useState([]);
+  const [previewDone, setPreviewDone] = useState(false);
   const [alertDialog, setAlertDialog] = useState({
     open: false,
     message: "",
     severity: "success", // "success" or "error"
   });
-  const [csvFile, setCsvFile] = useState(null);
-  const [groups, setGroups] = useState([]);
-  const [flaList, setFlaList] = useState([]);
 
+  /* ------------------ Fetch Data ------------------ */
   useEffect(() => {
-    fetchGroups();
+    apiClient.get("/employees/groups/").then((res) => setGroups(res.data));
+    apiClient
+      .get("/employees/fla-list/")
+      .then((res) => setFlaList(res.data.results || res.data || []))
+      .catch(() => setFlaList([]));
   }, []);
 
-  const fetchGroups = async () => {
+  /* ------------------ Helpers ------------------ */
+  const uniqueFlaList = useMemo(() => {
+    const map = new Map();
+    flaList.forEach((f) => map.set(f.fla_employee_id, f));
+    return Array.from(map.values());
+  }, [flaList]);
+
+  const hasErrors = previewData.length > 0 && previewData.some((r) => !r.valid);
+
+  /* ------------------ Handlers ------------------ */
+  const handleChange = (e) =>
+    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const res = await apiClient.get("/employees/groups/");
-      setGroups(res.data);
+      await apiClient.post("/employees/", formData);
+      setAlertDialog({
+        open: true,
+        message: "Employee added successfully!",
+        severity: "success",
+      });
+      setFormData({
+        name: "",
+        employee_id: "",
+        email: "",
+        group: "",
+        fla_name: "",
+        fla_email: "",
+        fla_employee_id: "",
+        is_fla: false,
+      });
     } catch (err) {
-      console.error("Failed to fetch groups", err);
+      setAlertDialog({
+        open: true,
+        message: "Failed to add employee",
+        severity: "error",
+      });
     }
   };
 
@@ -66,134 +110,56 @@ const AddEmployee = () => {
     fetchFlaList();
   }, []);
 
+  /* ------------------ CSV ------------------ */
   const handleFileChange = (e) => {
     setCsvFile(e.target.files[0]);
+    setPreviewData([]);
+    setPreviewDone(false);
   };
 
-  const handleChange = (e) => {
-    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
-  };
+  const handlePreview = async () => {
+    if (!csvFile) return;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    const fd = new FormData();
+    fd.append("file", csvFile);
 
-    try {
-      const response = await apiClient.post("/employees/", formData, {
-        headers: { "Content-Type": "application/json" },
-      });
+    const res = await apiClient.post("/employees/bulk-preview/", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-      if (response.status === 200 || response.status === 201) {
-        setAlertDialog({
-          open: true,
-          message: "Employee added successfully!",
-          severity: "success",
-        });
-
-        setFormData({
-          name: "",
-          employee_id: "",
-          email: "",
-          group: "",
-          fla_name: "",
-          fla_email: "",
-          fla_employee_id: "",
-        });
-      } else {
-        setAlertDialog({
-          open: true,
-          message: "Unexpected response from server.",
-          severity: "error",
-        });
-      }
-    } catch (error) {
-      const errorData = error?.response?.data;
-
-      let messages = [];
-
-      if (errorData && typeof errorData === "object") {
-        Object.entries(errorData).forEach(([field, value]) => {
-          if (Array.isArray(value)) {
-            value.forEach((msg) => messages.push(`${field}: ${msg}`));
-          } else {
-            messages.push(`${field}: ${value}`);
-          }
-        });
-      } else {
-        messages.push("Unexpected server error");
-      }
-
-      setAlertDialog({
-        open: true,
-        message: messages.join("\n"),
-        severity: "error",
-      });
-
-      console.error("Error adding employee:", error);
-    }
-  };
-
-  const handleDownloadTemplate = async () => {
-    try {
-      const response = await apiClient.get("/employees/csv-template/", {
-        responseType: "blob",
-      });
-
-      const blob = new Blob([response.data], { type: "text/csv" });
-      const url = window.URL.createObjectURL(blob);
-
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = "employee_bulk_template.csv";
-      link.click();
-
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error("Failed to download template", error);
-    }
+    setPreviewData(res.data.rows);
+    setPreviewDone(true);
   };
 
   const handleBulkUpload = async () => {
-    if (!csvFile) {
-      setAlertDialog({
-        open: true,
-        message: "Please select a CSV file",
-        severity: "error",
-      });
-      return;
-    }
+    const fd = new FormData();
+    fd.append("file", csvFile);
 
-    const formData = new FormData();
-    formData.append("file", csvFile);
+    const res = await apiClient.post("/employees/bulk-upload/", fd, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
 
-    try {
-      const response = await apiClient.post(
-        "/employees/bulk-upload/",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
+    setAlertDialog({
+      open: true,
+      message: `Created: ${res.data.created_count}\nFailed: ${res.data.failed_count}`,
+      severity: "success",
+    });
 
-      setAlertDialog({
-        open: true,
-        message: `Employees created: ${response.data.created_count}
-Failed: ${response.data.failed_count}`,
-        severity: "success",
-      });
-    } catch (error) {
-      setAlertDialog({
-        open: true,
-        message: "Bulk upload failed",
-        severity: "error",
-      });
-    }
+    setCsvFile(null);
+    setPreviewData([]);
+    setPreviewDone(false);
   };
 
-  const uniqueFlaList = React.useMemo(() => {
-    const map = new Map();
-    flaList.forEach((f) => {
-      map.set(f.fla_employee_id, f);
+  const handleDownloadTemplate = async () => {
+    const res = await apiClient.get("/employees/csv-template/", {
+      responseType: "blob",
     });
-    return Array.from(map.values());
-  }, [flaList]);
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "employee_bulk_template.csv";
+    a.click();
+  };
 
   return (
     <Container maxWidth="md">
@@ -305,65 +271,85 @@ Failed: ${response.data.failed_count}`,
         </form>
       </Paper>
 
+      {/* ----------- Bulk Upload ----------- */}
+      <Paper elevation={3} sx={{ p: 3, mt: 4 }}>
+        <Typography variant="h6">Bulk Upload Employees (CSV)</Typography>
+
+        <input type="file" accept=".csv" onChange={handleFileChange} />
+
+        <div style={{ marginTop: 16 }}>
+          <Button
+            variant="outlined"
+            onClick={handlePreview}
+            disabled={!csvFile}
+            sx={{ mr: 2 }}
+          >
+            Preview CSV
+          </Button>
+
+          <Button
+            variant="contained"
+            onClick={handleBulkUpload}
+            disabled={!previewDone || hasErrors}
+          >
+            Upload CSV
+          </Button>
+        </div>
+
+        <Button sx={{ mt: 2 }} variant="text" onClick={handleDownloadTemplate}>
+          Download CSV Template
+        </Button>
+
+        {/* ----------- Preview Table ----------- */}
+        {previewData.length > 0 && (
+          <Table sx={{ mt: 3 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Row</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell>Message</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {previewData.map((r, i) => (
+                <TableRow key={i}>
+                  <TableCell>{i + 1}</TableCell>
+                  <TableCell>{r.valid ? "OK" : "ERROR"}</TableCell>
+                  <TableCell>
+                    {r.errors && r.errors.length > 0
+                      ? r.errors.join(", ")
+                      : "-"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Paper>
+
+      {/* ----------- Dialog ----------- */}
       <Dialog
         open={alertDialog.open}
         onClose={() => setAlertDialog({ ...alertDialog, open: false })}
       >
-        <DialogTitle sx={{ textAlign: "center", p: 3 }}>
+        <DialogTitle sx={{ textAlign: "center" }}>
           {alertDialog.severity === "success" ? (
             <CheckCircleIcon color="success" sx={{ fontSize: 60 }} />
           ) : (
             <ErrorIcon color="error" sx={{ fontSize: 60 }} />
           )}
         </DialogTitle>
-        <DialogContent sx={{ textAlign: "center", px: 6 }}>
-          <Typography variant="h6" gutterBottom>
-            {alertDialog.severity === "success" ? "Success" : "Error"}
-          </Typography>
-          <Typography
-            variant="body1"
-            color="text.secondary"
-            sx={{ whiteSpace: "pre-line" }}
-          >
-            {alertDialog.message}
-          </Typography>
+        <DialogContent>
+          <Typography textAlign="center">{alertDialog.message}</Typography>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: "center", pb: 3 }}>
+        <DialogActions sx={{ justifyContent: "center" }}>
           <Button
             onClick={() => setAlertDialog({ ...alertDialog, open: false })}
-            variant="contained"
-            color={alertDialog.severity}
           >
             OK
           </Button>
         </DialogActions>
       </Dialog>
-      <Paper elevation={3} sx={{ p: 3, mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
-          Bulk Upload Employees (CSV)
-        </Typography>
-        
-
-        <input type="file" accept=".csv" onChange={handleFileChange} />
-
-        <Button
-          sx={{ mt: 2 }}
-          variant="contained"
-          color="primary"
-          onClick={handleBulkUpload}
-        >
-          Upload CSV
-        </Button>
-        <br />
-        <Button
-          sx={{ mt: 2, mr: 2 }}
-          variant="outlined"
-          color="primary"
-          onClick={handleDownloadTemplate}
-        >
-          Download CSV Template
-        </Button>
-      </Paper>
     </Container>
   );
 };

@@ -105,58 +105,52 @@ const Navbar = () => {
     setNotificationAnchor(null);
   };
 
- 
   /* -------------------- 👤 PROFILE HANDLERS -------------------- */
   const handleProfileClick = (event) => setProfileAnchor(event.currentTarget);
   const handleProfileClose = () => setProfileAnchor(null);
 
   /* -------------------- 🔍 FETCH PENDING REQUESTS (ADMIN and FLA ONLY) -------------------- */
 
- 
-    const { refreshKey } = useNotificationRefresh();
+  const { refreshKey } = useNotificationRefresh();
 
-    const fetchNotifications = async () => {
-      if (userRole !== "ADMIN" && userRole !== "FLA") return;
-      try {
-        // OpenStack
-        const osEndpoint =
-          userRole === "ADMIN" ? "/vmrequests/admin/" : "/vmrequests/fla/";
-        const osRes = await apiClient.get(osEndpoint);
-        const osAll = osRes.data.data || [];
+  const fetchNotifications = async () => {
+    if (userRole !== "ADMIN" && userRole !== "FLA") return;
+    try {
+      // OpenStack
+      const osEndpoint =
+        userRole === "ADMIN" ? "/vmrequests/admin/" : "/vmrequests/fla/";
+      const osRes = await apiClient.get(osEndpoint);
+      const osAll = osRes.data.data || [];
 
-        const osPending = osAll.filter((req) =>
-          userRole === "ADMIN"
-            ? req.fla_status === "Accepted" && req.admin_status === "Pending"
-            : req.fla_status === "Pending"
-        );
+      const osPending = osAll.filter((req) =>
+        userRole === "ADMIN"
+          ? req.fla_status === "Accepted" && req.admin_status === "Pending"
+          : req.fla_status === "Pending"
+      );
 
-        setOpenstackPending(osPending);
+      setOpenstackPending(osPending);
 
-        // Kubernetes
-        const k8sEndpoint =
-          userRole === "ADMIN"
-            ? "/service-requests/"
-            : "/fla/service-requests/";
-        const k8sRes = await apiClient.get(k8sEndpoint);
-        const k8sAll = k8sRes.data.data || [];
+      // Kubernetes
+      const k8sEndpoint =
+        userRole === "ADMIN" ? "/service-requests/" : "/fla/service-requests/";
+      const k8sRes = await apiClient.get(k8sEndpoint);
+      const k8sAll = k8sRes.data.data || [];
 
-        const k8sPending = k8sAll.filter((req) =>
-          userRole === "ADMIN"
-            ? req.fla_status === "Accepted" && req.admin_status === "Pending"
-            : req.fla_status === "Pending"
-        );
+      const k8sPending = k8sAll.filter((req) =>
+        userRole === "ADMIN"
+          ? req.fla_status === "Accepted" && req.admin_status === "Pending"
+          : req.fla_status === "Pending"
+      );
 
-        setK8sPending(k8sPending);
-      } catch (err) {
-        console.error("Notification fetch failed", err);
-      }
-    }; 
+      setK8sPending(k8sPending);
+    } catch (err) {
+      console.error("Notification fetch failed", err);
+    }
+  };
 
- useEffect(() => {
-  fetchNotifications();
- 
-}, [userRole, refreshKey]);
-
+  useEffect(() => {
+    fetchNotifications();
+  }, [userRole, refreshKey]);
 
   const totalPending = openstackPending.length + k8sPending.length;
 
@@ -543,7 +537,14 @@ const Navbar = () => {
                 }}
               >
                 {/* ================= OPENSTACK ================= */}
-                <Box sx={{ px: 2, py: 1, bgcolor: "#FFF7ED" }}>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "#2a1f14" : "#FFF7ED",
+                  }}
+                >
                   <Typography
                     variant="subtitle2"
                     fontWeight={700}
@@ -573,8 +574,11 @@ const Navbar = () => {
                       sx={{
                         alignItems: "flex-start",
                         gap: 1.5,
-                        bgcolor: "#FFF7ED",
-                        "&:hover": { bgcolor: "#FFEDD5" },
+                        bgcolor: "background.paper",
+                        color: "text.primary",
+                        "&:hover": {
+                          bgcolor: "action.hover",
+                        },
                       }}
                     >
                       {/* Icon */}
@@ -591,7 +595,7 @@ const Navbar = () => {
 
                       {/* Content */}
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
+                        <Typography variant="body2" fontWeight={600} noWrap color="text.secondary">
                           {req.name}
                         </Typography>
                         <Typography
@@ -619,7 +623,14 @@ const Navbar = () => {
                 <Divider sx={{ my: 1 }} />
 
                 {/* ================= KUBERNETES ================= */}
-                <Box sx={{ px: 2, py: 1, bgcolor: "#EFF6FF" }}>
+                <Box
+                  sx={{
+                    px: 2,
+                    py: 1,
+                    bgcolor: (theme) =>
+                      theme.palette.mode === "dark" ? "#0f1e33" : "#EFF6FF",
+                  }}
+                >
                   <Typography
                     variant="subtitle2"
                     fontWeight={700}
@@ -649,8 +660,11 @@ const Navbar = () => {
                       sx={{
                         alignItems: "flex-start",
                         gap: 1.5,
-                        bgcolor: "#EFF6FF",
-                        "&:hover": { bgcolor: "#DBEAFE" },
+                        bgcolor: "background.paper",
+                        color: "text.primary",
+                        "&:hover": {
+                          bgcolor: "action.hover",
+                        },
                       }}
                     >
                       {/* Icon */}
@@ -667,7 +681,7 @@ const Navbar = () => {
 
                       {/* Content */}
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="body2" fontWeight={600} noWrap>
+                        <Typography variant="body2" fontWeight={600} noWrap color="text.primary">
                           {req.app_name}
                         </Typography>
                         <Typography

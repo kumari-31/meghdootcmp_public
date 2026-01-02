@@ -14,7 +14,6 @@ load_dotenv()
 guacamole_base_url = os.getenv("GUACAMOLE_BASE_URL")
 guacamole_uname = os.getenv("GUACAMOLE_UNAME")
 guacamole_pwd = os.getenv('GUACAMOLE_PWD')
-# guacamole_pwd = "CHN@VL0987&*"
 HOST_FSPCLOUD_IP = os.getenv("HOST_FSPCLOUD_IP")
 HOST_DEFAULT_IP = os.getenv("HOST_DEFAULT_IP")
 VM_INFO_API_URL = os.getenv("VM_INFO_API_URL")
