@@ -218,18 +218,35 @@ urlpatterns = [
     # 8 Zabbix APIs
     # -------------------------------
    
-    path("api/hosts/", HostAvailabilityAPIView.as_view(), name="host-availability"),
-    path("api/cpu/<str:hostid>/", CPUUtilizationAPIView.as_view(), name="cpu-utilization"),
-    path("api/memory/<str:hostid>/", MemoryUtilizationAPIView.as_view(), name="memory-utilization"),
-    path("api/disk/<str:hostid>/", DiskUtilizationAPIView.as_view(), name="disk-utilization"),
-    path("api/system-metrics/<str:hostid>/", SystemMetricsAPIView.as_view(), name="system-metrics"),
-    path("api/alerts/<str:hostid>/", ZabbixProblemsAPIView.as_view(), name="zabbix-problems"),
-    # path("api/k8s/<str:hostid>/", KubernetesNodeMetricsAPIView.as_view(), name="kubernetes-node-metrics"),
-    path("api/health-report/", HealthReportAPIView.as_view(), name="health-report"),
-    path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view(), name="host-health-summary"),
-    path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view(), name="zabbix-host-list"),
+    # path("api/hosts/", HostAvailabilityAPIView.as_view(), name="host-availability"),
+    # path("api/cpu/<str:hostid>/", CPUUtilizationAPIView.as_view(), name="cpu-utilization"),
+    # path("api/memory/<str:hostid>/", MemoryUtilizationAPIView.as_view(), name="memory-utilization"),
+    # path("api/disk/<str:hostid>/", DiskUtilizationAPIView.as_view(), name="disk-utilization"),
+    # path("api/system-metrics/<str:hostid>/", SystemMetricsAPIView.as_view(), name="system-metrics"),
+    # path("api/alerts/<str:hostid>/", ZabbixProblemsAPIView.as_view(), name="zabbix-problems"),
+    # # path("api/k8s/<str:hostid>/", KubernetesNodeMetricsAPIView.as_view(), name="kubernetes-node-metrics"),
+    # path("api/health-report/", HealthReportAPIView.as_view(), name="health-report"),
+    # path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view(), name="host-health-summary"),
+    # path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view(), name="zabbix-host-list"),
    
-    
+    path("api/hosts/", HostAvailabilityAPIView.as_view()),
+
+    path("api/host-metrics/<str:hostid>/", HostMetricsAPIView.as_view()),
+    path("api/alerts/<str:hostid>/", ZabbixProblemsAPIView.as_view()),
+    path("api/host-health/<str:hostid>/", HostHealthSummaryAPIView.as_view()),
+    path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view()),
+
+    path("api/health-report/", HealthReportAPIView.as_view()),
+
+    path("api/host-groups/", HostGroupAPIView.as_view()),
+   
+    path("api/host-metrics/<str:hostid>/", SystemMetricsAPIView.as_view()),
+
+    path(
+        "api/host-all-metrics/<str:hostid>/",
+        HostAllMetricsAPIView.as_view(),
+        name="host-all-metrics",
+    ),
 
 
 

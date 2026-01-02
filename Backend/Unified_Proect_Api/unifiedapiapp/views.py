@@ -1754,22 +1754,29 @@ class UpdateFlavorMetadataAPIView(APIView):
                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+import os
+import logging
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+import openstack
+
+logger = logging.getLogger(__name__)
 
 class ListImages(APIView):
     permission_classes = [IsAuthenticated]
-    # permission_classes = []
 
     def get(self, request):
         token_payload = request.auth  # This contains the decoded token payload
-
         role = token_payload.get("role", "Unknown")
         logger.info("User role: %s", role)
+
         try:
             # Initialize OpenStack connection
             conn = openstack.connect(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                # username=os.getenv("OPENSTACK_UNAME"),
                 username="admin",
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
@@ -1777,51 +1784,48 @@ class ListImages(APIView):
             )
             logger.info("OpenStack connection established.")
 
-            # Fetch the list of images (adjust project_id as necessary)
-            # project_id = '4e58cc2addbc4f228f3993ed381cf21c'
-            images = list(conn.image.images())  # convert generator to list
+            # Fetch all images
+            images = list(conn.image.images())  # Convert generator to list
             logger.info("Fetched %d images.", len(images))
 
-
-            # Get the 'name' query parameter if provided
+            # Optional: Filter by 'name' query parameter
             name_query = request.query_params.get("name", None)
             image_list = []
 
             for image in images:
-                logger.debug("Processing image: %s", getattr(image, "name", "Unknown"))
+                # Skip private images
+                if getattr(image, "visibility", "public") == "private":
+                    continue
 
-                # Filter by name if a query parameter is provided
-                if name_query is None or name_query.lower() in image.name.lower():
-                    # Handle the case where image.size might be None
-                    if image.size is not None:
-                        image_size_gb = round(image.size / (1024**3), 2)
-                        image_size_mb = round(image.size / (1024**2), 2)
-                        size_formatted = f"{image_size_gb} GB ({image_size_mb} MB)"
-                    else:
-                        size_formatted = "N/A"  # Or handle as you prefer
+                # Filter by name if query provided
+                if name_query and name_query.lower() not in getattr(image, "name", "").lower():
+                    continue
 
-                    image_list.append(
-                        {
-                            "id": image.id,
-                            "name": image.name,
-                            "type": image.properties.get(
-                                "image_type", "Image"
-                            ),  # 👈 Type here
-                            "status": image.status,
-                            "visibility": image.visibility,
-                            "size": size_formatted,  # Size in GB and MB or "N/A"
-                            "min_disk": image.min_disk,
-                            "min_ram": image.min_ram,
-                            "created_at": image.created_at,
-                            "updated_at": image.updated_at,
-                            "os_hash_value": getattr(
-                                image, "os_hash_value", "N/A"
-                            ),  # Add os_hash_value, fallback to 'N/A' if not available
-                            "disk_format": getattr(
-                                image, "disk_format", "N/A"
-                            ),  # Add disk format, fallback to 'N/A' if not available
-                        }
-                    )
+                # Format image size
+                if getattr(image, "size", None) is not None:
+                    image_size_gb = round(image.size / (1024**3), 2)
+                    image_size_mb = round(image.size / (1024**2), 2)
+                    size_formatted = f"{image_size_gb} GB ({image_size_mb} MB)"
+                else:
+                    size_formatted = "N/A"
+
+                # Build the image dictionary
+                image_list.append(
+                    {
+                        "id": getattr(image, "id", "N/A"),
+                        "name": getattr(image, "name", "N/A"),
+                        "type": image.properties.get("image_type", "Image") if hasattr(image, "properties") else "Image",
+                        "status": getattr(image, "status", "N/A"),
+                        "visibility": getattr(image, "visibility", "N/A"),
+                        "size": size_formatted,
+                        "min_disk": getattr(image, "min_disk", 0),
+                        "min_ram": getattr(image, "min_ram", 0),
+                        "created_at": getattr(image, "created_at", None),
+                        "updated_at": getattr(image, "updated_at", None),
+                        "os_hash_value": getattr(image, "os_hash_value", "N/A"),
+                        "disk_format": getattr(image, "disk_format", "N/A"),
+                    }
+                )
 
             return Response(image_list, status=status.HTTP_200_OK)
 
@@ -10370,29 +10374,54 @@ class OpenStackImageListView(APIView):
         ]
         return Response({"images": image_list}, status=200)
 
+import os
+from django.http import StreamingHttpResponse, HttpResponseNotFound
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+import openstack
+import logging
+
+logger = logging.getLogger(__name__)
 
 class OpenStackImageDownloadView(APIView):
     """
-    API to download stored images.
+    Download any OpenStack Glance image by its ID (public/shared/private)
     """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request, image_id):
         try:
-            img_record = ImageRecord.objects.get(image_id=image_id)
-            logger.debug(img_record.file_path)
-            if os.path.exists(img_record.file_path):
-                return FileResponse(
-                    open(img_record.file_path, "rb"),
-                    as_attachment=True,
-                    filename=img_record.name,
-                )
-            else:
-                return HttpResponseNotFound("File not found")
-        except ImageRecord.DoesNotExist:
-            return HttpResponseNotFound("Image record not found")
+            # Connect to OpenStack
+            conn = openstack.connect(
+                auth_url=os.getenv("AUTH_URL"),
+                project_name=os.getenv("PROJECT_NAME"),
+                username="admin",
+                password=os.getenv("PASSWORD"),
+                user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+                project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
+            )
 
+            # Get image object
+            image = conn.image.get_image(image_id)
+            if not image:
+                return HttpResponseNotFound("Image not found in OpenStack")
+
+            # Stream image from OpenStack Glance to the client
+            def image_stream():
+                for chunk in conn.image.download_image(image):
+                    yield chunk
+
+            response = StreamingHttpResponse(
+                image_stream(),
+                content_type="application/octet-stream",
+            )
+            response["Content-Disposition"] = f'attachment; filename="{image.name}.qcow2"'
+            return response
+
+        except Exception as e:
+            logger.error(f"Error downloading image {image_id}: {str(e)}")
+            return HttpResponseNotFound(f"Error downloading image: {str(e)}")
 
 # ---------------------------------10 Feb 2025 ---------------------
 
@@ -10948,18 +10977,471 @@ class ListNodesAndVMsAPIView(APIView):
 
 # ------------------------------------ZABBIX API---------------------------------
 
-import base64
-import json
+# import base64
+# import json
 
-import requests
-from django.http import JsonResponse
-from django.views import View
+# import requests
+# from django.http import JsonResponse
+# from django.views import View
+
+# from .zabbix_client import ZabbixClient
+# from .zabbix_metrics import get_item_history
+
+
+# class HostAvailabilityAPIView(APIView):
+#     def get(self, request):
+#         zabbix = ZabbixClient()
+
+#         hosts = zabbix.call(
+#             "host.get",
+#             {
+#                 "output": ["hostid", "host"],
+#                 "selectInterfaces": ["ip", "available"],
+#             },
+#         )
+
+#         availability_map = {
+#             "0": "Unknown",
+#             "1": "Available",
+#             "2": "Not available",
+#         }
+
+#         data = []
+
+#         for h in hosts:
+#             interfaces = h.get("interfaces", [])
+
+#             # Defaults
+#             ip = "N/A"
+#             status = "Unknown"
+
+#             if interfaces:
+#                 iface = interfaces[0]
+#                 ip = iface.get("ip", "N/A")
+
+#                 available = str(iface.get("available", "0"))
+#                 status = availability_map.get(available, "Unknown")
+
+#             data.append(
+#                 {
+#                     "hostid": h["hostid"],
+#                     "host": h["host"],
+#                     "ip": ip,
+#                     "status": status,
+#                 }
+#             )
+
+#         return Response(data)
+
+
+    
+# class CPUUtilizationAPIView(APIView):
+#     def get(self, request, hostid):
+#          return Response(
+#             get_item_history(hostid, {"key_": "system.cpu.util"})
+#         )
+
+
+# class MemoryUtilizationAPIView(APIView):
+#     def get(self, request, hostid):
+#         data = get_item_history(
+#             hostid,
+#             {"name": "Memory utilization"},
+#         )
+
+#         return Response(data)
+
+# class DiskUtilizationAPIView(APIView):
+#     def get(self, request, hostid):
+#         data = get_item_history(
+#             hostid,
+#             {"key_": "vfs.fs.size[/,pused]"},
+#         )
+#         return Response(data)
+
+# class SystemMetricsAPIView(APIView):
+#     """
+#     Fetch Load Average (1m, 5m, 15m) and Process counts from Zabbix
+#     """
+
+#     def get(self, request, hostid):
+
+#         load_average = {
+#             "avg1": get_item_history(
+#                 hostid,
+#                 {"key_": "system.cpu.load[all,avg1]"},
+#             ),
+#             "avg5": get_item_history(
+#                 hostid,
+#                 {"key_": "system.cpu.load[all,avg5]"},
+#             ),
+#             "avg15": get_item_history(
+#                 hostid,
+#                 {"key_": "system.cpu.load[all,avg15]"},
+#             ),
+#         }
+
+#         running_processes = {
+#             "running": get_item_history(
+#                 hostid,
+#                 {"key_": "proc.num[,,run]"},
+#             ),
+#             "total": get_item_history(
+#                 hostid,
+#                 {"key_": "proc.num"},
+#             ),
+#         }
+
+#         return Response({
+#             "load_average": load_average,
+#             "running_processes": running_processes,
+#         })
+
+# class ZabbixProblemsAPIView(APIView):
+#     def get(self, request, hostid):
+#         zabbix = ZabbixClient()
+
+#         # 1️⃣ Get active triggers
+#         triggers = zabbix.call(
+#             "trigger.get",
+#             {
+#                 "output": ["triggerid"],
+#                 "hostids": hostid,
+#                 "filter": {"value": 1},  # ACTIVE ONLY
+#             },
+#         )
+
+#         trigger_ids = [t["triggerid"] for t in triggers]
+
+#         if not trigger_ids:
+#             return Response([])
+
+#         # 2️⃣ Get events for those triggers
+#         events = zabbix.call(
+#             "event.get",
+#             {
+#                 "output": [
+#                     "eventid",
+#                     "name",
+#                     "severity",
+#                     "clock",
+#                     "value",
+#                 ],
+#                 "source": 0,
+#                 "object": 0,
+#                 "value": 1,  # PROBLEM
+#                 "objectids": trigger_ids,
+#                 "selectHosts": ["hostid", "host"],
+#                 "sortfield": "clock",
+#                 "sortorder": "DESC",
+#             },
+#         )
+
+#         return Response(events)
+
+
+
+# def get_cpu_cores(hostid):
+#         data = get_item_history(
+#             hostid,
+#             {"key_": "system.cpu.num"},
+#         )
+#         for _, values in data.items():
+#             if values:
+#                 return int(float(values[-1]["value"]))
+#         return 1
+    
+# def calculate_health(cpu, memory, disk, load, cores):
+#         score = 100
+#         status = "Healthy"
+
+#         # CPU
+#         if cpu > 85:
+#             score -= 30
+#             status = "Critical"
+#         elif cpu > 70:
+#             score -= 15
+#             status = "Warning"
+
+#         # Memory
+#         if memory > 90:
+#             score -= 25
+#             status = "Critical"
+#         elif memory > 75:
+#             score -= 10
+#             status = "Warning"
+
+#         # Disk
+#         if disk > 90:
+#             score -= 20
+#             status = "Critical"
+#         elif disk > 80:
+#             score -= 10
+#             status = "Warning"
+
+#         # Load normalized
+#         load_per_core = load / max(cores, 1)
+#         if load_per_core > 1.5:
+#             score -= 15
+#             status = "Critical"
+#         elif load_per_core > 1:
+#             score -= 5
+#             status = "Warning"
+
+#         return max(score, 0), status, round(load_per_core, 2)
+    
+# def get_latest_value(hostid, key):
+#     data = get_item_history(hostid, {"key_": key})
+#     for _, values in data.items():
+#         if values:
+#             return float(values[-1]["value"])
+#     return 0.0
+
+# def get_host_health_summary(hostid):
+#     cpu = get_latest_value(hostid, "system.cpu.util")
+#     memory = get_latest_value(hostid, "vm.memory.utilization")
+#     disk = get_latest_value(hostid, "vfs.fs.size[/,pused]")
+#     load = get_latest_value(hostid, "system.cpu.load[all,avg1]")
+#     cores = get_cpu_cores(hostid)
+
+#     score, status, load_norm = calculate_health(
+#         cpu, memory, disk, load, cores
+#     )
+
+#     alerts = ZabbixClient().call(
+#         "event.get",
+#         {
+#             "hostids": hostid,
+#             "value": 1,
+#             "sortfield": "clock",
+#             "sortorder": "DESC",
+#             "limit": 2,
+#             "output": ["eventid", "name", "severity", "clock"],
+#         },
+#     )
+
+#     return {
+#         "health_score": score,
+#         "status": status,
+#         "cpu": round(cpu, 2),
+#         "memory": round(memory, 2),
+#         "disk": round(disk, 2),
+#         "load_per_core": load_norm,
+#         "alerts": alerts,
+#     }
+
+
+# class HostHealthSummaryAPIView(APIView):
+#     def get(self, request, hostid):
+#         return Response(get_host_health_summary(hostid))
+
+
+# from reportlab.platypus import SimpleDocTemplate, Paragraph
+# from reportlab.lib.styles import getSampleStyleSheet
+# import tempfile
+# import os
+
+# from reportlab.lib.pagesizes import A4
+# from reportlab.pdfgen import canvas
+
+# from reportlab.lib.pagesizes import A4
+# from reportlab.pdfgen import canvas
+# from reportlab.lib import colors
+# from django.http import HttpResponse
+# from .zabbix_pdf_charts import draw_line_chart
+
+# class HostHealthPDFAPIView(APIView):
+#     def get(self, request, hostid):
+#         response = HttpResponse(content_type="application/pdf")
+#         response["Content-Disposition"] = (
+#             f'attachment; filename="host_{hostid}_health.pdf"'
+#         )
+
+#         c = canvas.Canvas(response, pagesize=A4)
+#         width, height = A4
+
+#         summary = HostHealthSummaryAPIView().get(request, hostid).data
+#         cpu = get_item_history(hostid, {"key_": "system.cpu.util"})
+#         memory = get_item_history(hostid, {"key_": "vm.memory.utilization"})
+#         disk = get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"})
+
+#         # ===== HEADER =====
+#         logo_path = os.path.join(settings.BASE_DIR, "static", "logo191.png")
+#         c.drawImage(logo_path, 40, height - 80, width=80, height=40)
+#         c.setFont("Helvetica-Bold", 18)
+#         c.drawString(140, height - 60, "Host Health Report")
+
+#         c.setStrokeColor(colors.grey)
+#         c.line(40, height - 90, width - 40, height - 90)
+
+#         # ===== HEALTH SCORE =====
+#         status_color = {
+#             "Healthy": colors.green,
+#             "Warning": colors.orange,
+#             "Critical": colors.red,
+#         }[summary["status"]]
+
+#         c.setFont("Helvetica-Bold", 14)
+#         c.setFillColor(status_color)
+#         c.drawString(40, height - 120,
+#                      f"Health Score: {summary['health_score']} ({summary['status']})")
+#         c.setFillColor(colors.black)
+
+#         # ===== METRICS =====
+#         y = height - 150
+#         c.setFont("Helvetica", 11)
+#         for k in ["cpu", "memory", "disk", "load_per_core"]:
+#             c.drawString(40, y, f"{k.replace('_',' ').title()}: {summary[k]}")
+#             y -= 18
+
+#         # ===== CHARTS =====
+#         # ===== CHARTS =====
+#         cpu_data = list(cpu.values())[0] if cpu else []
+#         memory_data = list(memory.values())[0] if memory else []
+#         disk_data = list(disk.values())[0] if disk else []
+
+#         if cpu_data:
+#             draw_line_chart(
+#                 c,
+#                 40,
+#                 y - 140,
+#                 230,
+#                 120,
+#                 cpu_data,
+#                 "CPU Utilization (%)",
+#             )
+
+#         if memory_data:
+#             draw_line_chart(
+#                 c,
+#                 310,
+#                 y - 140,
+#                 230,
+#                 120,
+#                 memory_data,
+#                 "Memory Utilization (%)",
+#             )
+
+#         if disk_data:
+#             draw_line_chart(
+#                 c,
+#                 40,
+#                 y - 300,
+#                 230,
+#                 120,
+#                 disk_data,
+#                 "Disk Utilization (%)",
+#             )
+
+
+
+#         # ===== ALERTS =====
+#         ay = y - 340
+#         c.setFont("Helvetica-Bold", 12)
+#         c.drawString(40, ay, "Recent Alerts")
+#         ay -= 16
+
+#         for a in summary["alerts"]:
+#             severity = int(a.get("severity", 0))
+#             sev_color = colors.red if severity >= 3 else colors.orange
+#             c.setFillColor(sev_color)
+#             c.drawString(50, ay, f"- {a['name']}")
+#             ay -= 14
+
+#         # ===== FOOTER =====
+#         c.setFillColor(colors.black)
+#         c.setFont("Helvetica", 9)
+#         c.drawCentredString(width / 2, 20,
+#                              "Generated by Cloud Management Platform")
+
+#         c.showPage()
+#         c.save()
+#         return response
+
+
+
+# class HealthReportAPIView(APIView):
+#     def get(self, request):
+#         zabbix = ZabbixClient()
+
+#         hosts = zabbix.call(
+#             "host.get",
+#             {
+#                 "output": ["host"],
+#                 "selectInterfaces": ["available"],
+#             },
+#         )
+
+#         availability_map = {
+#             "0": "Unknown",
+#             "1": "Available",
+#             "2": "Not available",
+#         }
+
+#         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+#         doc = SimpleDocTemplate(tmp.name)
+#         styles = getSampleStyleSheet()
+#         story = []
+
+#         story.append(Paragraph("Infrastructure Health Report", styles["Title"]))
+
+#         for h in hosts:
+#             iface = h["interfaces"][0] if h["interfaces"] else {}
+#             status = availability_map.get(
+#                 iface.get("available", "0"), "Unknown"
+#             )
+
+#             story.append(
+#                 Paragraph(
+#                     f"{h['host']} - {status}",
+#                     styles["Normal"],
+#                 )
+#             )
+
+#         doc.build(story)
+#         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+
+
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from django.http import HttpResponse, FileResponse
+from django.conf import settings
+
+import os
+import tempfile
+
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
 
 from .zabbix_client import ZabbixClient
 from .zabbix_metrics import get_item_history
+from .zabbix_pdf_charts import draw_line_chart
 
 
+# ----------------------------------------------------
+# HOST LIST (WITH GROUPS)
+# ----------------------------------------------------
 class HostAvailabilityAPIView(APIView):
+    """
+    Returns:
+    [
+      {
+        hostid,
+        host,
+        ip,
+        status,
+        groups: [{groupid, name}]
+      }
+    ]
+    """
+
     def get(self, request):
         zabbix = ZabbixClient()
 
@@ -10968,6 +11450,7 @@ class HostAvailabilityAPIView(APIView):
             {
                 "output": ["hostid", "host"],
                 "selectInterfaces": ["ip", "available"],
+                "selectGroups": ["groupid", "name"],
             },
         )
 
@@ -10980,368 +11463,234 @@ class HostAvailabilityAPIView(APIView):
         data = []
 
         for h in hosts:
-            interfaces = h.get("interfaces", [])
+            iface = h["interfaces"][0] if h.get("interfaces") else {}
+            status = availability_map.get(str(iface.get("available", "0")), "Unknown")
 
-            # Defaults
-            ip = "N/A"
-            status = "Unknown"
-
-            if interfaces:
-                iface = interfaces[0]
-                ip = iface.get("ip", "N/A")
-
-                available = str(iface.get("available", "0"))
-                status = availability_map.get(available, "Unknown")
-
-            data.append(
-                {
-                    "hostid": h["hostid"],
-                    "host": h["host"],
-                    "ip": ip,
-                    "status": status,
-                }
-            )
+            data.append({
+                "hostid": h["hostid"],
+                "host": h["host"],
+                "ip": iface.get("ip", "N/A"),
+                "status": status,
+                "groups": h.get("groups", []),
+            })
 
         return Response(data)
 
 
-    
-class CPUUtilizationAPIView(APIView):
-    def get(self, request, hostid):
-         return Response(
-            get_item_history(hostid, {"key_": "system.cpu.util"})
-        )
-
-
-class MemoryUtilizationAPIView(APIView):
-    def get(self, request, hostid):
-        data = get_item_history(
-            hostid,
-            {"name": "Memory utilization"},
-        )
-
-        return Response(data)
-
-class DiskUtilizationAPIView(APIView):
-    def get(self, request, hostid):
-        data = get_item_history(
-            hostid,
-            {"key_": "vfs.fs.size[/,pused]"},
-        )
-        return Response(data)
-
-class SystemMetricsAPIView(APIView):
+# ----------------------------------------------------
+# UNIFIED HOST METRICS (USED BY FRONTEND)
+# ----------------------------------------------------
+class HostMetricsAPIView(APIView):
     """
-    Fetch Load Average (1m, 5m, 15m) and Process counts from Zabbix
+    /api/host-metrics/<hostid>/
     """
 
     def get(self, request, hostid):
-
-        load_average = {
-            "avg1": get_item_history(
-                hostid,
-                {"key_": "system.cpu.load[all,avg1]"},
-            ),
-            "avg5": get_item_history(
-                hostid,
-                {"key_": "system.cpu.load[all,avg5]"},
-            ),
-            "avg15": get_item_history(
-                hostid,
-                {"key_": "system.cpu.load[all,avg15]"},
-            ),
-        }
-
-        running_processes = {
-            "running": get_item_history(
-                hostid,
-                {"key_": "proc.num[,,run]"},
-            ),
-            "total": get_item_history(
-                hostid,
-                {"key_": "proc.num"},
-            ),
-        }
-
         return Response({
-            "load_average": load_average,
-            "running_processes": running_processes,
+            "cpu": get_item_history(hostid, {"key_": "system.cpu.util"}),
+            "memory": get_item_history(hostid, {"key_": "vm.memory.utilization"}),
+            "disk": get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"}),
+            "load_average": {
+                "avg1": get_item_history(hostid, {"key_": "system.cpu.load[all,avg1]"}),
+                "avg5": get_item_history(hostid, {"key_": "system.cpu.load[all,avg5]"}),
+                "avg15": get_item_history(hostid, {"key_": "system.cpu.load[all,avg15]"}),
+            },
         })
 
+
+# ----------------------------------------------------
+# ALERTS / PROBLEMS
+# ----------------------------------------------------
 class ZabbixProblemsAPIView(APIView):
     def get(self, request, hostid):
         zabbix = ZabbixClient()
 
-        # 1️⃣ Get active triggers
-        triggers = zabbix.call(
-            "trigger.get",
-            {
-                "output": ["triggerid"],
-                "hostids": hostid,
-                "filter": {"value": 1},  # ACTIVE ONLY
-            },
-        )
-
-        trigger_ids = [t["triggerid"] for t in triggers]
-
-        if not trigger_ids:
-            return Response([])
-
-        # 2️⃣ Get events for those triggers
         events = zabbix.call(
             "event.get",
             {
-                "output": [
-                    "eventid",
-                    "name",
-                    "severity",
-                    "clock",
-                    "value",
-                ],
-                "source": 0,
-                "object": 0,
-                "value": 1,  # PROBLEM
-                "objectids": trigger_ids,
-                "selectHosts": ["hostid", "host"],
+                "hostids": hostid,
+                "value": 1,
                 "sortfield": "clock",
                 "sortorder": "DESC",
+                "limit": 5,
+                "output": ["eventid", "name", "severity", "clock"],
             },
         )
 
         return Response(events)
 
 
-
-def get_cpu_cores(hostid):
-        data = get_item_history(
-            hostid,
-            {"key_": "system.cpu.num"},
-        )
-        for _, values in data.items():
-            if values:
-                return int(float(values[-1]["value"]))
-        return 1
-    
-def calculate_health(cpu, memory, disk, load, cores):
-        score = 100
-        status = "Healthy"
-
-        # CPU
-        if cpu > 85:
-            score -= 30
-            status = "Critical"
-        elif cpu > 70:
-            score -= 15
-            status = "Warning"
-
-        # Memory
-        if memory > 90:
-            score -= 25
-            status = "Critical"
-        elif memory > 75:
-            score -= 10
-            status = "Warning"
-
-        # Disk
-        if disk > 90:
-            score -= 20
-            status = "Critical"
-        elif disk > 80:
-            score -= 10
-            status = "Warning"
-
-        # Load normalized
-        load_per_core = load / max(cores, 1)
-        if load_per_core > 1.5:
-            score -= 15
-            status = "Critical"
-        elif load_per_core > 1:
-            score -= 5
-            status = "Warning"
-
-        return max(score, 0), status, round(load_per_core, 2)
-    
-def get_latest_value(hostid, key):
+# ----------------------------------------------------
+# HEALTH CALCULATION HELPERS
+# ----------------------------------------------------
+def _latest(hostid, key):
     data = get_item_history(hostid, {"key_": key})
     for _, values in data.items():
         if values:
             return float(values[-1]["value"])
     return 0.0
 
-def get_host_health_summary(hostid):
-    cpu = get_latest_value(hostid, "system.cpu.util")
-    memory = get_latest_value(hostid, "vm.memory.utilization")
-    disk = get_latest_value(hostid, "vfs.fs.size[/,pused]")
-    load = get_latest_value(hostid, "system.cpu.load[all,avg1]")
-    cores = get_cpu_cores(hostid)
 
-    score, status, load_norm = calculate_health(
-        cpu, memory, disk, load, cores
-    )
-
-    alerts = ZabbixClient().call(
-        "event.get",
-        {
-            "hostids": hostid,
-            "value": 1,
-            "sortfield": "clock",
-            "sortorder": "DESC",
-            "limit": 2,
-            "output": ["eventid", "name", "severity", "clock"],
-        },
-    )
-
-    return {
-        "health_score": score,
-        "status": status,
-        "cpu": round(cpu, 2),
-        "memory": round(memory, 2),
-        "disk": round(disk, 2),
-        "load_per_core": load_norm,
-        "alerts": alerts,
-    }
+def _cpu_cores(hostid):
+    return max(int(_latest(hostid, "system.cpu.num")), 1)
 
 
+def _calculate_health(cpu, memory, disk, load, cores):
+    score = 100
+    status = "Healthy"
+
+    if cpu > 85:
+        score -= 30
+        status = "Critical"
+    elif cpu > 70:
+        score -= 15
+        status = "Warning"
+
+    if memory > 90:
+        score -= 25
+        status = "Critical"
+    elif memory > 75:
+        score -= 10
+        status = "Warning"
+
+    if disk > 90:
+        score -= 20
+        status = "Critical"
+    elif disk > 80:
+        score -= 10
+        status = "Warning"
+
+    load_pc = load / cores
+    if load_pc > 1.5:
+        score -= 15
+        status = "Critical"
+    elif load_pc > 1:
+        score -= 5
+        status = "Warning"
+
+    return max(score, 0), status, round(load_pc, 2)
+
+
+# ----------------------------------------------------
+# HOST HEALTH SUMMARY
+# ----------------------------------------------------
 class HostHealthSummaryAPIView(APIView):
     def get(self, request, hostid):
-        return Response(get_host_health_summary(hostid))
+        cpu = _latest(hostid, "system.cpu.util")
+        memory = _latest(hostid, "vm.memory.utilization")
+        disk = _latest(hostid, "vfs.fs.size[/,pused]")
+        load = _latest(hostid, "system.cpu.load[all,avg1]")
+        cores = _cpu_cores(hostid)
+
+        score, status, load_pc = _calculate_health(cpu, memory, disk, load, cores)
+
+        alerts = ZabbixClient().call(
+            "event.get",
+            {
+                "hostids": hostid,
+                "value": 1,
+                "limit": 3,
+                "sortfield": "clock",
+                "sortorder": "DESC",
+                "output": ["eventid", "name", "severity", "clock"],
+            },
+        )
+
+        return Response({
+            "health_score": score,
+            "status": status,
+            "cpu": round(cpu, 2),
+            "memory": round(memory, 2),
+            "disk": round(disk, 2),
+            "load_per_core": load_pc,
+            "alerts": alerts,
+        })
 
 
-from reportlab.platypus import SimpleDocTemplate, Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
-import tempfile
-import os
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from django.http import HttpResponse
-from .zabbix_pdf_charts import draw_line_chart
-
+# ----------------------------------------------------
+# PDF REPORT
+# ----------------------------------------------------
 class HostHealthPDFAPIView(APIView):
     def get(self, request, hostid):
         response = HttpResponse(content_type="application/pdf")
-        response["Content-Disposition"] = (
-            f'attachment; filename="host_{hostid}_health.pdf"'
-        )
+        response["Content-Disposition"] = f'attachment; filename="host_{hostid}_health.pdf"'
 
         c = canvas.Canvas(response, pagesize=A4)
         width, height = A4
 
         summary = HostHealthSummaryAPIView().get(request, hostid).data
-        cpu = get_item_history(hostid, {"key_": "system.cpu.util"})
-        memory = get_item_history(hostid, {"key_": "vm.memory.utilization"})
-        disk = get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"})
 
-        # ===== HEADER =====
-        logo_path = os.path.join(settings.BASE_DIR, "static", "logo191.png")
-        c.drawImage(logo_path, 40, height - 80, width=80, height=40)
         c.setFont("Helvetica-Bold", 18)
-        c.drawString(140, height - 60, "Host Health Report")
+        c.drawString(40, height - 50, "Host Health Report")
 
-        c.setStrokeColor(colors.grey)
-        c.line(40, height - 90, width - 40, height - 90)
-
-        # ===== HEALTH SCORE =====
         status_color = {
             "Healthy": colors.green,
             "Warning": colors.orange,
             "Critical": colors.red,
         }[summary["status"]]
 
-        c.setFont("Helvetica-Bold", 14)
         c.setFillColor(status_color)
-        c.drawString(40, height - 120,
+        c.drawString(40, height - 90,
                      f"Health Score: {summary['health_score']} ({summary['status']})")
         c.setFillColor(colors.black)
 
-        # ===== METRICS =====
-        y = height - 150
-        c.setFont("Helvetica", 11)
+        y = height - 130
         for k in ["cpu", "memory", "disk", "load_per_core"]:
             c.drawString(40, y, f"{k.replace('_',' ').title()}: {summary[k]}")
             y -= 18
-
-        # ===== CHARTS =====
-        # ===== CHARTS =====
-        cpu_data = list(cpu.values())[0] if cpu else []
-        memory_data = list(memory.values())[0] if memory else []
-        disk_data = list(disk.values())[0] if disk else []
-
-        if cpu_data:
-            draw_line_chart(
-                c,
-                40,
-                y - 140,
-                230,
-                120,
-                cpu_data,
-                "CPU Utilization (%)",
-            )
-
-        if memory_data:
-            draw_line_chart(
-                c,
-                310,
-                y - 140,
-                230,
-                120,
-                memory_data,
-                "Memory Utilization (%)",
-            )
-
-        if disk_data:
-            draw_line_chart(
-                c,
-                40,
-                y - 300,
-                230,
-                120,
-                disk_data,
-                "Disk Utilization (%)",
-            )
-
-
-
-        # ===== ALERTS =====
-        ay = y - 340
-        c.setFont("Helvetica-Bold", 12)
-        c.drawString(40, ay, "Recent Alerts")
-        ay -= 16
-
-        for a in summary["alerts"]:
-            severity = int(a.get("severity", 0))
-            sev_color = colors.red if severity >= 3 else colors.orange
-            c.setFillColor(sev_color)
-            c.drawString(50, ay, f"- {a['name']}")
-            ay -= 14
-
-        # ===== FOOTER =====
-        c.setFillColor(colors.black)
-        c.setFont("Helvetica", 9)
-        c.drawCentredString(width / 2, 20,
-                             "Generated by Cloud Management Platform")
 
         c.showPage()
         c.save()
         return response
 
 
-
+# ----------------------------------------------------
+# OVERALL PDF (ALL HOSTS)
+# ----------------------------------------------------
 class HealthReportAPIView(APIView):
     def get(self, request):
         zabbix = ZabbixClient()
+        hosts = zabbix.call("host.get", {"output": ["host"]})
 
-        hosts = zabbix.call(
-            "host.get",
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        doc = SimpleDocTemplate(tmp.name)
+        styles = getSampleStyleSheet()
+        story = [Paragraph("Infrastructure Health Report", styles["Title"])]
+
+        for h in hosts:
+            story.append(Paragraph(h["host"], styles["Normal"]))
+
+        doc.build(story)
+        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+
+
+class HostGroupAPIView(APIView):
+    def get(self, request):
+        zabbix = ZabbixClient()
+
+        groups = zabbix.call(
+            "hostgroup.get",
             {
-                "output": ["host"],
-                "selectInterfaces": ["available"],
+                "output": ["groupid", "name"],
+                "sortfield": "name",
             },
         )
+
+        return Response(groups)
+class HostAvailabilityAPIView(APIView):
+    def get(self, request):
+        zabbix = ZabbixClient()
+        groupid = request.GET.get("groupid")
+
+        params = {
+            "output": ["hostid", "host"],
+            "selectInterfaces": ["ip", "available"],
+        }
+
+        if groupid:
+            params["groupids"] = groupid
+
+        hosts = zabbix.call("host.get", params)
 
         availability_map = {
             "0": "Unknown",
@@ -11349,39 +11698,94 @@ class HealthReportAPIView(APIView):
             "2": "Not available",
         }
 
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        doc = SimpleDocTemplate(tmp.name)
-        styles = getSampleStyleSheet()
-        story = []
-
-        story.append(Paragraph("Infrastructure Health Report", styles["Title"]))
-
+        data = []
         for h in hosts:
-            iface = h["interfaces"][0] if h["interfaces"] else {}
-            status = availability_map.get(
-                iface.get("available", "0"), "Unknown"
+            iface = h["interfaces"][0] if h.get("interfaces") else {}
+            data.append({
+                "hostid": h["hostid"],
+                "host": h["host"],
+                "ip": iface.get("ip", "N/A"),
+                "status": availability_map.get(
+                    str(iface.get("available", "0")), "Unknown"
+                ),
+            })
+
+        return Response(data)
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+
+class SystemMetricsAPIView(APIView):
+    """
+    Single API for ALL host metrics
+    """
+
+    def get(self, request, hostid):
+        cpu = get_item_history(hostid, {"key_": "system.cpu.util"})
+        memory = get_item_history(hostid, {"key_": "vm.memory.utilization"})
+        disk = get_item_history(hostid, {"key_": "vfs.fs.size[/,pused]"})
+
+        load_average = {
+            "avg1": get_item_history(
+                hostid, {"key_": "system.cpu.load[all,avg1]"}
+            ),
+            "avg5": get_item_history(
+                hostid, {"key_": "system.cpu.load[all,avg5]"}
+            ),
+            "avg15": get_item_history(
+                hostid, {"key_": "system.cpu.load[all,avg15]"}
+            ),
+        }
+
+        return Response({
+            "cpu": cpu,
+            "memory": memory,
+            "disk": disk,
+            "load_average": load_average,
+        })
+
+class HostAllMetricsAPIView(APIView):
+    """
+    Fetch ALL numeric metrics for a host
+    """
+
+    def get(self, request, hostid):
+        zabbix = ZabbixClient()
+
+        # 1️⃣ Get all numeric items
+        items = zabbix.call(
+            "item.get",
+            {
+                "hostids": hostid,
+                "output": ["itemid", "name", "key_", "units"],
+                "value_type": [0, 3],  # float + uint
+                "status": 0,          # enabled only
+            },
+        )
+
+        metrics = []
+
+        for item in items:
+            history = get_item_history(
+                hostid,
+                {"itemids": item["itemid"]},
             )
 
-            story.append(
-                Paragraph(
-                    f"{h['host']} - {status}",
-                    styles["Normal"],
-                )
-            )
+            values = next(iter(history.values()), [])
 
-        doc.build(story)
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True)
+            if not values:
+                continue
 
+            metrics.append({
+                "itemid": item["itemid"],
+                "name": item["name"],
+                "key": item["key_"],
+                "units": item.get("units", ""),
+                "history": values,
+            })
 
-
-
-
-
-
-
-
-
-
+        return Response(metrics)
 
 
 
@@ -16779,7 +17183,7 @@ def send_deployment_email(email, employee_name, service_request):
     Sends service deployment success email to employee.
     Matches the same quality/style as OTP email function.
     """
-    node_ip = os.getenv("node_ip", "YOUR_NODE_IP")
+    node_ip = os.getenv("node_ip")
     deployment_url = f"http://{node_ip}:{getattr(service_request, 'node_port', '')}/"
 
     subject = f"{getattr(service_request, 'service_name', 'Service')} Deployment Successful - Meghdoot CMP"

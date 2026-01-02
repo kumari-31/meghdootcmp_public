@@ -1,4 +1,4 @@
-import  { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import apiClient from "../../Axios";
 import {
   FaPlayCircle,
@@ -48,20 +48,20 @@ const getImageByName = (name) => {
   return "https://via.placeholder.com/150?text=Image";
 };
 
-
 const getStatusIcon = (status) => {
   return status === "active" ? (
-    <FaPlayCircle className="status-icon active"  style={{ color: "#4ade80" }} />
+    <FaPlayCircle className="status-icon active" style={{ color: "#4ade80" }} />
   ) : (
-    <FaStopCircle className="status-icon inactive" style={{ color: "#f87171" }} />
+    <FaStopCircle
+      className="status-icon inactive"
+      style={{ color: "#f87171" }}
+    />
   );
 };
 
 const getVisibilityIcon = (visibility) => {
-  if (visibility === "public")
-    return <FaGlobe style={{ color: "#60a5fa" }} />;
-  if (visibility === "private")
-    return <FaLock style={{ color: "#fbbf24" }} />;
+  if (visibility === "public") return <FaGlobe style={{ color: "#60a5fa" }} />;
+  if (visibility === "private") return <FaLock style={{ color: "#fbbf24" }} />;
   if (visibility === "shared")
     return <FaShareAlt style={{ color: "#a78bfa" }} />;
   return null;
@@ -72,18 +72,19 @@ const Images = () => {
   const [imageData, setImageData] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
-  // eslint-disable-next-line 
+  // eslint-disable-next-line
   const [showUploadForm, setShowUploadForm] = useState(false);
-  // eslint-disable-next-line 
+  // eslint-disable-next-line
   const [uploadFile, setUploadFile] = useState(null);
-  // eslint-disable-next-line 
+  // eslint-disable-next-line
   const [uploadName, setUploadName] = useState("");
   const [createVolumeDialogOpen, setCreateVolumeDialogOpen] = useState(false);
   const [selectedImageForVolume, setSelectedImageForVolume] = useState(null);
   const [newVolumeName, setNewVolumeName] = useState("");
   const [newVolumeDescription, setNewVolumeDescription] = useState("");
   const [newVolumeSize, setNewVolumeSize] = useState(2); // Default size
-  const [newVolumeAvailabilityZone, setNewVolumeAvailabilityZone] = useState("nova"); // Default AZ
+  const [newVolumeAvailabilityZone, setNewVolumeAvailabilityZone] =
+    useState("nova"); // Default AZ
   const [newVolumeType, setNewVolumeType] = useState("_DEFAULT_"); // Default Type
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -97,7 +98,6 @@ const Images = () => {
   };
 
   const handleSnackbarClose = () => setSnackbarOpen(false);
-
 
   const fetchData = useCallback(async () => {
     setError(null);
@@ -151,11 +151,27 @@ const Images = () => {
   }, [fetchData]);
 
   const handleDownload = async (imageId, imageName) => {
+    if (!imageId || !imageName) {
+      showSnackbar("Invalid image data for download.", "error");
+      return;
+    }
+
     try {
       const response = await apiClient.get(`/download-image/${imageId}/`, {
-        responseType: "blob",
+        responseType: "blob", // Important for binary data
       });
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+
+      if (!response.data) {
+        showSnackbar("No data received from server.", "error");
+        return;
+      }
+
+      // Create a blob and trigger download
+      const blob = new Blob([response.data], {
+        type: "application/octet-stream",
+      });
+      const url = window.URL.createObjectURL(blob);
+
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute("download", `${imageName}.qcow2`);
@@ -163,13 +179,15 @@ const Images = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      showSnackbar("Download started successfully.", "success");
-    } catch (downloadError) {
-      console.error("Error downloading image:", downloadError);
+
+      showSnackbar(`Download started for ${imageName}`, "success");
+    } catch (error) {
+      console.error("Error downloading image:", error);
       showSnackbar("Failed to download image.", "error");
     }
   };
-// eslint-disable-next-line 
+
+  // eslint-disable-next-line
   const handleUpload = async (e) => {
     e.preventDefault();
     if (!uploadFile || !uploadName) {
@@ -287,49 +305,41 @@ const Images = () => {
 
   return (
     <div
-        className="App-image"
-        style={{
-          backgroundColor:
-            theme.palette.mode === "dark"
-              ? "#0d1117"      // dark bg
-              : "#ffffff",     // light bg (matches card’s light feel)
+      className="App-image"
+      style={{
+        backgroundColor:
+          theme.palette.mode === "dark"
+            ? "#0d1117" // dark bg
+            : "#ffffff", // light bg (matches card’s light feel)
 
-          color:
-            theme.palette.mode === "dark"
-              ? "#c9d1d9"      // dark text
-              : "#1e293b",     // light text (neutral dark blue-gray)
-        }}
-      >
-
-<div style={headerStyle}>
-      
-      <h1
-        
-      >
-        Images Dashboard
-      </h1>
-
+        color:
+          theme.palette.mode === "dark"
+            ? "#c9d1d9" // dark text
+            : "#1e293b", // light text (neutral dark blue-gray)
+      }}
+    >
+      <div style={headerStyle}>
+        <h1>Images Dashboard</h1>
       </div>
 
       <div className="card-container">
         {imageData.map((image, index) => (
-          <div className="card" key={index}
-          style={{
-            background:
-              theme.palette.mode === "dark"
-                ? "linear-gradient(135deg,rgb(31, 33, 36) 0%, #0d1117 100%)"
-                : "linear-gradient(135deg, #ffffff 0%,rgb(228, 231, 236) 100%)",
-        
-            border:
-              theme.palette.mode === "dark"
-                ? "1px solid #30363d"
-                : "1px solid #e5e7eb",
-        
-            color:
-              theme.palette.mode === "dark"
-                ? "#c9d1d9"
-                : "#1f2937",
-          }}
+          <div
+            className="card"
+            key={index}
+            style={{
+              background:
+                theme.palette.mode === "dark"
+                  ? "linear-gradient(135deg,rgb(31, 33, 36) 0%, #0d1117 100%)"
+                  : "linear-gradient(135deg, #ffffff 0%,rgb(228, 231, 236) 100%)",
+
+              border:
+                theme.palette.mode === "dark"
+                  ? "1px solid #30363d"
+                  : "1px solid #e5e7eb",
+
+              color: theme.palette.mode === "dark" ? "#c9d1d9" : "#1f2937",
+            }}
           >
             <div className="card-left">
               <img
@@ -337,26 +347,22 @@ const Images = () => {
                 alt={image.name}
                 className="circular-image"
               />
-              
+
               <div className="download-button">
                 <button
-                  className="btn small-btn" style={{
+                  className="btn small-btn"
+                  style={{
                     background:
-                      theme.palette.mode === "dark"
-                        ? "#21262d"
-                        : "#f3f4f6",
+                      theme.palette.mode === "dark" ? "#21262d" : "#f3f4f6",
                     border:
                       theme.palette.mode === "dark"
                         ? "1px solid #30363d"
                         : "1px solid #d1d5db",
                     color:
-                      theme.palette.mode === "dark"
-                        ? "#58a6ff"
-                        : "#2563eb",
+                      theme.palette.mode === "dark" ? "#58a6ff" : "#2563eb",
                   }}
-                  
-                  onClick={() => image?.id && image?.name && handleDownload(image.id, image.name)}
-                  >
+                  onClick={() => handleDownload(image.id, image.name)}
+                >
                   <span>
                     <FaDownload />
                   </span>
@@ -365,18 +371,14 @@ const Images = () => {
               </div>
             </div>
             <div className="card-middle">
-            <h4
-              className="image-title"
-              style={{
-                color:
-                  theme.palette.mode === "dark"
-                    ? "#ffffff"
-                    : "#111827",
-              }}
-            >
-            </h4>
+              <h4
+                className="image-title"
+                style={{
+                  color: theme.palette.mode === "dark" ? "#ffffff" : "#111827",
+                }}
+              ></h4>
               <div className="info">
-                 <p>
+                <p>
                   <strong>Name:</strong>
                   {getStatusIcon(image.name)} {image.name}
                 </p>
@@ -396,10 +398,9 @@ const Images = () => {
                   <strong>Size:</strong> {image.size}
                 </p>
               </div>
-              
             </div>
             <div className="card-right">
-            <div className="card-actions one">
+              <div className="card-actions one">
                 {/* <button
                   className="btn small-btn"
                   onClick={() => handleCreateVolumeDialogOpen(image)}
@@ -411,39 +412,46 @@ const Images = () => {
                 </button> */}
               </div>
               <div className="card-actions two">
-              <button
-                className="btn small-btn"
-                style={{
-                  background:
-                    theme.palette.mode === "dark" ? "#21262d" : "#ffffff",
-                  border:
-                    theme.palette.mode === "dark" ? "1px solid #30363d" : "1px solid #d1d5db",
-                  color:
-                    theme.palette.mode === "dark" ? "#10b981" : "#059669",
-                }}
-                onClick={() => handleCreateVolumeDialogOpen(image)}
-              >
-                <span><CiCirclePlus /></span>
-                Create Volume
-              </button>
-              </div>
-              <div className="card-actions three">
-              <button
+                <button
                   className="btn small-btn"
                   style={{
                     background:
                       theme.palette.mode === "dark" ? "#21262d" : "#ffffff",
                     border:
-                      theme.palette.mode === "dark" ? "1px solid #30363d" : "1px solid #fecaca",
+                      theme.palette.mode === "dark"
+                        ? "1px solid #30363d"
+                        : "1px solid #d1d5db",
+                    color:
+                      theme.palette.mode === "dark" ? "#10b981" : "#059669",
+                  }}
+                  onClick={() => handleCreateVolumeDialogOpen(image)}
+                >
+                  <span>
+                    <CiCirclePlus />
+                  </span>
+                  Create Volume
+                </button>
+              </div>
+              <div className="card-actions three">
+                <button
+                  className="btn small-btn"
+                  style={{
+                    background:
+                      theme.palette.mode === "dark" ? "#21262d" : "#ffffff",
+                    border:
+                      theme.palette.mode === "dark"
+                        ? "1px solid #30363d"
+                        : "1px solid #fecaca",
                     color:
                       theme.palette.mode === "dark" ? "#f87171" : "#dc2626",
                   }}
                   onClick={() => handleDelete(image.id)}
                 >
-                  <span><FaTrashAlt /></span>
+                  <span>
+                    <FaTrashAlt />
+                  </span>
                   Delete
                 </button>
-
               </div>
             </div>
           </div>
@@ -496,7 +504,9 @@ const Images = () => {
             inputProps={{ min: 1 }}
           />
           <FormControl fullWidth margin="dense">
-            <InputLabel id="availability-zone-label">Availability Zone</InputLabel>
+            <InputLabel id="availability-zone-label">
+              Availability Zone
+            </InputLabel>
             <Select
               labelId="availability-zone-label"
               id="availability_zone"
@@ -537,12 +547,15 @@ const Images = () => {
         anchorOrigin={{ vertical: "top", horizontal: "right" }}
         TransitionComponent={Slide}
       >
-        <Alert onClose={handleSnackbarClose} severity={snackbarSeverity} sx={{ width: "100%" }}>
+        <Alert
+          onClose={handleSnackbarClose}
+          severity={snackbarSeverity}
+          sx={{ width: "100%" }}
+        >
           {snackbarMessage}
         </Alert>
       </Snackbar>
     </div>
-   
   );
 };
 const headerStyle = {
@@ -551,7 +564,5 @@ const headerStyle = {
   alignItems: "center",
   marginBottom: "20px",
 };
-
-
 
 export default Images;
