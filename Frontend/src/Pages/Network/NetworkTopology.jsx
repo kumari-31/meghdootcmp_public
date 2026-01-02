@@ -34,7 +34,8 @@ import {
   Checkbox,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  useTheme
 } from "@mui/material";
 
 // Icons
@@ -45,11 +46,11 @@ import AddIcon from "@mui/icons-material/Add";
 import TimelineIcon from '@mui/icons-material/Timeline'; 
 import AccountTreeIcon from '@mui/icons-material/AccountTree'; 
 import CloseIcon from '@mui/icons-material/Close';
-import RiBallPenLine from "@mui/icons-material/Edit"; // Assuming this mapped to Edit or similar
+import RiBallPenLine from "@mui/icons-material/Edit"; // Edit icon
 
 import apiClient from "../../Axios"; 
 
-// --- 1. CONFIGURATION & STYLES ---
+// --- CONFIG ---
 const nodeWidth = 172;
 const nodeHeight = 80;
 
@@ -59,47 +60,59 @@ const modalStyle = {
   left: '50%',
   transform: 'translate(-50%, -50%)',
   width: 500,
-  bgcolor: 'background.paper',
   boxShadow: 24,
   p: 4,
   borderRadius: 2,
 };
 
 const styles = `
-  @keyframes pulse-green {
-    0% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(46, 125, 50, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
-  }
-  @keyframes pulse-blue {
-    0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7); }
-    70% { box-shadow: 0 0 0 10px rgba(25, 118, 210, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
-  }
+@keyframes pulse-green {
+  0% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(46, 125, 50, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(46, 125, 50, 0); }
+}
+@keyframes pulse-blue {
+  0% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(25, 118, 210, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(25, 118, 210, 0); }
+}
 `;
 
-// --- 2. THE POPUP CARD (Hover/Click) ---
-const NodeInfoCard = ({ data, onClose, isLocked }) => (
+// --- NODE INFO CARD ---
+const NodeInfoCard = ({ data, onClose, isLocked, theme }) => (
   <Paper
     elevation={6}
-    sx={{ width: 280, p: 2, borderRadius: 2, bgcolor: 'rgba(255, 255, 255, 0.98)', border: '1px solid #ccc', pointerEvents: 'all' }}
+    sx={{
+      width: 280,
+      p: 2,
+      borderRadius: 2,
+      bgcolor: theme.palette.background.paper,
+      border: `1px solid ${theme.palette.divider}`,
+      pointerEvents: 'all',
+      color: theme.palette.text.primary
+    }}
   >
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        {data.type === 'router' ? <RouterIcon color="warning"/> : data.type === 'instance' ? <StorageIcon color="secondary"/> : <CloudIcon color="primary"/>}
-        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ maxWidth: 180 }}>{data.label}</Typography>
+        {data.type === 'router' ? <RouterIcon color="warning"/> : data.type === 'instance' ? <StorageIcon color="secondary"/> : <CloudIcon color="primary"/> }
+        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ maxWidth: 180, color: theme.palette.text.primary }}>{data.label}</Typography>
       </Box>
       {isLocked && <IconButton size="small" onClick={(e) => { e.stopPropagation(); onClose(); }}><CloseIcon fontSize="small" /></IconButton>}
     </Box>
     <Divider sx={{ mb: 1 }} />
     <List dense disablePadding>
-        {data.details && Object.entries(data.details).slice(0, 4).map(([k, v]) => (
-           (typeof v !== 'object' && v !== null) && (
-            <ListItem key={k} disablePadding sx={{ py: 0.5 }}>
-              <ListItemText primary={k} secondary={v} primaryTypographyProps={{ fontSize: '0.70rem', fontWeight: 'bold', color: '#555' }} secondaryTypographyProps={{ fontSize: '0.75rem', noWrap: true }} />
-            </ListItem>
-           )
-        ))}
+      {data.details && Object.entries(data.details).slice(0, 4).map(([k, v]) => (
+         (typeof v !== 'object' && v !== null) && (
+          <ListItem key={k} disablePadding sx={{ py: 0.5 }}>
+            <ListItemText 
+              primary={k} 
+              secondary={v} 
+              primaryTypographyProps={{ fontSize: '0.70rem', fontWeight: 'bold', color: theme.palette.text.secondary }} 
+              secondaryTypographyProps={{ fontSize: '0.75rem', noWrap: true, color: theme.palette.text.primary }} 
+            />
+          </ListItem>
+         )
+      ))}
     </List>
     <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
        <Chip size="small" label={data.details?.status || 'Active'} color={data.details?.status === 'ERROR' ? 'error' : 'success'} variant="outlined" />
@@ -107,19 +120,41 @@ const NodeInfoCard = ({ data, onClose, isLocked }) => (
   </Paper>
 );
 
-// --- 3. CUSTOM NODE COMPONENTS ---
+// --- CUSTOM NODES ---
 const CustomNetworkNode = ({ data, id, selected }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const theme = useTheme();
+
   return (
     <Box onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)} sx={{ position: 'relative' }}>
       <style>{styles}</style>
       <NodeToolbar isVisible={selected || isHovered} position={Position.Right} offset={20}>
-        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} />
+        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} theme={theme} />
       </NodeToolbar>
-      <Paper elevation={isHovered ? 6 : 3} sx={{ p: 1, minWidth: 100, textAlign: "center", border: selected ? "3px solid #000" : "3px solid #1976d2", borderRadius: "50%", width: 100, height: 100, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', bgcolor: "#e3f2fd", transition: 'all 0.3s ease', animation: 'pulse-blue 2s infinite', transform: isHovered ? 'scale(1.1)' : 'scale(1)', cursor: 'pointer' }}>
+      <Paper
+        elevation={isHovered ? 6 : 3}
+        sx={{
+          p: 1,
+          minWidth: 100,
+          textAlign: "center",
+          border: selected ? `3px solid ${theme.palette.primary.light}` : `3px solid ${theme.palette.primary.main}`,
+          borderRadius: "50%",
+          width: 100,
+          height: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          bgcolor: theme.palette.background.default,
+          transition: 'all 0.3s ease',
+          animation: 'pulse-blue 2s infinite',
+          transform: isHovered ? 'scale(1.1)' : 'scale(1)',
+          cursor: 'pointer'
+        }}
+      >
         <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
-        <CloudIcon color="primary" sx={{ fontSize: 40 }} />
-        <Typography variant="caption" fontWeight="bold" sx={{ mt: 0.5 }}>{data.label}</Typography>
+        <CloudIcon sx={{ fontSize: 40, color: theme.palette.primary.main }} />
+        <Typography variant="caption" fontWeight="bold" sx={{ mt: 0.5, color: theme.palette.text.primary }}>{data.label}</Typography>
         <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
       </Paper>
     </Box>
@@ -128,16 +163,31 @@ const CustomNetworkNode = ({ data, id, selected }) => {
 
 const CustomDeviceNode = ({ data, id, selected }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const theme = useTheme();
   const isRouter = data.type === 'router';
+
   return (
     <Box onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       <NodeToolbar isVisible={selected || isHovered} position={Position.Right} offset={20}>
-        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} />
+        <NodeInfoCard data={data} isLocked={selected} onClose={() => {}} theme={theme} />
       </NodeToolbar>
-      <Paper elevation={isHovered ? 8 : 2} sx={{ p: 1, minWidth: 140, textAlign: "center", borderRadius: 3, border: selected ? "2px solid #000" : (isRouter ? "2px solid #ed6c02" : "2px solid #9c27b0"), bgcolor: "#fff", transition: 'all 0.3s ease', cursor: 'pointer', transform: isHovered ? 'translateY(-5px)' : 'translateY(0)' }}>
+      <Paper
+        elevation={isHovered ? 8 : 2}
+        sx={{
+          p: 1,
+          minWidth: 140,
+          textAlign: "center",
+          borderRadius: 3,
+          border: selected ? `2px solid ${theme.palette.primary.light}` : (isRouter ? "2px solid #ed6c02" : "2px solid #9c27b0"),
+          bgcolor: theme.palette.background.paper,
+          transition: 'all 0.3s ease',
+          cursor: 'pointer',
+          transform: isHovered ? 'translateY(-5px)' : 'translateY(0)'
+        }}
+      >
         <Handle type="target" position={Position.Top} />
         {isRouter ? <RouterIcon sx={{ color: "#ed6c02", fontSize: 30 }} /> : <StorageIcon sx={{ color: "#9c27b0", fontSize: 30 }} />}
-        <Typography variant="body2" fontWeight="bold" noWrap sx={{ mt: 0.5 }}>{data.label}</Typography>
+        <Typography variant="body2" fontWeight="bold" noWrap sx={{ mt: 0.5, color: theme.palette.text.primary }}>{data.label}</Typography>
         <Handle type="source" position={Position.Bottom} />
       </Paper>
     </Box>
@@ -146,7 +196,7 @@ const CustomDeviceNode = ({ data, id, selected }) => {
 
 const nodeTypes = { networkNode: CustomNetworkNode, deviceNode: CustomDeviceNode };
 
-// --- 4. LAYOUT LOGIC ---
+// --- DAGRE & GRAPH LAYOUT FUNCTIONS ---
 const getTreeLayout = (nodes, edges) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -192,22 +242,21 @@ const getGraphLayout = (nodes, edges) => {
   return { nodes: updatedNodes, edges: edges.map(e => ({ ...e, type: 'default', animated: true })) };
 };
 
-// --- 5. MAIN COMPONENT ---
-
+// --- MAIN COMPONENT ---
 export default function NetworkTopology() {
+  const theme = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [loading, setLoading] = useState(true);
   const [tabValue, setTabValue] = useState(0); 
   const [rawGraphData, setRawGraphData] = useState({ nodes: [], edges: [] });
 
-  // --- CREATE ROUTER STATES ---
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [creating, setCreating] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [projects, setProjects] = useState([]);
-  const [rawNetworksList, setRawNetworksList] = useState([]); // Needed for dropdown
-    const [error, setError] = useState(null);
+  const [rawNetworksList, setRawNetworksList] = useState([]); 
+  const [error, setError] = useState(null);
   const [newRouter, setNewRouter] = useState({
     name: '',
     admin_state_up: true,
@@ -217,6 +266,7 @@ export default function NetworkTopology() {
     enable_snat: false,
   });
 
+  // --- DATA LOADING ---
   const loadTopologyData = async () => {
     try {
       setLoading(true);
@@ -224,7 +274,7 @@ export default function NetworkTopology() {
         apiClient.get("/networks/"),
         apiClient.get("/routers/"),
         apiClient.get("/instances/"),
-        apiClient.get('/openstack/projects/') // Fetch projects for the modal
+        apiClient.get('/openstack/projects/')
       ]);
 
       setRawNetworksList(nRes.data);
@@ -253,7 +303,6 @@ export default function NetworkTopology() {
 
       setRawGraphData({ nodes: generatedNodes, edges: generatedEdges });
       
-      // Apply layout based on current tab
       const layouted = tabValue === 0 
         ? getTreeLayout(generatedNodes, generatedEdges) 
         : getGraphLayout(generatedNodes, generatedEdges);
@@ -263,6 +312,7 @@ export default function NetworkTopology() {
 
     } catch (err) {
       console.error("Failed to load topology", err);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -272,8 +322,6 @@ export default function NetworkTopology() {
     loadTopologyData();
   }, []);
 
-  // --- FORM HANDLERS ---
-  
   const validateRouterForm = () => {
     let errors = {};
     if (!newRouter.name.trim()) errors.name = "Router name is required.";
@@ -292,7 +340,6 @@ export default function NetworkTopology() {
     if (creating) return; 
     if (!validateRouterForm()) return;
 
-    // Optional: Check local duplicate name (Note: exact name might exist on backend but not in current graph view)
     const existingRouter = rawGraphData.nodes.find((node) => node.data.label === newRouter.name && node.data.type === 'router');
     if (existingRouter) {
       alert('A router with the same name already exists.');
@@ -314,7 +361,6 @@ export default function NetworkTopology() {
         alert('Router created successfully');
         setNewRouter({ name: '', admin_state_up: true, external_network_name: '', project_id: '', project_name: '', enable_snat: false });
         setShowCreateForm(false);
-        // REFRESH TOPOLOGY
         loadTopologyData();
       } else {
         alert('Unexpected response from the server.');
@@ -340,51 +386,31 @@ export default function NetworkTopology() {
     setNodes((nds) => nds.map((n) => ({ ...n, selected: false })));
   }, [setNodes]);
 
- 
-    if (loading) {
-      return (
-        <div className="cloud-container">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="7.87722 9.61948 33.01 16.88"
-          >
-            <path
-              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-              className="cloud-back"
-            />
-            <path
-              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-              className="cloud-front"
-            />
-          </svg>
-          <div className="loading-message">Loading...</div>
-        </div>
-      );
-    }
-  
-    if (error) {
-      return (
-        <div className="error-message">
-          <GoAlert />
-          <h2>❌ Server Down</h2>
-        </div>
-      );
-    }
+  if (loading) return (
+    <Box sx={{ width: "100%", height: "90vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <CircularProgress />
+    </Box>
+  );
+
+  if (error) return (
+    <Box sx={{ width: "100%", height: "90vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
+      <Typography color="error">❌ Server Error</Typography>
+    </Box>
+  );
 
   return (
-    <Box sx={{ width: "100%", height: "90vh", bgcolor: "#f8f9fa", display: "flex", flexDirection: "column" }}>
+    <Box sx={{ width: "100%", height: "90vh", bgcolor: theme.palette.background.default, display: "flex", flexDirection: "column" }}>
       
       {/* TOOLBAR */}
-      <Paper elevation={0} sx={{ px: 3, py: 1, borderBottom: '1px solid #ddd', display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 10 }}>
+      <Paper elevation={0} sx={{ px: 3, py: 1, borderBottom: `1px solid ${theme.palette.divider}`, display: "flex", alignItems: "center", justifyContent: "space-between", zIndex: 10, bgcolor: theme.palette.background.paper }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography variant="h6" color="text.secondary" sx={{ mr: 2, fontWeight: 'bold' }}>Network Topology</Typography>
+          <Typography variant="h6" color="text.primary" sx={{ mr: 2, fontWeight: 'bold' }}>Network Topology</Typography>
           <Tabs value={tabValue} onChange={handleTabChange} indicatorColor="primary" textColor="primary" sx={{ minHeight: 40 }}>
             <Tab icon={<AccountTreeIcon fontSize="small"/>} iconPosition="start" label="Hierarchy" sx={{ minHeight: 40 }}/>
             <Tab icon={<TimelineIcon fontSize="small"/>} iconPosition="start" label="Graph" sx={{ minHeight: 40 }}/>
           </Tabs>
         </Box>
         <Stack direction="row" spacing={2}>
-           {/* CREATE ROUTER BUTTON TRIGGER */}
            <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => setShowCreateForm(true)}>
              Create Router
            </Button>
@@ -407,13 +433,13 @@ export default function NetworkTopology() {
         >
           <Controls />
           <MiniMap style={{ height: 100, width: 150 }} zoomable pannable />
-          <Background gap={24} size={1} color="#aaa" />
+          <Background gap={24} size={1} color={theme.palette.divider} />
         </ReactFlow>
       </Box>
 
-      {/* --- MODAL: CREATE ROUTER --- */}
+      {/* CREATE ROUTER MODAL */}
       <Modal open={showCreateForm} onClose={creating ? undefined : () => setShowCreateForm(false)}>
-        <Box sx={modalStyle}>
+        <Box sx={{ ...modalStyle, bgcolor: theme.palette.background.paper, color: theme.palette.text.primary }}>
           <Typography variant="h6" component="h2" gutterBottom>Create New Router</Typography>
           <form onSubmit={handleCreateRouter}>
             <FormControl fullWidth margin="normal">
@@ -427,12 +453,15 @@ export default function NetworkTopology() {
                 required
               />
             </FormControl>
+
             <FormControl fullWidth margin="normal">
               <FormControlLabel control={<Checkbox checked={newRouter.admin_state_up} onChange={(e) => setNewRouter({ ...newRouter, admin_state_up: e.target.checked })} />} label="Admin State Up" />
             </FormControl>
+
             <FormControl fullWidth margin="normal">
               <FormControlLabel control={<Checkbox checked={newRouter.enable_snat} onChange={(e) => setNewRouter({ ...newRouter, enable_snat: e.target.checked })} />} label="Enable SNAT" />
             </FormControl>
+
             <FormControl fullWidth margin="normal">
               <InputLabel id="external_network_name-label">External Network</InputLabel>
               <Select
@@ -445,14 +474,7 @@ export default function NetworkTopology() {
                 required
               >
                 <MenuItem value="">Select Network</MenuItem>
-                {/* Ensure we map over rawNetworksList for dropdown, not graph nodes */}
-                {rawNetworksList
-                .filter((network) => network.external === true)
-                .map((network) => (
-                  <MenuItem key={network.id} value={network.id}>
-                    {network.network_name}
-                  </MenuItem>
-                ))}
+                {rawNetworksList.filter(n => n.external === true).map(n => <MenuItem key={n.id} value={n.id}>{n.network_name}</MenuItem>)}
               </Select>
               {formErrors.external_network_name && <Typography variant="caption" color="error">{formErrors.external_network_name}</Typography>}
             </FormControl>
@@ -472,9 +494,7 @@ export default function NetworkTopology() {
                 required
               >
                 <MenuItem value="">Select Project</MenuItem>
-                {projects.map((project) => (
-                  <MenuItem key={project.id} value={project.name}>{project.name}</MenuItem>
-                ))}
+                {projects.map(p => <MenuItem key={p.id} value={p.name}>{p.name}</MenuItem>)}
               </Select>
               {formErrors.project_id && <Typography variant="caption" color="error">{formErrors.project_id}</Typography>}
             </FormControl>
@@ -491,6 +511,7 @@ export default function NetworkTopology() {
     </Box>
   );
 }
+
 
 
 

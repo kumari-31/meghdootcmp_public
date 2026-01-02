@@ -8,114 +8,109 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import "../style.css";
 import { GoAlert } from "react-icons/go";
+import "../style.css";
+
+/* -------------------- CACHE -------------------- */
+const hostCache = {};
+
+/* -------------------- HELPERS -------------------- */
+const normalizeHistory = (raw) => {
+  if (!raw || typeof raw !== "object") return [];
+
+  const series = Object.values(raw)[0];
+  if (!Array.isArray(series)) return [];
+
+  return series.map((d) => ({
+    time: new Date(d.clock * 1000).toLocaleTimeString(),
+    value: Number(d.value),
+  }));
+};
 
 /* -------------------- MAIN COMPONENT -------------------- */
-const hostDataCache = {};
-
 const HealthMonitoring = () => {
+  const [groups, setGroups] = useState([]);
   const [hosts, setHosts] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedHost, setSelectedHost] = useState("");
-  const [summary, setSummary] = useState(null);
+
   const [cpu, setCPU] = useState([]);
   const [memory, setMemory] = useState([]);
   const [disk, setDisk] = useState([]);
   const [loadAverage, setLoadAverage] = useState({});
+  const [summary, setSummary] = useState(null);
   const [alerts, setAlerts] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  /* -------------------- LOAD HOSTS -------------------- */
+
+  /* -------------------- LOAD GROUPS -------------------- */
   useEffect(() => {
-    apiClient.get("/hosts/").then((res) => {
-      const hostList = res.data || [];
-      setHosts(hostList);
-
-      const savedHost = localStorage.getItem("selectedHost");
-
-      // ✅ ensure saved host exists
-      const validSavedHost = hostList.find((h) => h.hostid === savedHost);
-
-      if (validSavedHost) {
-        setSelectedHost(savedHost);
-      } else if (hostList.length > 0) {
-        setSelectedHost(hostList[0].hostid);
-        localStorage.setItem("selectedHost", hostList[0].hostid);
-      }
-    });
+    apiClient.get("/host-groups/")
+      .then(res => setGroups(res.data || []))
+      .catch(() => setError("Failed to load host groups"));
   }, []);
 
-  /* -------------------- LOAD DATA -------------------- */
+  /* -------------------- LOAD HOSTS BY GROUP -------------------- */
   useEffect(() => {
-    setLoading(true); 
-  if (!selectedHost) return;
+    if (!selectedGroup) return;
 
- // ✅ MOVE THIS TO THE TOP
-  // 🔥 Load from cache first
-  const cached =
-    hostDataCache[selectedHost] ||
-    JSON.parse(sessionStorage.getItem(`host-cache-${selectedHost}`));
+    setHosts([]);
+    setSelectedHost("");
 
-    if (cached) {
-      hostDataCache[selectedHost] = cached;
-  
-      // ⏱ simulate small delay so loader is visible (UX polish)
-      setTimeout(() => {
-        setCPU(cached.cpu);
-        setMemory(cached.memory);
-        setDisk(cached.disk);
-        setLoadAverage(cached.loadAverage);
-        setSummary(cached.summary);
-        setAlerts(cached.alerts);
-        setLoading(false); // ✅ IMPORTANT
-      }, 300);
-  
+    apiClient.get(`/hosts/?groupid=${selectedGroup}`)
+      .then(res => setHosts(res.data || []))
+      .catch(() => setError("Failed to load hosts"));
+  }, [selectedGroup]);
+
+  /* -------------------- LOAD METRICS -------------------- */
+  useEffect(() => {
+    if (!selectedHost) return;
+
+    setLoading(true);
+    setError(null);
+
+    if (hostCache[selectedHost]) {
+      const c = hostCache[selectedHost];
+      setCPU(c.cpu);
+      setMemory(c.memory);
+      setDisk(c.disk);
+      setLoadAverage(c.loadAverage);
+      setSummary(c.summary);
+      setAlerts(c.alerts);
+      setLoading(false);
       return;
     }
 
-  setLoading(true);
+    Promise.all([
+      apiClient.get(`/host-metrics/${selectedHost}/`),
+      apiClient.get(`/host-health/${selectedHost}/`),
+      apiClient.get(`/alerts/${selectedHost}/`),
+    ])
+      .then(([metrics, health, alerts]) => {
+        const payload = {
+          cpu: normalizeHistory(metrics.data.cpu),
+          memory: normalizeHistory(metrics.data.memory),
+          disk: normalizeHistory(metrics.data.disk),
+          loadAverage: metrics.data.load_average || {},
+          summary: health.data,
+          alerts: alerts.data || [],
+        };
 
-  Promise.all([
-    apiClient.get(`/cpu/${selectedHost}/`),
-    apiClient.get(`/memory/${selectedHost}/`),
-    apiClient.get(`/disk/${selectedHost}/`),
-    apiClient.get(`/system-metrics/${selectedHost}/`),
-    apiClient.get(`/host-health/${selectedHost}/`),
-  ])
-    .then(([cpuRes, memRes, diskRes, sysRes, summaryRes]) => {
-      const payload = {
-        cpu: cpuRes.data,
-        memory: memRes.data,
-        disk: diskRes.data,
-        loadAverage: sysRes.data.load_average || {},
-        summary: summaryRes.data,
-        alerts: summaryRes.data.alerts || [],
-      };
+        hostCache[selectedHost] = payload;
 
-      // ✅ cache properly
-      hostDataCache[selectedHost] = payload;
-      sessionStorage.setItem(
-        `host-cache-${selectedHost}`,
-        JSON.stringify(payload)
-      );
+        setCPU(payload.cpu);
+        setMemory(payload.memory);
+        setDisk(payload.disk);
+        setLoadAverage(payload.loadAverage);
+        setSummary(payload.summary);
+        setAlerts(payload.alerts);
+      })
+      .catch(() => setError("Failed to load host data"))
+      .finally(() => setLoading(false));
+  }, [selectedHost]);
 
-      setCPU(payload.cpu);
-      setMemory(payload.memory);
-      setDisk(payload.disk);
-      setLoadAverage(payload.loadAverage);
-      setSummary(payload.summary);
-      setAlerts(payload.alerts);
-    })
-    .finally(() => setLoading(false));
-}, [selectedHost]);
-
-  /* -------------------- HELPERS -------------------- */
-  const formatData = (data) =>
-    Object.values(data || {})[0]?.map((d) => ({
-      time: new Date(d.clock * 1000).toLocaleTimeString(),
-      value: Number(d.value),
-    })) || [];
-
+  /* -------------------- PDF -------------------- */
   const downloadPDF = () => {
     window.open(
       `${apiClient.defaults.baseURL}host-health-pdf/${selectedHost}/`,
@@ -123,58 +118,50 @@ const HealthMonitoring = () => {
     );
   };
 
+  /* -------------------- LOADING -------------------- */
+  if (loading) {
+    return <div className="cloud-container">Loading...</div>;
+  }
 
-    /* -------------------- LOADING & ERROR -------------------- */
-    if (loading) {
-      return (
-        <div className="cloud-container">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="7.87722 9.61948 33.01 16.88"
-          >
-            <path
-              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-              className="cloud-back"
-            />
-            <path
-              d="M 12 26 H 37 C 42 26 41 20 37 20 C 38 18 37 15 33 16 C 32 8 15 8 14 17 C 8 16 6 25 12 26"
-              className="cloud-front"
-            />
-          </svg>
-          <div className="loading-message">Loading ...</div>
-        </div>
-      );
-    }
-  
-    if (error) {
-      return (
-        <div className="error-message">
-          <GoAlert size={40} />
-          <h2>❌ Server Down</h2>
-          <p>{error}</p>
-        </div>
-      );
-    }
-  
+  /* -------------------- ERROR -------------------- */
+  if (error) {
+    return (
+      <div className="error-message">
+        <GoAlert size={40} />
+        <h2>Error</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
 
   /* -------------------- UI -------------------- */
   return (
     <div style={{ padding: 24 }}>
       <h2>Health Monitoring</h2>
 
-      {/* Host Selector */}
+      {/* GROUP & HOST SELECT */}
       <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
         <select
+          value={selectedGroup}
+          onChange={(e) => setSelectedGroup(e.target.value)}
+          style={{ padding: 8, width: 300 }}
+        >
+          <option value="">Select Group</option>
+          {groups.map(g => (
+            <option key={g.groupid} value={g.groupid}>
+              {g.name}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={selectedHost}
-          onChange={(e) => {
-            const host = e.target.value;
-            setSelectedHost(host);
-            localStorage.setItem("selectedHost", host);
-          }}
+          onChange={(e) => setSelectedHost(e.target.value)}
+          disabled={!hosts.length}
           style={{ padding: 8, width: 300 }}
         >
           <option value="">Select Host</option>
-          {hosts.map((h) => (
+          {hosts.map(h => (
             <option key={h.hostid} value={h.hostid}>
               {h.host} ({h.ip})
             </option>
@@ -187,41 +174,33 @@ const HealthMonitoring = () => {
             style={{
               padding: "10px 16px",
               borderRadius: 10,
-              border: "none",
               background: "#1976d2",
               color: "#fff",
+              border: "none",
               cursor: "pointer",
               fontWeight: "bold",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
             }}
           >
-            📄 Download Health Report
+            📄 Download Report
           </button>
         )}
       </div>
 
-
-      {!loading && summary && (
+      {summary && (
         <>
-          {/* ALERT STRIP */}
           <AlertStrip alerts={alerts} />
-
-          {/* HEALTH CARDS */}
           <HealthCards summary={summary} />
 
-          {/* GRAPHS */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
-            <Metric title="CPU Utilization (%)" data={formatData(cpu)} />
-            <Metric title="Memory Utilization (%)" data={formatData(memory)} />
-            <Metric title="Disk Utilization (%)" data={formatData(disk)} />
+            <Metric title="CPU Utilization (%)" data={cpu} />
+            <Metric title="Memory Utilization (%)" data={memory} />
+            <Metric title="Disk Utilization (%)" data={disk} />
 
             {Object.entries(loadAverage).map(([k, v]) => (
               <Metric
                 key={k}
                 title={`Load Average (${k.replace("avg", "")} min)`}
-                data={formatData(v)}
+                data={normalizeHistory(v)}
               />
             ))}
           </div>
@@ -237,7 +216,7 @@ const AlertStrip = ({ alerts }) => {
 
   return (
     <div style={{ display: "flex", gap: 16, marginBottom: 20 }}>
-      {alerts.map((a) => (
+      {alerts.map(a => (
         <div
           key={a.eventid}
           style={{
@@ -270,11 +249,11 @@ const HealthCards = ({ summary }) => {
         flex: 1,
         padding: 16,
         borderRadius: 12,
-        background: "#fff",
+        background: "var(--card-bg)",
         boxShadow: "0 4px 12px rgba(0,0,0,.08)",
       }}
     >
-      <div style={{ fontSize: 14, color: "#666" }}>{label}</div>
+      <div style={{ opacity: 0.7 }}>{label}</div>
       <div style={{ fontSize: 26, fontWeight: "bold" }}>{value}</div>
     </div>
   );
@@ -303,7 +282,7 @@ const Metric = ({ title, data }) => (
     style={{
       width: "48%",
       padding: 16,
-      background: "#fff",
+      background: "var(--card-bg)",
       borderRadius: 12,
       boxShadow: "0 4px 12px rgba(0,0,0,.08)",
     }}
@@ -321,6 +300,8 @@ const Metric = ({ title, data }) => (
 );
 
 export default HealthMonitoring;
+
+
 
 // import { useState, useEffect } from "react";
 // import {
