@@ -2930,6 +2930,7 @@ class GroupListAPIView(APIView):
 import json
 from urllib.parse import unquote
 
+
 class EmployeeCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -3002,54 +3003,131 @@ class EmployeeCreateAPIView(APIView):
 
 
 
-import csv
-import io
-
+import csv, io
 
 class EmployeeBulkUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
+    REQUIRED_FIELDS = [
+        "name",
+        "employee_id",
+        "email",
+        "group",
+        "fla_employee_id",
+        "fla_name",
+        "fla_email",
+        "is_fla",
+    ]
+
     def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"error": "Admin only"}, status=403)
+
         file = request.FILES.get("file")
+        if not file or not file.name.endswith(".csv"):
+            return Response({"error": "Valid CSV required"}, status=400)
 
-        if not file:
-            return Response(
-                {"error": "CSV file is required"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+        created, failed = 0, []
 
-        if not file.name.endswith(".csv"):
-            return Response(
-                {"error": "Only CSV files are allowed"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        for row_num, row in enumerate(reader, start=2):
+            try:
+                # -------------------------
+                # REQUIRED FIELD CHECK
+                # -------------------------
+                for field in self.REQUIRED_FIELDS:
+                    if not row.get(field):
+                        raise ValueError(f"{field} is required")
 
-        decoded_file = file.read().decode("utf-8")
-        io_string = io.StringIO(decoded_file)
-        reader = csv.DictReader(io_string)
+                # -------------------------
+                # TYPE NORMALIZATION
+                # -------------------------
+                row["is_fla"] = row["is_fla"].strip().lower() == "true"
+                row["phone_number"] = row.get("phone_number") or None
+                row["designation"] = row.get("designation") or None
 
-        created = []
-        errors = []
-
-        for index, row in enumerate(reader, start=1):
-            serializer = EmployeeSerializer(data=row)
-            if serializer.is_valid():
+                serializer = EmployeeSerializer(data=row)
+                serializer.is_valid(raise_exception=True)
                 serializer.save()
-                created.append(serializer.data)
-            else:
-                errors.append({
-                    "row": index,
-                    "errors": serializer.errors
+
+                created += 1
+
+            except Exception as e:
+                failed.append({
+                    "row": row_num,
+                    "employee_id": row.get("employee_id"),
+                    "error": str(e),
                 })
 
         return Response(
             {
-                "created_count": len(created),
-                "failed_count": len(errors),
-                "errors": errors
+                "created_count": created,
+                "failed_count": len(failed),
+                "errors": failed,
             },
-            status=status.HTTP_201_CREATED if not errors else status.HTTP_207_MULTI_STATUS
+            status=207 if failed else 201,
         )
+
+
+class EmployeeCSVTemplateAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"error": "Admin only"}, status=403)
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = (
+            'attachment; filename="employee_bulk_template.csv"'
+        )
+
+        writer = csv.writer(response)
+
+        writer.writerow([
+            "name",
+            "employee_id",
+            "email",
+            "group",
+            "fla_employee_id",
+            "fla_name",
+            "fla_email",
+            "phone_number",
+            "designation",
+            "is_fla",
+        ])
+
+        # # FLA example (self-reporting)
+        # writer.writerow([
+        #     "Ms V A Prabha",
+        #     "101897",
+        #     "prabhav@cdac.in",
+        #     "FOSS",
+        #     "101897",
+        #     "Ms V A Prabha",
+        #     "prabhav@cdac.in",
+        #     "9856237856",
+        #     "Manager",
+        #     "true",
+        # ])
+
+        # # Employee example
+        # writer.writerow([
+        #     "Mr Tejas Jitendra Patil",
+        #     "346814",
+        #     "ptejas@cdac.in",
+        #     "FOSS",
+        #     "101897",
+        #     "Ms V A Prabha",
+        #     "prabhav@cdac.in",
+        #     "7767825008",
+        #     "Developer",
+        #     "false",
+        # ])
+
+        return response
+
+
+
 
 
 class AllRegistrationRequestsAPIView(APIView):

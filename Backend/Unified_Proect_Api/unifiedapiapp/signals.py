@@ -1,22 +1,17 @@
 import logging
-import os
 from django.contrib.auth import get_user_model
+import os
 
 def create_admin_user(sender, **kwargs):
     User = get_user_model()
 
-    admin_email = os.getenv("DJANGO_ADMIN_EMAIL")
-    admin_password = os.getenv("DJANGO_ADMIN_PASSWORD")
+    username = os.getenv("DJANGO_ADMIN_USERNAME", "admin@cdac.in")
+    password = os.getenv("DJANGO_ADMIN_PASSWORD", "Root1234#$")
+    email = os.getenv("DJANGO_ADMIN_EMAIL", "admin@cdac.in")
 
-    if not admin_email or not admin_password:
-        return  # fail silently if env vars not set
+    if not User.objects.filter(username=username).exists():
+        User.objects.create_superuser(username, email, password)
 
-    if not User.objects.filter(email=admin_email).exists():
-        User.objects.create_superuser(
-            username=admin_email,   # IMPORTANT (email-based login)
-            email=admin_email,
-            password=admin_password,
-        )
-        logging.info(f"Superuser created with email: {admin_email}")
+        logging.info(f"Superuser created with email: {email}")
     else:
-        logging.info(f"Superuser with email {admin_email} already exists.")
+        logging.info(f"Superuser with email {email} already exists.")

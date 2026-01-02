@@ -245,6 +245,7 @@ urlpatterns = [
     path("api/employees/groups/", GroupListAPIView.as_view(), name="employee-groups"),
     path("api/employees/fla-list/", FLAListAPIView.as_view(), name="fla-list"),
     path("api/employees/bulk-upload/", EmployeeBulkUploadAPIView.as_view(), name="bulk-employee-create"),
+    path("api/employees/csv-template/", EmployeeCSVTemplateAPIView.as_view(), name="employee-csv-template"),
     path("api/employees/delete/<str:employee_id>/", EmployeeDeleteAPIView.as_view(), name="delete-employee"),
     path("api/employees/update/<str:employee_id>/", EmployeeUpdateAPIView.as_view(), name="update-employee"),
     path("api/send-email/", SendEmailView.as_view(), name="send-test-email"),
