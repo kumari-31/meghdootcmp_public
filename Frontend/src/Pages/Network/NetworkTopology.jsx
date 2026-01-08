@@ -429,7 +429,7 @@ export default function NetworkTopology() {
           nodeTypes={nodeTypes}
           fitView
           minZoom={0.2}
-          attributionPosition="bottom-left"
+          proOptions={{ hideAttribution: true }}
         >
           <Controls />
           <MiniMap style={{ height: 100, width: 150 }} zoomable pannable />

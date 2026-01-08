@@ -197,6 +197,9 @@ const handleSubmit = async (e) => {
             <Link to="/forgot-password" className="forgot-password-link">
               Forgot Password?
             </Link>
+            <Link to="/faq" className="faq-link">
+              FAQ
+            </Link>
           </div>
           <div className="copyright">
             Copyright © 2024–25 C-DAC. All rights reserved

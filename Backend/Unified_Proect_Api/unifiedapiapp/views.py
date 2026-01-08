@@ -11610,6 +11610,7 @@ class HostHealthSummaryAPIView(APIView):
 # ----------------------------------------------------
 # PDF REPORT
 # ----------------------------------------------------
+
 class HostHealthPDFAPIView(APIView):
     def get(self, request, hostid):
         response = HttpResponse(content_type="application/pdf")
