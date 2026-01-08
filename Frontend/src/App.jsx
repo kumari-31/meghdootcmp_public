@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { Suspense, lazy } from "react";
 import PersistentVolumeDetails from "./Kubernets/PersistentVolumeDetails";
 import { ImageOutlined } from "@mui/icons-material";
+import FaqPage from "./Pages/Authentication/FaqPage";
 const K8sRequestStatus = lazy(() =>
   import("./KubernetesRBAC/K8sRequestStatus")
 );
@@ -118,6 +119,7 @@ const App = () => {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/registration" element={<RegistrationForm />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/faq" element={<FaqPage />} />
 
           {/* Routes that use the Layout */}
           <Route path="/app" element={<Layout />}>

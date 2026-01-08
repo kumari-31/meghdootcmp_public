@@ -550,6 +550,10 @@ export default function Dashboard() {
     fetchDashboardData(selectedDate);
   }, [selectedDate]);
 
+  
+
+  
+  
   // --------------------------------------------
   // DATE CHANGE HANDLER (Calendar Picker)
   // --------------------------------------------
@@ -569,33 +573,33 @@ export default function Dashboard() {
     })();
   }, []);
 
-  // OpenStack requests
-  useEffect(() => {
-    (async () => {
-      try {
-        // If no date selected, fetch overall
-        const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
+  // // OpenStack requests
+  // useEffect(() => {
+  //   (async () => {
+  //     try {
+  //       // If no date selected, fetch overall
+  //       const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
 
-        // Fetch data from API
-        const data = await fetchVmRequests({ date: dateString });
+  //       // Fetch data from API
+  //       const data = await fetchVmRequests({ date: dateString });
 
-        // Optional: calculate today count only when no date filter
-        const todayCount =
-          !dateString && data.raw.length
-            ? data.raw.filter((vm) => dayjs(vm.request_timestamp).isToday())
-                .length
-            : 0;
+  //       // Optional: calculate today count only when no date filter
+  //       const todayCount =
+  //         !dateString && data.raw.length
+  //           ? data.raw.filter((vm) => dayjs(vm.request_timestamp).isToday())
+  //               .length
+  //           : 0;
 
-        // Update state
-        setOpenstackReq({
-          ...data,
-          today: todayCount,
-        });
-      } catch (err) {
-        console.error("OpenStack Requests Error:", err);
-      }
-    })();
-  }, [date]); // <--- Important: re-run whenever 'date' changes
+  //       // Update state
+  //       setOpenstackReq({
+  //         ...data,
+  //         today: todayCount,
+  //       });
+  //     } catch (err) {
+  //       console.error("OpenStack Requests Error:", err);
+  //     }
+  //   })();
+  // }, [date]); // <--- Important: re-run whenever 'date' changes
 
   // K8s service requests
   // Kubernetes Service Requests (Pending etc.)
@@ -633,17 +637,7 @@ export default function Dashboard() {
   }, []);
 
   // quick composite health metric (example: weighted)
-  const systemHealth = useMemo(() => {
-    // simple algorithm: more accepted and lower pending = better
-    const total = openstackReq.total + k8sReq.total || 1;
-    const acceptRatio =
-      (openstackReq.accepted + k8sReq.accepted) / Math.max(1, total);
-    const pendingPenalty = Math.min(
-      1,
-      (openstackReq.pending + k8sReq.pending) / Math.max(1, total)
-    );
-    return Math.round(acceptRatio * 100 * (1 - pendingPenalty * 0.45));
-  }, [openstackReq, k8sReq]);
+
 
   const smallMotion = {
     initial: { opacity: 0, y: 8 },
@@ -757,19 +751,40 @@ export default function Dashboard() {
   };
 
   // Calculate usage percentages
-  const vcpuUsage = (
-    (overview.used_vcpus / overview.total_vcpus) *
-    100
-  ).toFixed(1);
-  const memoryUsage = (
-    (overview.used_memory_mb / overview.total_memory_mb) *
-    100
-  ).toFixed(1);
-  const storageUsage = (
-    (overview.used_storage_gb / overview.total_storage_gb) *
-    100
-  ).toFixed(1);
+  const vcpuUsage = useMemo(() => {
+    if (!overview?.total_vcpus) return 0;
+    return (
+      (overview.used_vcpus / overview.total_vcpus) * 100
+    ).toFixed(1);
+  }, [overview]);
+  
+  const memoryUsage = useMemo(() => {
+    if (!overview?.total_memory_mb) return 0;
+    return (
+      (overview.used_memory_mb / overview.total_memory_mb) * 100
+    ).toFixed(1);
+  }, [overview]);
+  
+  const storageUsage = useMemo(() => {
+    if (!overview?.total_storage_gb) return 0;
+    return (
+      (overview.used_storage_gb / overview.total_storage_gb) * 100
+    ).toFixed(1);
+  }, [overview]);
 
+
+  const systemHealth = useMemo(() => {
+    const cpu = Number(vcpuUsage);
+    const ram = Number(memoryUsage);
+    const storage = Number(storageUsage);
+  
+    const health =
+      (100 - cpu) * 0.4 +
+      (100 - ram) * 0.35 +
+      (100 - storage) * 0.25;
+  
+    return Math.max(0, Math.min(100, Math.round(health)));
+  }, [vcpuUsage, memoryUsage, storageUsage]);
   // Determine bar color based on usage
   const getBarColor = (usage) => {
     usage = Number(usage) || 0;
