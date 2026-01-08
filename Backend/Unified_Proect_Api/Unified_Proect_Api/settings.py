@@ -10,17 +10,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45"
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "False") == "True"
+# DEBUG = True
 
 os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-# X_FRAME_OPTIONS = "ALLOWALL"
-# SECURE_CROSS_ORIGIN_OPENER_POLICY = None
-
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -38,9 +34,6 @@ INSTALLED_APPS = [
     'unifiedapiapp',
     
 ]
-
-
-
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -64,15 +57,12 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 # CORS_ALLOW_ALL_ORIGINS = True  # Or set to False and specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
-
-
-
 
 ROOT_URLCONF = "Unified_Proect_Api.urls"
 
@@ -132,15 +122,6 @@ ACCESS_COOKIE_SAMESITE = "Lax"
 ACCESS_COOKIE_PATH = "/"
 ACCESS_COOKIE_AGE = 25 * 60  # 15 minutes
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
 
 # settings.py
 DATABASES = {
@@ -189,7 +170,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
@@ -208,9 +189,6 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media/")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-OPENSTACK_MEMBER_ROLE = (
-    "member"  # Replace "member" with the actual role in your OpenStack setup
-)
 
 # Email settings
 EMAIL_BACKEND = os.getenv(
