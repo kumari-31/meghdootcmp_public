@@ -173,7 +173,12 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-OTP_TEST_MODE = True
+# OTP_TEST_MODE = True
+# MFA behavior
+MFA_MODE = os.getenv("MFA_MODE", "NONE")
+# EMAIL | TOTP | NONE
+
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/4.2/topics/i18n/
