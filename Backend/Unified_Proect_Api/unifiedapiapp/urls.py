@@ -237,16 +237,12 @@ urlpatterns = [
     path("api/host-health-pdf/<str:hostid>/", HostHealthPDFAPIView.as_view()),
 
     path("api/health-report/", HealthReportAPIView.as_view()),
-
+    path("api/host-graphs/<str:hostid>/", HostGraphsAPIView.as_view()),
     path("api/host-groups/", HostGroupAPIView.as_view()),
    
     path("api/host-metrics/<str:hostid>/", SystemMetricsAPIView.as_view()),
 
-    path(
-        "api/host-all-metrics/<str:hostid>/",
-        HostAllMetricsAPIView.as_view(),
-        name="host-all-metrics",
-    ),
+    path("api/host-all-metrics/<str:hostid>/",HostAllMetricsAPIView.as_view(),name="host-all-metrics",),
 
 
 

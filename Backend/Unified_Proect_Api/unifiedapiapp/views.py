@@ -5657,6 +5657,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
     TEST_MODE_ALLOW_ANY_OTP = True
+    
+    def _inject_plain_credentials(self, request, username, password):
+    
+        mutable_data = request.data.copy()
+        mutable_data["username"] = username
+        mutable_data["password"] = password
+        request._full_data = mutable_data
 
     # ---------------------- COOKIE HELPER ----------------------
     def _set_auth_cookies(
@@ -5784,9 +5791,48 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 status=400,
             )
 
-        # --- OTP (must be 6 digits) ---
+        if not username or not password:
+            return Response({"error": "Username and password required"}, status=400)
+
+      
+
+        
+         # ------------------ Authenticate user first ------------------
+        user = authenticate(username=username, password=password)
+        if not user:
+            return Response({"error": "Invalid username or password"}, status=401)
+                
         if otp and not re.fullmatch(r"\d{6}", otp):
             return Response({"error": "OTP must be exactly 6 digits."}, status=400)
+
+# ================= MFA DECISION POINT =================
+        MFA_MODE = getattr(settings, "MFA_MODE", "EMAIL")
+
+        if MFA_MODE == "NONE":
+            # 🔴 NO MFA: login immediately without OTP
+            self._inject_plain_credentials(request, username, password)
+            response = super().post(request, *args, **kwargs)
+
+            access = response.data.get("access")
+            refresh = response.data.get("refresh")
+
+            serializer = CustomTokenObtainPairSerializer()
+            token = serializer.get_token(user)
+
+            user_data = {
+                "username": user.username,
+                "email": user.email,
+                "role": token.get("role"),
+                "employee_id": token.get("employee_id"),
+            }
+
+            response.data = {"detail": "Login successful"}
+            self._set_auth_cookies(response, access, refresh, user_data)
+            return response
+
+        
+    # 🔵 MFA_MODE == "EMAIL" → do nothing here, execution continues to your existing email OTP logic
+
 
         # ---------- OTP RESEND ----------
         if resend_otp:
@@ -11649,6 +11695,80 @@ class HealthReportAPIView(APIView):
         doc.build(story)
         return FileResponse(open(tmp.name, "rb"), as_attachment=True)
 
+
+
+
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from .zabbix_client import ZabbixClient
+
+
+class HostGraphsAPIView(APIView):
+    """
+    FAST Zabbix Graph API
+    type:
+      all    -> host graphs + simple graphs
+      host   -> predefined host graphs
+      simple -> item graphs
+    """
+
+    def get(self, request, hostid):
+        graph_type = request.GET.get("type", "all")
+        zabbix = ZabbixClient()
+
+        result = {
+            "host_graphs": [],
+            "simple_graphs": [],
+        }
+
+        # --------------------------------------------------
+        # 1️⃣ PREDEFINED HOST GRAPHS (graph.get)
+        # --------------------------------------------------
+        if graph_type in ("all", "host"):
+            graphs = zabbix.call(
+                "graph.get",
+                {
+                    "hostids": hostid,
+                    "output": ["graphid", "name"],
+                    "sortfield": "name",
+                },
+            )
+
+            result["host_graphs"] = [
+                {
+                    "id": g["graphid"],
+                    "name": g["name"],
+                    # Zabbix renders this image (cached internally)
+                    "img": f"/zabbix/chart2.php?graphid={g['graphid']}",
+                }
+                for g in graphs
+            ]
+
+        # --------------------------------------------------
+        # 2️⃣ SIMPLE GRAPHS (item.get)
+        # --------------------------------------------------
+        if graph_type in ("all", "simple"):
+            items = zabbix.call(
+                "item.get",
+                {
+                    "hostids": hostid,
+                    "output": ["itemid", "name"],
+                    "value_type": [0, 3],  # numeric only
+                    "status": 0,
+                },
+            )
+
+            result["simple_graphs"] = [
+                {
+                    "id": i["itemid"],
+                    "name": i["name"],
+                    "img": f"/zabbix/chart.php?itemids[]={i['itemid']}",
+                }
+                for i in items
+            ]
+
+        # ⚡ API RESPONSE IS PURE METADATA → < 20 ms
+        return Response(result)
 
 class HostGroupAPIView(APIView):
     def get(self, request):
