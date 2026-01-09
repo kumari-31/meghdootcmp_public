@@ -5784,21 +5784,6 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                 status=400,
             )
 
-        # --- Password strength ---
-        # password_pattern = (
-        #     r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{6,}$"
-        # )
-        # if password and not re.match(password_pattern, password):
-        #     return Response(
-        #         {
-        #             "error": (
-        #                 "Password must be at least 6 characters long, "
-        #                 "contain one uppercase letter, one number, and one special character."
-        #             )
-        #         },
-        #         status=400,
-        #     )
-
         # --- OTP (must be 6 digits) ---
         if otp and not re.fullmatch(r"\d{6}", otp):
             return Response({"error": "OTP must be exactly 6 digits."}, status=400)
@@ -5845,7 +5830,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     "message": "New OTP generated successfully",
                     "username": username,
                     "require_otp": True,
-                    "test_otp": otp,  # REMOVE in production
+                    # "test_otp": otp,  # REMOVE in production
                 }
             )
 
