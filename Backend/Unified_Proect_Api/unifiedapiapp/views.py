@@ -5877,7 +5877,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     "message": "New OTP generated successfully",
                     "username": username,
                     "require_otp": True,
-                    "test_otp": otp,  # REMOVE in production
+                    # "test_otp": otp,  # REMOVE in production
                 }
             )
 
