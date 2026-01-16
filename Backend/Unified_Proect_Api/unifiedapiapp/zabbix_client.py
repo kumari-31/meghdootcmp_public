@@ -12,11 +12,10 @@ class ZabbixClient:
             "jsonrpc": "2.0",
             "method": "user.login",
             "params": {
-                "user": settings.ZABBIX_USER,
+                "username": settings.ZABBIX_USER,
                 "password": settings.ZABBIX_PASSWORD,
             },
             "id": 1,
-            "auth": None,
         }
         res = requests.post(self.url, json=payload).json()
         return res.get("result")
@@ -27,6 +26,37 @@ class ZabbixClient:
             "method": method,
             "params": params,
             "auth": self.auth,
-            "id": 1,
+            "id": 2,
         }
-        return requests.post(self.url, json=payload).json().get("result", [])
+        res = requests.post(self.url, json=payload).json()
+        return res.get("result", [])
+
+
+# class ZabbixClient:
+#     def __init__(self):
+#         self.url = settings.ZABBIX_URL
+#         self.auth = self.login()
+
+#     def login(self):
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": "user.login",
+#             "params": {
+#                 "username": settings.ZABBIX_USER,
+#                 "password": settings.ZABBIX_PASSWORD,
+#             },
+#             "id": 1,
+#             "auth": None,
+#         }
+#         res = requests.post(self.url, json=payload).json()
+#         return res.get("result")
+
+#     def call(self, method, params):
+#         payload = {
+#             "jsonrpc": "2.0",
+#             "method": method,
+#             "params": params,
+#             "auth": self.auth,
+#             "id": 1,
+#         }
+#         return requests.post(self.url, json=payload).json().get("result", [])

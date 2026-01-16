@@ -2,8 +2,8 @@ import json
 
 import requests
 
-# Zabbix credentials and URL
-ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
+# ZABBIX API CREDENTIALS
+ZABBIX_URL = "http://10.184.49.247:9008/api_jsonrpc.php"
 ZABBIX_USER = "Admin"
 ZABBIX_PASSWORD = "zabbix"
 
@@ -13,7 +13,7 @@ def zabbix_login():
     payload = {
         "jsonrpc": "2.0",
         "method": "user.login",
-        "params": {"user": ZABBIX_USER, "password": ZABBIX_PASSWORD},
+        "params": {"username": ZABBIX_USER, "password": ZABBIX_PASSWORD},
         "id": 1,
         "auth": None,
     }
