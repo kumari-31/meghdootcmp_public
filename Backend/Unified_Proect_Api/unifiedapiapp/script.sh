@@ -8,46 +8,97 @@ if [[ ! -f "$ENV_FILE" ]]; then
     exit 1
 fi
 
+# Load env safely
+set -a
 source "$ENV_FILE"
-# Collect command-line arguments (VM names)
+set +a
+
+# Collect VM names
 vms=("$@")
 
-script_dir=$(dirname "$(readlink -f "$0")")
-csv_file="$script_dir/vm_info_new.csv"
-
-# Create a CSV file with header
-echo "VMname,Hostname,Instance Name,VNC Display" > "$csv_file"
+# CSV HEADER → STDOUT
+echo "VMname,Hostname,Instance Name,VNC Display"
 
 for vm in "${vms[@]}"; do
-    host=$(ssh -o 'StrictHostKeyChecking=no' cloud@10.184.43.17 \
-        "source openrc && openstack server show '$vm' | awk '/OS-EXT-SRV-ATTR:host/ {print \$4}'")
 
-    instance=$(ssh -o 'StrictHostKeyChecking=no' cloud@10.184.43.17 \
-        "source openrc && openstack server show '$vm' | awk '/OS-EXT-SRV-ATTR:instance_name/ {print \$4}'")
+    host=$(ssh -o StrictHostKeyChecking=no cloud@10.184.49.18 \
+        "source openrc && openstack server show '$vm' -f value -c OS-EXT-SRV-ATTR:host" 2>/dev/null)
 
-    # Skip if instance or host empty
-    if [[ -z "$host" || -z "$instance" ]]; then
-        continue
-    fi
+    instance=$(ssh -o StrictHostKeyChecking=no cloud@10.184.49.18 \
+        "source openrc && openstack server show '$vm' -f value -c OS-EXT-SRV-ATTR:instance_name" 2>/dev/null)
 
-    # Determine host IP based on host name
+    [[ -z "$host" || -z "$instance" ]] && continue
+
     if [[ "$host" == "fspcloud" ]]; then
         hostip="$HOST_FSPCLOUD_IP"
     else
         hostip="$HOST_DEFAULT_IP"
     fi
 
-    vnc=$(ssh -o 'StrictHostKeyChecking=no' cloud@"$hostip" \
-        "sudo virsh vncdisplay $instance | awk -F: '{print \$2}'")
+    vnc=$(ssh -o StrictHostKeyChecking=no cloud@"$hostip" \
+        "sudo virsh vncdisplay $instance" 2>/dev/null | awk -F: '{print $2}')
 
-    # If VNC empty, use "-"
-    if [[ -z "$vnc" ]]; then
-        vnc="-"
-    fi
+    [[ -z "$vnc" ]] && vnc="-"
 
-    # Append line to CSV
-    echo "$vm,$host,$instance,$vnc" >> "$csv_file"
+    # CSV ROW → STDOUT
+    echo "$vm,$host,$instance,$vnc"
+
 done
+
+
+
+
+
+# #!/bin/bash
+# set -e
+
+# ENV_FILE="/home/boss/Desktop/Cmp19nov25/Backend/Unified_Proect_Api/.env"
+
+# if [[ ! -f "$ENV_FILE" ]]; then
+#     echo "ENV file not found: $ENV_FILE"
+#     exit 1
+# fi
+
+# source "$ENV_FILE"
+# # Collect command-line arguments (VM names)
+# vms=("$@")
+
+# script_dir=$(dirname "$(readlink -f "$0")")
+# csv_file="$script_dir/vm_info_new.csv"
+
+# # Create a CSV file with header
+# echo "VMname,Hostname,Instance Name,VNC Display" > "$csv_file"
+
+# for vm in "${vms[@]}"; do
+#     host=$(ssh -o 'StrictHostKeyChecking=no' cloud@10.184.43.17 \
+#         "source openrc && openstack server show '$vm' | awk '/OS-EXT-SRV-ATTR:host/ {print \$4}'")
+
+#     instance=$(ssh -o 'StrictHostKeyChecking=no' cloud@10.184.43.17 \
+#         "source openrc && openstack server show '$vm' | awk '/OS-EXT-SRV-ATTR:instance_name/ {print \$4}'")
+
+#     # Skip if instance or host empty
+#     if [[ -z "$host" || -z "$instance" ]]; then
+#         continue
+#     fi
+
+#     # Determine host IP based on host name
+#     if [[ "$host" == "fspcloud" ]]; then
+#         hostip="$HOST_FSPCLOUD_IP"
+#     else
+#         hostip="$HOST_DEFAULT_IP"
+#     fi
+
+#     vnc=$(ssh -o 'StrictHostKeyChecking=no' cloud@"$hostip" \
+#         "sudo virsh vncdisplay $instance | awk -F: '{print \$2}'")
+
+#     # If VNC empty, use "-"
+#     if [[ -z "$vnc" ]]; then
+#         vnc="-"
+#     fi
+
+#     # Append line to CSV
+#     echo "$vm,$host,$instance,$vnc" >> "$csv_file"
+# done
 
 
 

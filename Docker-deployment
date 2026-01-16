@@ -1,0 +1,195 @@
+1.python3.11 -m venv venv
+  504  source venv/bin/activate
+  505  pip install --upgrade pip setuptools wheel
+  506  pip install -r Unified_Proect_Api/requirements.txt
+  507  mkdir wheels
+   pip wheel -r Unified_Proect_Api/requirements.txt -w wheels
+  510  pip install --no-index --find-links=./wheels -r Unified_Proect_Api/requirements.txt
+docker compose down -v
+  513  docker system prune -af
+  514  docker compose build --no-cache
+  515  docker compose up -d
+docker ps
+docker ps
+    517  docker compose logs -f
+      docker save   -o meghdootcmp-backend-image.tar   meghdootcmp-docker-backend:latest
+  559  docker save   -o postgres-15-image.tar   postgres:15
+tar -czvf meghdootcmp-airgapped-images.tar.gz meghdootcmp-backend-image.tar postgres-15-image.tar entrypoint.sh install_cmp.sh docker-compose.yml dockercmp.conf wheels .env 
+tar -tvf meghdootcmp-airgapped-images.tar.gz //Verify TAR contents
+tar -rvf meghdootcmp-airgapped-images.tar.gz pgdata-backup.tar.gz //Add files to existing TAR
+ 
+
+Include Postgres Volume Backup
+docker volume inspect meghdootcmp-docker_pgdata
+docker run --rm \
+  -v meghdootcmp-docker_pgdata:/volume \
+  -v $(pwd):/backup \
+  busybox \
+  tar -czvf /backup/pgdata-backup.tar.gz /volume
+tar -rvf meghdootcmp-airgapped-images.tar.gz pgdata-backup.tar.gz
+
+
+update docker image steps 
+Build NEW backend image 
+docker build -t meghdootcmp-backend:1.1 -f Dockerfile.backend .
+Verify image
+docker images | grep meghdootcmp
+Save NEW backend image
+docker save  meghdootcmp-backend:1.1 -o meghdootcmp-backend-image-v1.1.tar
+docker images --digests > image-digests-1.1.txt
+Update docker-compose.yml to use new image version
+services:
+  backend:
+    image: meghdootcmp-backend:1.1
+Update TAR file
+tar -rvf meghdootcmp-airgapped-images.tar.gz meghdootcmp-back
+
+
+
+Dockerfile 
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+ENV DJANGO_SETTINGS_MODULE=Unified_Proect_Api.settings
+
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libpq-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app/Unified_Proect_Api
+
+COPY Unified_Proect_Api/requirements.txt .
+COPY wheels ./wheels
+
+RUN pip install --no-index \
+    --find-links=./wheels \
+    -r requirements.txt \
+    && pip check
+
+COPY Unified_Proect_Api /app/Unified_Proect_Api
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
+RUN addgroup --system django && adduser --system --group django
+RUN chown -R django:django /app
+
+USER django
+
+EXPOSE 8000
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["gunicorn", "-c", "/app/Unified_Proect_Api/gunicorn.conf.py", "Unified_Proect_Api.wsgi:application"]
+
+
+entrypoint.sh 
+#!/bin/bash
+set -e
+
+
+echo "Running migrations..."
+python /app/Unified_Proect_Api/manage.py migrate --noinput
+
+echo "Collecting static files..."
+python /app/Unified_Proect_Api/manage.py collectstatic --noinput
+
+echo "Creating superuser if not exists..."
+python /app/Unified_Proect_Api/manage.py shell <<EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+if not User.objects.filter(username="${DJANGO_ADMIN_USERNAME}").exists():
+    User.objects.create_superuser(
+        username="${DJANGO_ADMIN_USERNAME}",
+        email="${DJANGO_ADMIN_EMAIL}",
+        password="${DJANGO_ADMIN_PASSWORD}"
+    )
+    print("Superuser created")
+else:
+    print("Superuser already exists")
+EOF
+
+echo "🚀 Starting Gunicorn..."
+exec "$@"
+
+
+docker-compose.yml 
+
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: meghdootcmp_db
+    restart: always
+    security_opt:
+      - apparmor=unconfined
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: meghdootcmp-docker-backend:latest
+    build: .
+    container_name: meghdootcmp_backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/kubernetes/admin.conf:/app/Unified_Proect_Api/unifiedapiapp/admin.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  pgdata:
+
+if [ ! -f /etc/kubernetes/admin.conf ]; then
+  echo "❌ /etc/kubernetes/admin.conf not found"
+  exit 1
+fi
+
+
+
+
+To Delete Docker 
+docker compose down -v
+docker rm -f $(docker ps -aq)
+docker rmi -f $(docker images -q)
+docker system prune -af
+
+#To verify Docker installation
+docker ps
+docker images
+
+
+
+26  docker build -t meghdootcmp-docker-backend:1.1.0 .
+  527  docker images
+  528  nano docker-compose.yml 
+  529  docker save meghdootcmp-docker-backend:1.1.0   -o meghdootcmp-backend-image-1.1.0.tar
+  530  docker images --digests > image-digests-1.1.0.txt
+  531  ls
+
+   docker exec -it meghdootcmp_db psql -U rootcmp -d meghdootcmp

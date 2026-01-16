@@ -2907,17 +2907,19 @@ class FLAListAPIView(APIView):
     def get(self, request):
         flas = (
             Employee.objects
-            .filter(fla_employee_id__isnull=False)
+            .filter(is_fla=True)
             .values(
-                "fla_employee_id",
-                "fla_name",
-                "fla_email",
+                "employee_id",
+                "name",
+                "email",
                 "group",
             )
-            .distinct("fla_employee_id")   # 🔑 IMPORTANT
         )
 
-        return Response(list(flas))
+        return Response({
+            "bootstrap": not flas.exists(),
+            "flas": list(flas)
+        })
 
     
 class GroupListAPIView(APIView):
@@ -2937,6 +2939,9 @@ class GroupListAPIView(APIView):
 import json
 from urllib.parse import unquote
 
+def has_any_fla():
+    return Employee.objects.filter(is_fla=True).exists()
+
 
 class EmployeeCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -2946,11 +2951,23 @@ class EmployeeCreateAPIView(APIView):
         data = request.data.copy()
         is_admin = user.is_staff or user.is_superuser
 
-        # -----------------------------
-        # ADMIN FLOW
-        # -----------------------------
-        if is_admin:
-            # Admin MUST choose reporting officer from dropdown
+        employee_count = Employee.objects.count()
+        fla_exists = Employee.objects.filter(is_fla=True).exists()
+
+        # --------------------------------
+        # BOOTSTRAP MODE (FIRST EMPLOYEE)
+        # --------------------------------
+        if is_admin and employee_count == 0:
+            # Root FLA
+            data["is_fla"] = True
+            data["fla_employee_id"] = None
+            data["fla_name"] = None
+            data["fla_email"] = None
+
+        # --------------------------------
+        # ADMIN FLOW (after bootstrap)
+        # --------------------------------
+        elif is_admin:
             reporting_id = data.get("fla_employee_id")
 
             if not reporting_id:
@@ -2960,25 +2977,25 @@ class EmployeeCreateAPIView(APIView):
                 )
 
             try:
-                reporting = Employee.objects.get(employee_id=reporting_id)
+                reporting = Employee.objects.get(
+                    employee_id=reporting_id,
+                    is_fla=True
+                )
             except Employee.DoesNotExist:
                 return Response(
-                    {"fla_employee_id": "Invalid reporting officer"},
+                    {"fla_employee_id": "Invalid FLA reporting officer"},
                     status=400
                 )
 
-            # Auto-fill reporting fields
+            data["fla_employee_id"] = reporting.employee_id
             data["fla_name"] = reporting.name
             data["fla_email"] = reporting.email
-            data["fla_employee_id"] = reporting.employee_id
             data["is_fla"] = data.get("is_fla", False)
 
-        # -----------------------------
-        # FLA FLOW (from cookie/user data)
-        # -----------------------------
+        # --------------------------------
+        # FLA FLOW
+        # --------------------------------
         else:
-            # Expecting UD cookie contains JSON data of user
-            
             ud_cookie = request.COOKIES.get("UD")
             if not ud_cookie:
                 return Response({"error": "User data cookie missing"}, status=400)
@@ -2989,13 +3006,15 @@ class EmployeeCreateAPIView(APIView):
                 return Response({"error": "Invalid cookie data"}, status=400)
 
             if ud_data.get("role") != "FLA":
-                return Response({"error": "Only FLA users can create employee"}, status=403)
+                return Response(
+                    {"error": "Only FLA users can create employees"},
+                    status=403
+                )
 
-            # Fill FLA details from cookie
             data["fla_employee_id"] = ud_data.get("employee_id")
-            data["fla_name"] = ud_data.get("username")  # or map to proper name field
+            data["fla_name"] = ud_data.get("username")
             data["fla_email"] = ud_data.get("email")
-            data["is_fla"] = False  # employees created by FLA are not themselves FLA
+            data["is_fla"] = False
 
         serializer = EmployeeSerializer(data=data)
         serializer.is_valid(raise_exception=True)
@@ -3005,6 +3024,91 @@ class EmployeeCreateAPIView(APIView):
             {"message": "Employee created successfully"},
             status=201
         )
+
+
+
+# class EmployeeCreateAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         user = request.user
+#         data = request.data.copy()
+#         is_admin = user.is_staff or user.is_superuser
+
+#         employee_count = Employee.objects.count()
+#            # -----------------------------
+#         # FIRST EMPLOYEE (ROOT SLA / FLA)
+#         # -----------------------------
+#         if is_admin and employee_count == 0:
+#             # Admin manually provides FLA details
+#             required = ["fla_name", "fla_email", "fla_employee_id"]
+#             for field in required:
+#                 if not data.get(field):
+#                     return Response(
+#                         {field: "Required for first SLA"},
+#                         status=400
+#                     )
+
+#             data["is_fla"] = True
+#             data["fla_employee_id"] = None
+#             data["fla_name"] = None
+#             data["fla_email"] = None
+#         # -----------------------------
+#         # ADMIN FLOW
+#         # -----------------------------
+#         elif is_admin:
+#             # Admin MUST choose reporting officer from dropdown
+#             reporting_id = data.get("fla_employee_id")
+#             if not reporting_id:
+#                 return Response(
+#                     {"fla_employee_id": "Reporting officer is required"},
+#                     status=400
+#                 )
+
+#             try:
+#                 reporting = Employee.objects.get(employee_id=reporting_id)
+#             except Employee.DoesNotExist:
+#                 return Response(
+#                     {"fla_employee_id": "Invalid reporting officer"},
+#                     status=400
+#                 )
+
+#             data["fla_name"] = reporting.name
+#             data["fla_email"] = reporting.email
+#             data["fla_employee_id"] = reporting.employee_id
+
+#         # -----------------------------
+#         # FLA FLOW (from cookie/user data)
+#         # -----------------------------
+#         else:
+#             # Expecting UD cookie contains JSON data of user
+            
+#             ud_cookie = request.COOKIES.get("UD")
+#             if not ud_cookie:
+#                 return Response({"error": "User data cookie missing"}, status=400)
+
+#             try:
+#                 ud_data = json.loads(unquote(ud_cookie))
+#             except json.JSONDecodeError:
+#                 return Response({"error": "Invalid cookie data"}, status=400)
+
+#             if ud_data.get("role") != "FLA":
+#                 return Response({"error": "Only FLA users can create employee"}, status=403)
+
+#             # Fill FLA details from cookie
+#             data["fla_employee_id"] = ud_data.get("employee_id")
+#             data["fla_name"] = ud_data.get("username")  # or map to proper name field
+#             data["fla_email"] = ud_data.get("email")
+#             data["is_fla"] = False  # employees created by FLA are not themselves FLA
+
+#         serializer = EmployeeSerializer(data=data)
+#         serializer.is_valid(raise_exception=True)
+#         serializer.save()
+
+#         return Response(
+#             {"message": "Employee created successfully"},
+#             status=201
+#         )
 
 
 
@@ -3021,9 +3125,6 @@ class EmployeeBulkPreviewAPIView(APIView):
         "employee_id",
         "email",
         "group",
-        "fla_employee_id",
-        "fla_name",
-        "fla_email",
         "is_fla",
     ]
 
@@ -3038,13 +3139,14 @@ class EmployeeBulkPreviewAPIView(APIView):
         reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
 
         preview = []
-        errors = []
         seen_employee_ids = set()
+
+        fla_exists = Employee.objects.filter(is_fla=True).exists()
 
         for row_num, row in enumerate(reader, start=2):
             row_errors = []
 
-            # Required fields
+            # Required base fields
             for field in self.REQUIRED_FIELDS:
                 if not row.get(field):
                     row_errors.append(f"{field} is required")
@@ -3060,25 +3162,33 @@ class EmployeeBulkPreviewAPIView(APIView):
             if Employee.objects.filter(employee_id=emp_id).exists():
                 row_errors.append("employee_id already exists in database")
 
+            # Normalize is_fla
+            is_fla = str(row.get("is_fla")).lower() == "true"
+
+            fla_emp_id = row.get("fla_employee_id")
+
+            # 🔑 ROOT FLA RULE
+            if not fla_exists and is_fla:
+                if fla_emp_id:
+                    row_errors.append("Root FLA must not have reporting officer")
+            else:
+                if not fla_emp_id:
+                    row_errors.append("fla_employee_id is required")
+
+                elif not Employee.objects.filter(employee_id=fla_emp_id, is_fla=True).exists():
+                    row_errors.append("Invalid reporting FLA")
+
             preview.append({
                 "row": row_num,
                 "employee_id": emp_id,
-                "data": row,
                 "errors": row_errors,
                 "valid": len(row_errors) == 0,
             })
 
-            if row_errors:
-                errors.append({
-                    "row": row_num,
-                    "employee_id": emp_id,
-                    "errors": row_errors,
-                })
-
         return Response({
             "total": len(preview),
-            "valid_rows": sum(1 for r in preview if r["valid"]),
-            "invalid_rows": len(errors),
+            "valid_rows": sum(r["valid"] for r in preview),
+            "invalid_rows": sum(not r["valid"] for r in preview),
             "rows": preview,
         })
 
@@ -3093,45 +3203,40 @@ class EmployeeBulkUploadAPIView(APIView):
             return Response({"error": "Admin only"}, status=403)
 
         file = request.FILES.get("file")
-        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
+        if not file:
+            return Response({"error": "CSV required"}, status=400)
 
-        created = 0
-        errors = []
+        reader = csv.DictReader(io.StringIO(file.read().decode("utf-8")))
         rows = list(reader)
 
-        employee_ids = [r["employee_id"] for r in rows]
-
-        # ❌ Block if any employee already exists
-        existing = Employee.objects.filter(employee_id__in=employee_ids)
-        if existing.exists():
-            return Response({
-                "error": "Duplicate employee_id found",
-                "existing_ids": list(existing.values_list("employee_id", flat=True))
-            }, status=400)
+        created = 0
+        fla_exists = Employee.objects.filter(is_fla=True).exists()
 
         try:
             with transaction.atomic():
                 for row in rows:
-                    # Normalize
-                    row["is_fla"] = row["is_fla"].lower() == "true"
-                    row["phone_number"] = row.get("phone_number") or None
-                    row["designation"] = row.get("designation") or None
+                    row["is_fla"] = str(row["is_fla"]).lower() == "true"
 
-                    # Ensure FLA exists
-                    fla_id = row["fla_employee_id"]
-                    fla = Employee.objects.filter(employee_id=fla_id).first()
+                    # ROOT FLA
+                    if not fla_exists and row["is_fla"]:
+                        row["fla_employee_id"] = None
+                        row["fla_name"] = None
+                        row["fla_email"] = None
+                        fla_exists = True
 
-                    if not fla:
-                        fla = Employee.objects.create(
-                            name=row["fla_name"],
-                            employee_id=row["fla_employee_id"],
-                            email=row["fla_email"],
-                            group=row["group"],
-                            fla_employee_id=row["fla_employee_id"],
-                            fla_name=row["fla_name"],
-                            fla_email=row["fla_email"],
-                            is_fla=True,
-                        )
+                    else:
+                        fla = Employee.objects.filter(
+                            employee_id=row.get("fla_employee_id"),
+                            is_fla=True
+                        ).first()
+
+                        if not fla:
+                            raise ValueError(
+                                f"Invalid reporting FLA: {row.get('fla_employee_id')}"
+                            )
+
+                        row["fla_name"] = fla.name
+                        row["fla_email"] = fla.email
 
                     serializer = EmployeeSerializer(data=row)
                     serializer.is_valid(raise_exception=True)
@@ -3145,6 +3250,7 @@ class EmployeeBulkUploadAPIView(APIView):
             "created_count": created,
             "message": "Bulk upload successful"
         }, status=201)
+
 
 
 # class EmployeeBulkUploadAPIView(APIView):
@@ -3721,142 +3827,7 @@ class InstanceDetailsAPIView(APIView):
         else:
             return f"{hours} hour{'s' if hours != 1 else ''}"
 
-    # def calculate_age(self, created_at):
-    #     """Calculate the age of the instance."""
-    #     created_time = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
-    #     now = datetime.now(timezone.utc)
-    #     age = now - created_time
-    #     days = age.days
-    #     hours = age.seconds // 3600
-    #     return f"{days} days, {hours} hours"
 
-
-# class InstanceDetailsAPIViewDetails(APIView):
-
-#     permission_classes = [IsAuthenticated]
-
-#     def get(self, request):
-#         try:
-#             # Initialize OpenStack connection
-#             conn = get_openstack_connection()
-
-#             # Fetch all instances
-#             servers = conn.compute.servers(details=True)
-#             instances = []
-
-#             for server in servers:
-#                 # Get instance details
-#                 instance_id = server.id
-#                 instance_name = server.name if server.name else "Unknown"
-#                 status = server.status if server.status else "Unknown"
-#                 power_state = "Running" if server.power_state == 1 else "Stopped"
-#                 availability_zone = server.availability_zone if server.availability_zone else "-"
-#                 task = server.task_state if server.task_state else "None"
-#                 created_at = server.created_at if server.created_at else None
-#                 updated_at = server.updated_at if server.updated_at else None
-#                 age = self.calculate_age(created_at) if created_at else "Unknown"
-
-#                 # Get image details
-#                 image_id = server.image['id'] if server.image else None
-#                 image_name = "-"
-#                 if image_id:
-#                     image = conn.compute.find_image(image_id)
-#                     image_name = image.name if image else "-"
-
-#                 # Get flavor details
-#                 flavor_id = server.flavor['id'] if server.flavor else None
-#                 flavor_name, ram, vcpus, disk = "-", "-", "-", "-"
-#                 if flavor_id:
-#                     flavor = conn.compute.find_flavor(flavor_id)
-#                     print("flavor",flavor)
-#                     if flavor:
-#                         flavor_name = flavor.name
-#                         print("flavor_name",flavor_name)
-#                         ram = f"{flavor.ram} MB"
-#                         vcpus = flavor.vcpus
-#                         disk = f"{flavor.disk} GB"
-
-#                 # Handle boot from volume case
-#                 boot_volume_id = None
-#                 if hasattr(server, "os-extended-volumes:volumes_attached"):
-#                     attached_volumes = server.get("os-extended-volumes:volumes_attached", [])
-#                     if attached_volumes:
-#                         boot_volume_id = attached_volumes[0].get("id")
-
-#                 if not image_name and boot_volume_id:
-#                     image_name = f"Booted from Volume ({boot_volume_id})"
-
-#                 # Get security groups
-#                 security_groups = [sg['name'] for sg in server.security_groups] if hasattr(server, 'security_groups') else []
-
-#                 # Get IP addresses
-#                 ip_addresses = {}
-#                 if server.addresses:
-#                     for network, address_list in server.addresses.items():
-#                         ip_addresses[network] = [addr['addr'] for addr in address_list]
-
-#                 # Get metadata
-#                 metadata = server.metadata if hasattr(server, "metadata") else {}
-
-#                 # Get attached volumes
-#                 volumes_attached = [vol['id'] for vol in server.attached_volumes] if hasattr(server, 'attached_volumes') else []
-
-#                 # Get extra details
-#                 host = getattr(server, 'OS-EXT-SRV-ATTR:host', None)
-#                 launch_index = getattr(server, 'OS-EXT-SRV-ATTR:launch_index', 0)
-#                 hostname = getattr(server, 'OS-EXT-SRV-ATTR:hostname', instance_name)
-#                 reservation_id = getattr(server, 'OS-EXT-SRV-ATTR:reservation_id', "-")
-#                 kernel_id = getattr(server, 'OS-EXT-SRV-ATTR:kernel_id', "-")
-#                 ramdisk_id = getattr(server, 'OS-EXT-SRV-ATTR:ramdisk_id', "-")
-#                 device_name = getattr(server, 'OS-EXT-SRV-ATTR:root_device_name', "-")
-#                 user_data = getattr(server, 'OS-EXT-SRV-ATTR:user_data', None)
-
-#                 # Construct instance details
-#                 instances.append({
-#                     "Instance ID": instance_id,
-#                     "Instance Name": instance_name,
-#                     "Image Name": image_name,
-#                     "Image ID": image_id if image_id else "-",
-#                     "Flavor Name": flavor_name,
-#                     "Flavor ID": flavor_id if flavor_id else "-",
-#                     "RAM": ram,
-#                     "VCPUs": vcpus,
-#                     "Disk": disk,
-#                     "Key Pair": server.key_name if server.key_name else "None",
-#                     "Status": status,
-#                     "Availability Zone": availability_zone,
-#                     "Task": task,
-#                     "Power State": power_state,
-#                     "Age": age,
-#                     "Created At": created_at,
-#                     "Updated At": updated_at,
-#                     "Host": host,
-#                     "Launch Index": launch_index,
-#                     "Hostname": hostname,
-#                     "Reservation ID": reservation_id,
-#                     "Kernel ID": kernel_id,
-#                     "Ramdisk ID": ramdisk_id,
-#                     "Device Name": device_name,
-#                     "User Data": user_data,
-#                     "IP Addresses": ip_addresses,
-#                     "Security Groups": security_groups,
-#                     "Volumes Attached": volumes_attached,
-#                     "Metadata": metadata,
-#                 })
-
-#             return Response(instances, status=200)
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=500)
-
-#     def calculate_age(self, created_at):
-#         if not created_at:
-#             return "Unknown"
-#         created_time = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
-#         now = datetime.now(timezone.utc)
-#         age = now - created_time
-#         days = age.days
-#         hours = age.seconds // 3600
-#         return f"{days} days, {hours} hours"
 
 
 class InstanceDetailsAPIViewDetails(APIView):
@@ -5711,7 +5682,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
         totp = pyotp.TOTP(secret, interval=300)  # 5 minutes validity
         otp = totp.now()
         logger.info("OTP generated for user; valid for 5 minutes")
-
+        print(f"Generated OTP: {otp}")  # For debugging; remove in production
         return otp, secret
 
     def send_otp_email(self, email, otp, username):
@@ -5784,7 +5755,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             return Response({"error": "Username is required"}, status=400)
 
         # --- Username (email format) ---
-        email_pattern = r"^[A-Za-z0-9._%+-]+@cdac\.in$"
+        email_pattern = r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$"
         if username and not re.match(email_pattern, username):
             return Response(
                 {"error": "Username must be a valid CDAC email (e.g., user@cdac.in)."},
@@ -14845,7 +14816,7 @@ class OpenStackRequestsByDateAPIView(APIView):
             "creation_status",
             "designation",
         )
-        logger.info("Table Data:", list(table_data))
+       
         return Response({
             "date": selected_date,
             "pending": pending_qs.count(),

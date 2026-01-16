@@ -291,7 +291,7 @@ const VmRequest = () => {
           count_of_vms: 1,
           purpose: "",
           purpose_of_request: "",
-          project_name: "",network_id: "",
+          project_name: "",
           designation: "",
           vdi_required: true,
           image: "",

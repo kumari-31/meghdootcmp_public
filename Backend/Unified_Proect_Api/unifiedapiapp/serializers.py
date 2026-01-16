@@ -192,6 +192,18 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "is_fla",
         ]
 
+    def validate(self, attrs):
+        is_fla = attrs.get("is_fla", False)
+        fla_employee_id = attrs.get("fla_employee_id")
+
+        # If NOT root FLA, reporting officer is mandatory
+        if not is_fla and not fla_employee_id:
+            raise serializers.ValidationError({
+                "fla_employee_id": "Reporting officer is required"
+            })
+
+        return attrs
+    
     def validate_email(self, value):
         if Employee.objects.filter(email=value).exists():
             raise serializers.ValidationError(

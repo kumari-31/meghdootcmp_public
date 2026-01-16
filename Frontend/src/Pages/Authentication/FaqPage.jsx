@@ -76,27 +76,27 @@ const faqData = [
     answer:
       "Navigate to the VM Request section, fill in the required details, and submit. Track approval in the Requests tab.",
   },
-  {
-    category: "VM Services",
-    icon: <VmIcon />,
-    question: "What is the maximum number of VMs I can request?",
-    answer:
-      "The quota depends on your role and allocation by Admin/FLA. Check your Dashboard for limits.",
-  },
+  // {
+  //   category: "VM Services",
+  //   icon: <VmIcon />,
+  //   question: "What is the maximum number of VMs I can request?",
+  //   answer:
+  //     "The quota depends on your role and allocation by Admin/FLA. Check your Dashboard for limits.",
+  // },
   {
     category: "VM Services",
     icon: <VmIcon />,
     question: "How do I delete a VM?",
     answer:
-      "Select the VM in your dashboard and click Delete. Confirm to release resources.",
+      "Go to operations > click on Approved Request > select actions buttons which VM you want delete and click Delete. Wait for Admin to delete it.",
   },
-  {
-    category: "VM Services",
-    icon: <VmIcon />,
-    question: "Can I extend storage or network of my VM?",
-    answer:
-      "Yes, submit a request via the Storage or Network section. Approval depends on your quota.",
-  },
+  // {
+  //   category: "VM Services",
+  //   icon: <VmIcon />,
+  //   question: "Can I extend storage or network of my VM?",
+  //   answer:
+  //     "Yes, submit a request via the Storage or Network section. Approval depends on your quota.",
+  // },
 
   // Kubernetes Services
   {
@@ -113,29 +113,29 @@ const faqData = [
     answer:
       "Select the deployment and adjust the replica count. Submit to apply changes.",
   },
-  {
-    category: "Kubernetes Services",
-    icon: <KubernetesIcon />,
-    question: "How do I check pod logs?",
-    answer:
-      "Select the pod in the Kubernetes dashboard and click Logs to view output.",
-  },
+  // {
+  //   category: "Kubernetes Services",
+  //   icon: <KubernetesIcon />,
+  //   question: "How do I check pod logs?",
+  //   answer:
+  //     "Select the pod in the Kubernetes dashboard and click Logs to view output.",
+  // },
   {
     category: "Kubernetes Services",
     icon: <KubernetesIcon />,
     question: "Why is my pod not running?",
     answer:
-      "Check the pod status and events in the dashboard. It may be due to insufficient resources or misconfiguration.",
+      "Check the pod status in deployed services. It may be due to insufficient resources or misconfiguration.",
   },
 
   // Security
-  {
-    category: "Security",
-    icon: <SecurityIcon />,
-    question: "How do I reset my two-factor authentication (2FA) or OTP?",
-    answer:
-      "If 2FA is enabled and you can’t access it, contact support to reset it.",
-  },
+  // {
+  //   category: "Security",
+  //   icon: <SecurityIcon />,
+  //   question: "How do I reset my two-factor authentication (2FA) or OTP?",
+  //   answer:
+  //     "If 2FA is enabled and you can’t access it, contact support to reset it.",
+  // },
 
   // Session
   {
@@ -161,7 +161,7 @@ const faqData = [
     icon: <SupportAgentIcon />,
     question: "How do I contact CMP support?",
     answer:
-      "Click “Need Help?” on the login page or email support@cmpportal.com with your issue.",
+      "Click “Need Help?” on the login page or email cloud-chn@cdac.in with your issue.",
   },
 ];
 
@@ -173,7 +173,6 @@ const categories = [
   "VM Services",
   "Kubernetes Services",
   "Session",
-  "Security",
   "UI",
   "Support",
 ];
@@ -204,7 +203,7 @@ const FaqPage = () => {
   });
 
   return (
-    <Box sx={{ minHeight: "100vh", backgroundColor: "#f0f4f8" }}>
+    <Box sx={{ minHeight: "100vh", backgroundColor: "#f0f4f8",overflowY: "auto" }}>
       {/* Navbar */}
       <AppBar position="sticky" sx={{ backgroundColor: "#253848", mb: 2 }}>
         <Toolbar sx={{ justifyContent: "space-between" }}>
@@ -232,7 +231,8 @@ const FaqPage = () => {
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="md" sx={{ py: 4 }}>
+      <Container maxWidth="md" sx={{ py: 4 ,maxHeight: "calc(100vh - 64px)", 
+    overflowY: "auto"}}>
         {/* Search Section */}
         <Typography
           variant="h4"

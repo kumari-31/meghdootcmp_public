@@ -1,11 +1,17 @@
 import json
+import os
 
 import requests
 
 # Zabbix API credentials
-ZABBIX_URL = "http://10.184.49.245/zabbix/api_jsonrpc.php"
-ZABBIX_USER = "Admin"
-ZABBIX_PASSWORD = "zabbix"
+from dotenv import load_dotenv
+
+load_dotenv()  
+
+# ZABBIX API CREDENTIALS
+ZABBIX_URL = os.getenv("ZABBIX_URL")
+ZABBIX_USER = os.getenv("ZABBIX_USER")
+ZABBIX_PASSWORD = os.getenv("ZABBIX_PASSWORD")
 
 
 # Function to authenticate with Zabbix API

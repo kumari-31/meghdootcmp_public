@@ -72,11 +72,13 @@ const handleSubmit = async (e) => {
   setError("");
   setLoadingLogin(true);
 
-  let username = formData.username.trim();
-  if (!username.includes("@")) username = username + "@cdac.in";
+ const username = formData.username.trim();
 
-  if (!username.endsWith("@cdac.in")) {
-    setError("Username must be a valid CDAC email (ex: user@cdac.in)");
+  // Basic email validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailRegex.test(username)) {
+    setError("Please enter a valid email address.");
     setLoadingLogin(false);
     return;
   }
@@ -102,9 +104,17 @@ const handleSubmit = async (e) => {
       return;
     }
 
-  } catch (err) {
-    setError(err.message || "Login failed.");
-  } finally {
+ } catch (err) {
+  if (err.response && err.response.data) {
+    setError(
+      err.response.data.detail ||
+      err.response.data.error ||
+      "Invalid username or password"
+    );
+  } else {
+    setError("Unable to connect to server.");
+  }
+} finally {
     setLoadingLogin(false);
   }
 };
@@ -158,6 +168,20 @@ const handleSubmit = async (e) => {
     setLoadingLogin(false);
   };
 
+    const getFinancialYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0 = Jan, 3 = April
+  
+    if (month >= 3) {
+      // April or later
+      return `${year.toString().slice(-2)}–${(year + 1).toString().slice(-2)}`;
+    } else {
+      // Jan–March
+      return `${(year - 1).toString().slice(-2)}–${year.toString().slice(-2)}`;
+    }
+  };
+
   return (
     <div className="login-page">
       <div className="logo-container">
@@ -186,7 +210,7 @@ const handleSubmit = async (e) => {
               required
             />
             <button type="submit" disabled={loadingLogin || !formData.username || !formData.password}>
-              {loadingLogin ? "Sending OTP..." : "Login"}
+              Login
             </button>
             {error && <p className="error">{error}</p>}
             {success && <p className="success">{success}</p>}
@@ -197,12 +221,13 @@ const handleSubmit = async (e) => {
             <Link to="/forgot-password" className="forgot-password-link">
               Forgot Password?
             </Link>
+            <br />
             <Link to="/faq" className="faq-link">
               FAQ
             </Link>
           </div>
           <div className="copyright">
-            Copyright © 2024–25 C-DAC. All rights reserved
+             Copyright © {getFinancialYear()} C-DAC. All rights reserved 
           </div>
         </div>
       </div>

@@ -1,12 +1,15 @@
+import os
 import requests
+from dotenv import load_dotenv
 
+load_dotenv()  
 
 def get_auth_token(base_url, username, password, verify_ssl=False):
     """
     Authenticate with the Ceph API and return the JWT token.
 
     Args:
-        base_url (str): Base URL of the Ceph API (e.g., 'https://10.184.43.52:8443')
+        base_url (str): Base URL of the Ceph API (e.g., 'https://ceph.example.com')
         username (str): Admin username
         password (str): Admin password
         verify_ssl (bool): Whether to verify SSL certificates (default: False)
@@ -43,9 +46,9 @@ def get_auth_token(base_url, username, password, verify_ssl=False):
 
 # Example usage
 if __name__ == "__main__":
-    BASE_URL = "https://10.184.43.52:8443"
-    USERNAME = "admin"
-    PASSWORD = "Meghd@@t123"
+    BASE_URL = os.getenv("CEPH_BASE_URL")
+    USERNAME = os.getenv("CEPH_USERNAME")
+    PASSWORD = os.getenv("CEPH_PASSWORD")
 
     token = get_auth_token(BASE_URL, USERNAME, PASSWORD)
 

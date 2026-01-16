@@ -368,109 +368,15 @@ def wait_for_server_status(server, target_status="ACTIVE", retries=1800, delay=5
     raise TimeoutError("Server build timeout")
 
 
-def get_guac_token():
-    url = f"{guacamole_base_url}/tokens"
-    # payload=f"username={guacamole_uname}&password={guacamole_pwd}"
-    payload = {"username": guacamole_uname, "password": guacamole_pwd}
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    # response = requests.request("POST", url, headers=headers, data=payload)
-    response = requests.post(url, data=payload, headers=headers)
-    if response.status_code != 200:
-        return None # Failed to get token
-    return response.json().get("authToken")
-
-def create_connection(name, port, hostname, authToken):
-    url = f"{guacamole_base_url}/session/data/postgresql/connections?token=" + authToken
-
-    payload = {
-            "parentIdentifier": "ROOT",
-            "name": name,
-            "protocol": "vnc",
-            "parameters": {
-                "port": str(port),
-                "hostname": hostname,
-            },
-            "attributes": {
-                "max-connections": "5",
-                "max-connections-per-user": "5",
-                
-            },
-        }
-    
-    headers = {"Content-Type": "application/json"}
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    return response
 
 def get_guac_user(username, token):
     """Return True if Guacamole user exists, else False."""
-    url = f"{guacamole_base_url}/session/data/postgresql/users/{username}?token={token}"
-    resp = requests.get(url)
-    return resp.status_code == 200
-         
-    
-
-def create_user(username, password, authToken):
-
-    check_url = f"{guacamole_base_url}/session/data/postgresql/users/{username}?token=" + authToken
-    check_resp = requests.get(check_url)
-
-    if check_resp.status_code == 200:
-        print(f"User '{username}' already exists in Guacamole → SKIPPING creation")
-        return check_resp
-
-    url = f"{guacamole_base_url}/session/data/postgresql/users?token={authToken}"
-
-    payload = {
-        "username": username,
-        "password": password,
-        "attributes": {
-            "disabled": "",
-            "expired": "",
-            # "access-window-start": vmvalidity["vm_access_from_time"],
-            # "access-window-end": vmvalidity["vm_access_to_time"],
-            # "valid-from": vmvalidity["vm_access_from_date"],
-            # "valid-until": vmvalidity["vm_access_to_date"],
-            "timezone": "Asia/Kolkata",
-            "guac-full-name": "",
-            "guac-organization": "",
-            "guac-organizational-role": "",
-        },
-    }
-
-    headers = {"Content-Type": "application/json"}
-    response = requests.post(url, json=payload, headers=headers)
-
-    return response
-
-
-
-def map_user_conn(con_identifier, username, authToken):
-    # print(type(con_identifier))
-
-    url = (
-        f"{guacamole_base_url}/session/data/postgresql/users/"
-        + username
-        + "/permissions?token="
-        + authToken
-    )
-
-    payload = [
-        {
-            "op": "add",
-            "path": "/connectionPermissions/" + con_identifier,
-            "value": "READ",
-        }
-    ]
-    headers = {"Content-Type": "application/json"}
-
-    response = requests.patch(url, headers=headers, json=payload)
-
-    return response
-
-
-
+    try:
+        url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token={token}"
+        resp = requests.get(url)
+        return resp.status_code == 200
+    except:
+        return False
 
 
 def run_shell_script_to_save_vm_details(vms, creation=True):
@@ -541,13 +447,25 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
             vm_name, host_raw, parsed_instance_name, vnc_raw = fields
 
             host_name = HOST_FSPCLOUD_IP if host_raw == "fspcloud" else HOST_DEFAULT_IP
-            vnc_port = 5900 + int(vnc_raw)
-            vnc_display = vnc_port
+            vnc_display = f"59{vnc_raw}" if len(vnc_raw) == 2 else f"590{vnc_raw}"
             u_name = vmtime.get("username")
             user_mail = vmtime.get("email")
             print(
                 f"Parsed → Host:{host_name}, Instance:{parsed_instance_name}, VNC:{vnc_display}, User:{u_name}"
             )
+
+            # -------------------------------
+            # 4️⃣ CREATE GUACAMOLE CONNECTION
+            # -------------------------------
+            conn = create_connection(vm_name, vnc_display, host_name, authToken)
+            if conn.status_code != 200:
+                print(f"Failed to create connection for {vm_name}")
+                continue
+
+            con_identifier = conn.json().get("identifier")
+            print("Connection ID:", con_identifier)
+
+            guac_connections[vm_name] = con_identifier
 
             # -------------------------------
             # 5️⃣ CREATE GUACAMOLE USER
@@ -558,29 +476,12 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
                 print(f"User '{u_name}' already exists → will reuse this user.")
                 user_created = False
             else:
-                user = create_user(u_name, u_name, authToken)
+                user = create_user(u_name, u_name, authToken, vmtime)
                 user_created = user.status_code == 200
                 if user_created:
                     print(f"New Guacamole user '{u_name}' created.")
                 else:
                     print("User creation failed:", getattr(user, "text", user))
-
-            # -------------------------------
-            # 4️⃣ CREATE GUACAMOLE CONNECTION
-            # -------------------------------
-            conn = create_connection(vm_name, vnc_port, host_name, authToken)
-            if conn.status_code != 200:
-                print(f"Failed to create connection for {vm_name}")
-                print("Status:", conn.status_code)
-                print("Response:", conn.text)
-                continue
-
-            con_identifier = conn.json().get("identifier")
-            print("Connection ID:", con_identifier)
-
-            guac_connections[vm_name] = con_identifier
-
-
 
             # -------------------------------
             # 6️⃣ MAP USER ↔ CONNECTION
@@ -691,18 +592,145 @@ def update_ip_by_vmname(vm_name):
         return ""
 
 
+def get_guac_token():
+    url = f"{guacamole_base_url}/tokens"
+    # payload=f"username={guacamole_uname}&password={guacamole_pwd}"
+    payload = {"username": guacamole_uname, "password": guacamole_pwd}
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    # response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.post(url, data=payload, headers=headers)
+    if response.status_code != 200:
+        return None # Failed to get token
+    return response.json().get("authToken")
 
 def delete_connection(connection_id, authToken):
-    url = f"{guacamole_base_url}/session/data/postgresql/connections/{connection_id}?token={authToken}"
+    url = f"{guacamole_base_url}/session/data/mysql/connections/{connection_id}?token={authToken}"
     headers = {"X-Guacamole-Token": authToken}  # optional
     response = requests.delete(url, headers=headers)
     return response
 
 
 def delete_guac_user(username, authToken):
-    url = f"{guacamole_base_url}/session/data/postgresql/users/{username}?token={authToken}"
+    url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token={authToken}"
     headers = {"X-Guacamole-Token": authToken}  # optional
     response = requests.delete(url, headers=headers)
+    return response
+
+def create_connection(name, port, hostname, authToken):
+    url = f"{guacamole_base_url}/session/data/mysql/connections?token=" + authToken
+
+    payload = json.dumps(
+        {
+            "parentIdentifier": "ROOT",
+            "name": name,
+            "protocol": "vnc",
+            "parameters": {
+                "port": port,
+                "read-only": "",
+                "swap-red-blue": "",
+                "cursor": "",
+                "color-depth": "",
+                "clipboard-encoding": "",
+                "disable-copy": "",
+                "disable-paste": "",
+                "dest-port": "",
+                "recording-exclude-output": "",
+                "recording-exclude-mouse": "",
+                "recording-include-keys": "",
+                "create-recording-path": "",
+                "enable-sftp": "false",
+                "sftp-port": "",
+                "sftp-server-alive-interval": "",
+                "enable-audio": "",
+                "audio-servername": "",
+                "sftp-directory": "",
+                "sftp-root-directory": "",
+                "sftp-passphrase": "",
+                "sftp-private-key": "",
+                "sftp-username": "",
+                "sftp-password": "",
+                "sftp-host-key": "",
+                "sftp-hostname": "",
+                "recording-name": "",
+                "recording-path": "",
+                "dest-host": "",
+                "password": "",
+                "username": "",
+                "hostname": hostname,
+            },
+            "attributes": {
+                "max-connections": "5",
+                "max-connections-per-user": "5",
+                "weight": "",
+                "failover-only": "",
+                "guacd-port": "",
+                "guacd-encryption": "",
+                "guacd-hostname": "",
+            },
+        }
+    )
+    headers = {"Content-Type": "application/json"}
+
+    response = requests.request("POST", url, headers=headers, data=payload)
+
+    return response
+
+
+def create_user(username, password, authToken, vmvalidity):
+
+    check_url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token=" + authToken
+    check_resp = requests.get(check_url)
+
+    if check_resp.status_code == 200:
+        print(f"User '{username}' already exists in Guacamole → SKIPPING creation")
+        return check_resp
+
+    url = f"{guacamole_base_url}/session/data/mysql/users?token={authToken}"
+
+    payload = {
+        "username": username,
+        "password": password,
+        "attributes": {
+            "disabled": "",
+            "expired": "",
+            # "access-window-start": vmvalidity["vm_access_from_time"],
+            # "access-window-end": vmvalidity["vm_access_to_time"],
+            # "valid-from": vmvalidity["vm_access_from_date"],
+            # "valid-until": vmvalidity["vm_access_to_date"],
+            "timezone": "Asia/Kolkata",
+            "guac-full-name": "",
+            "guac-organization": "",
+            "guac-organizational-role": "",
+        },
+    }
+
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, json=payload, headers=headers)
+
+    return response
+
+
+def map_user_conn(con_identifier, username, authToken):
+    # print(type(con_identifier))
+
+    url = (
+        f"{guacamole_base_url}/session/data/mysql/users/"
+        + username
+        + "/permissions?token="
+        + authToken
+    )
+
+    payload = [
+        {
+            "op": "add",
+            "path": "/connectionPermissions/" + con_identifier,
+            "value": "READ",
+        }
+    ]
+    headers = {"Content-Type": "application/json"}
+
+    response = requests.patch(url, headers=headers, json=payload)
+
     return response
 
 
@@ -713,7 +741,7 @@ def get_connections_list():
         print("Failed to get Guacamole token")
         return {}
 
-    url = f"{guacamole_base_url}/session/data/postgresql/connections?token=" + authToken
+    url = f"{guacamole_base_url}//session/data/mysql/connections?token=" + authToken
     response = requests.get(url)
 
     # Check if the request was successful (status code 200)
@@ -742,7 +770,7 @@ def update_connection(connection_id, update_data):
     """
     try:
         # API endpoint for updating a connection
-        api_url = f"{guacamole_base_url}/session/data/postgresql/connections/{connection_id}"
+        api_url = f"{guacamole_base_url}/session/data/mysql/connections/{connection_id}"
 
         # Make a PATCH request to update the connection
         response = requests.patch(api_url, json=update_data)
@@ -772,7 +800,7 @@ def update_guacamole_user_date_time(username, from_date, to_date, from_time, to_
         return
     
     print(authToken)
-    url = f"{guacamole_base_url}/session/data/postgresql/users/{username}?token=" + authToken
+    url = f"{guacamole_base_url}/session/data/mysql/users/{username}?token=" + authToken
 
     headers = {
         "Content-Type": "application/json",
