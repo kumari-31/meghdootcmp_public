@@ -134,6 +134,20 @@ const handleSubmit = async (e) => {
     }
   };
 
+  const getFinancialYear = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0 = Jan, 3 = April
+  
+    if (month >= 3) {
+      // April or later
+      return `${year.toString().slice(-2)}–${(year + 1).toString().slice(-2)}`;
+    } else {
+      // Jan–March
+      return `${(year - 1).toString().slice(-2)}–${year.toString().slice(-2)}`;
+    }
+  };
+  
   const handleResendOtp = async () => {
     setResendingOtp(true);
     setOtpMessage(""); // Clear old messages
@@ -202,7 +216,7 @@ const handleSubmit = async (e) => {
             </Link>
           </div>
           <div className="copyright">
-            Copyright © 2024–25 C-DAC. All rights reserved
+          Copyright © {getFinancialYear()} C-DAC. All rights reserved
           </div>
         </div>
       </div>
