@@ -1,8 +1,10 @@
 import requests
 
-guacamole_base_url = "https://virtuallab.bosschn.in/api"
+guacamole_base_url = "http://10.184.49.247:9006/guacamole/api"
 guacamole_username = "guacadmin"
-guacamole_password = "CHN@VL0987&*"
+guacamole_password = "guacadmin"
+
+
 
 
 def get_token():

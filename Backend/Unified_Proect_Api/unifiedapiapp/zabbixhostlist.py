@@ -23,6 +23,7 @@ class HostAvailabilityDetailView(APIView):
             "id": 1,
             "auth": None,
         }
+
         response = requests.post(ZABBIX_URL, json=payload).json()
         return response.get("result")
 
@@ -31,14 +32,16 @@ class HostAvailabilityDetailView(APIView):
             "jsonrpc": "2.0",
             "method": "host.get",
             "params": {
-                "output": ["hostid", "host", "available"],
-                "selectInterfaces": ["ip"],
+                "output": ["hostid", "host"],
+                "selectInterfaces": ["ip", "available"],
+                "selectGroups": ["groupid", "name"],
             },
             "auth": auth_token,
             "id": 2,
         }
         response = requests.post(ZABBIX_URL, json=payload).json()
         return response.get("result", [])
+
 
     def get(self, request, *args, **kwargs):
         auth_token = self.zabbix_login()
@@ -48,18 +51,24 @@ class HostAvailabilityDetailView(APIView):
         hosts = self.get_hosts(auth_token)
         print(hosts)
 
-        availability_map = {0: "Unknown", 1: "Available", 2: "Not available"}
+        availability_map = {
+            "0": "Unknown",
+            "1": "Available",
+            "2": "Not available",
+        }
 
         detailed_data = []
+
         for host in hosts:
-            detailed_data.append(
-                {
-                    "host": host["host"],
-                    "status": availability_map.get(int(host["available"]), "Unknown"),
-                    "ip": (
-                        host["interfaces"][0]["ip"] if host.get("interfaces") else "N/A"
-                    ),
-                }
-            )
+            iface = host["interfaces"][0] if host.get("interfaces") else {}
+
+            detailed_data.append({
+                "host": host["host"],
+                "groups": [g["name"] for g in host.get("groups", [])],
+                "ip": iface.get("ip", "N/A"),
+                "status": availability_map.get(
+                    str(iface.get("available", "0")), "Unknown"
+                ),
+            })
 
         return Response(detailed_data)

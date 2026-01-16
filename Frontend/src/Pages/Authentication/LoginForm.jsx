@@ -143,7 +143,7 @@ const handleSubmit = async (e) => {
       setOtpError(err.message || "OTP verification failed.");
     }
   };
-
+  
   const handleResendOtp = async () => {
     setResendingOtp(true);
     setOtpMessage(""); // Clear old messages
@@ -227,7 +227,7 @@ const handleSubmit = async (e) => {
             </Link>
           </div>
           <div className="copyright">
-             Copyright © {getFinancialYear()} C-DAC. All rights reserved 
+          Copyright © {getFinancialYear()} C-DAC. All rights reserved
           </div>
         </div>
       </div>

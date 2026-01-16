@@ -5676,6 +5676,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             )
         return response
 
+
     # ---------------------- OTP GENERATION & EMAIL ----------------------
     def generate_otp(self):
         secret = pyotp.random_base32()
@@ -11754,6 +11755,7 @@ class HostGroupAPIView(APIView):
         )
 
         return Response(groups)
+
 class HostAvailabilityAPIView(APIView):
     def get(self, request):
         zabbix = ZabbixClient()

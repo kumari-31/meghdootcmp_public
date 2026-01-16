@@ -14,6 +14,7 @@ class ZabbixClient:
             "method": "user.login",
             "params": {
                 "username": settings.ZABBIX_USER,
+                "username": settings.ZABBIX_USER,
                 "password": settings.ZABBIX_PASSWORD,
             },
             "id": 1,
