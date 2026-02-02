@@ -74,7 +74,7 @@ import apiClient from "../Axios";
 const setCache = (key, data, ttl = 60000) => {
   sessionStorage.setItem(
     key,
-    JSON.stringify({ data, expiry: Date.now() + ttl })
+    JSON.stringify({ data, expiry: Date.now() + ttl }),
   );
 };
 
@@ -90,8 +90,6 @@ const getCache = (key) => {
 
   return parsed.data;
 };
-
-
 
 /**
  * KubernetOverview.jsx
@@ -149,7 +147,7 @@ const arrayToCSV = (rows, columns) => {
         const val = typeof c.selector === "function" ? c.selector(r) : r[c.key];
         return escapeCell(val);
       })
-      .join(",")
+      .join(","),
   );
   return [header, ...lines].join("\n");
 };
@@ -228,7 +226,7 @@ const KubernetOverview = () => {
   // --- Routing helpers (unchanged behavior) ---
   const handleDeploymentClick = (name, namespace) => {
     navigate(
-      `/app/kubernetes/deployment-details/${name}?namespace=${namespace}`
+      `/app/kubernetes/deployment-details/${name}?namespace=${namespace}`,
     );
   };
   const handleServiceClick = (name, namespace) => {
@@ -242,7 +240,7 @@ const KubernetOverview = () => {
   };
   const handleReplicaSetClick = (name, namespace) => {
     navigate(
-      `/app/kubernetes/replicaset-details/${name}?namespace=${namespace}`
+      `/app/kubernetes/replicaset-details/${name}?namespace=${namespace}`,
     );
   };
 
@@ -363,27 +361,27 @@ const KubernetOverview = () => {
 
         const fetchedServices =
           servicesResult.status === "fulfilled"
-            ? servicesResult.value.data.services ?? []
+            ? (servicesResult.value.data.services ?? [])
             : [];
 
         const fetchedAllPods =
           podsResult.status === "fulfilled"
-            ? podsResult.value.data.pods ?? []
+            ? (podsResult.value.data.pods ?? [])
             : [];
 
         const fetchedNodes =
           nodesResult.status === "fulfilled"
-            ? nodesResult.value.data.nodes ?? []
+            ? (nodesResult.value.data.nodes ?? [])
             : [];
 
         const fetchedAllDeployments =
           deploymentsResult.status === "fulfilled"
-            ? deploymentsResult.value.data ?? []
+            ? (deploymentsResult.value.data ?? [])
             : [];
 
         const fetchedAllReplicaSets =
           allReplicaSetsResult.status === "fulfilled"
-            ? allReplicaSetsResult.value.data ?? []
+            ? (allReplicaSetsResult.value.data ?? [])
             : [];
 
         const filteredServices =
@@ -448,7 +446,7 @@ const KubernetOverview = () => {
     const list = data.filteredDeployments || [];
     if (!searchQuery) return list;
     return list.filter((dep) =>
-      matchesResource(dep, searchQuery, ["name", "namespace"])
+      matchesResource(dep, searchQuery, ["name", "namespace"]),
     );
   }, [data.filteredDeployments, searchQuery]);
 
@@ -456,7 +454,7 @@ const KubernetOverview = () => {
     const list = data.services || [];
     if (!searchQuery) return list;
     return list.filter((svc) =>
-      matchesResource(svc, searchQuery, ["name", "namespace", "type"])
+      matchesResource(svc, searchQuery, ["name", "namespace", "type"]),
     );
   }, [data.services, searchQuery]);
 
@@ -464,7 +462,12 @@ const KubernetOverview = () => {
     const list = data.filteredPods || [];
     if (!searchQuery) return list;
     return list.filter((pod) =>
-      matchesResource(pod, searchQuery, ["name", "namespace", "node", "status"])
+      matchesResource(pod, searchQuery, [
+        "name",
+        "namespace",
+        "node",
+        "status",
+      ]),
     );
   }, [data.filteredPods, searchQuery]);
 
@@ -472,7 +475,7 @@ const KubernetOverview = () => {
     const list = data.nodes || [];
     if (!searchQuery) return list;
     return list.filter((node) =>
-      matchesResource(node, searchQuery, ["name", "ready"])
+      matchesResource(node, searchQuery, ["name", "ready"]),
     );
   }, [data.nodes, searchQuery]);
 
@@ -701,6 +704,7 @@ const KubernetOverview = () => {
     { key: "cpu_usage", header: "CPU" },
     { key: "memory_usage", header: "Memory" },
     { key: "created_at", header: "Created At" },
+    { key: "actions", header: "Actions", align: "center" },
   ];
 
   const replicaSetColumns = [
@@ -741,6 +745,37 @@ const KubernetOverview = () => {
     { key: "pods", header: "Pods" },
     { key: "created", header: "Created" },
   ];
+
+const handleOpenShell = (item) => {
+  // If pod_selector exists (old API), use it. 
+  // Otherwise, use the deployment name (new API).
+  const selector = item.pod_selector 
+    ? JSON.stringify(item.pod_selector) 
+    : item.name;
+
+  // Pick a container name from labels or use the item name
+  const container = 
+    item.labels?.["app.kubernetes.io/name"] || 
+    item.labels?.app || 
+    item.name;
+
+  const params = new URLSearchParams({
+    namespace: item.namespace,
+    pod: selector, // Sending either stringified JSON or plain Name
+    container: container,
+  }).toString();
+
+  // window.open logic...
+  const w = 1000, h = 600;
+  const left = window.screen.width / 2 - w / 2;
+  const top = window.screen.height / 2 - h / 2;
+
+  window.open(
+    `/shell?${params}`,
+    `shell-${item.name}`,
+    `width=${w},height=${h},top=${top},left=${left},resizable=yes`
+  );
+};
 
   /* ----------------------------- Render helpers for tables ----------------------------- */
 
@@ -783,7 +818,7 @@ const KubernetOverview = () => {
             ))}
           </TableRow>
         </TableHead>
-  
+
         <TableBody>
           {[0, 1, 2, 3, 4].map((row) => (
             <TableRow key={row}>
@@ -805,7 +840,6 @@ const KubernetOverview = () => {
       </Table>
     </TableContainer>
   );
-  
 
   const renderTable = (rows, columns, keyPrefix = "") => {
     // apply sorting
@@ -819,7 +853,7 @@ const KubernetOverview = () => {
     const sorted = applySort(withSelector, columns);
     const visibleRows = sorted.slice(
       page * rowsPerPage,
-      page * rowsPerPage + rowsPerPage
+      page * rowsPerPage + rowsPerPage,
     );
 
     return (
@@ -864,102 +898,78 @@ const KubernetOverview = () => {
                     >
                       {columns.map((col) => {
                         const cellValue = row[col.key];
-                        // clickable name column linking to details for specific known tables
-                        if (col.key === "name" && orig?.name) {
-                          // determine which resource by columns set
-                          if (columns === podsColumns) {
-                            return (
-                              <TableCell
-                                key={col.key}
-                                onClick={() =>
-                                  handlePodClick(orig.name, orig.namespace)
+
+                        // 1. ACTION BUTTONS (Shell)
+                        if (col.key === "actions" && columns === podsColumns) {
+                          return (
+                            <TableCell key={col.key} align="center">
+                              <Tooltip title="Open Interactive Terminal">
+                              <Button
+                                variant="contained"
+                                size="small"
+                                startIcon={
+                                  <span style={{ fontSize: "14px" }}></span>
                                 }
+                                onClick={(e) => {
+                                  e.stopPropagation(); // Crucial: prevents row click details from opening
+                                  handleOpenShell(orig);
+                                }}
                                 sx={{
-                                  color: theme.palette.primary.main,
-                                  fontWeight: 700,
+                                  textTransform: "none",
+                                  backgroundColor: "#1a1b26",
+                                  borderRadius: "6px",
+                                  "&:hover": { backgroundColor: "#24283b" },
                                 }}
                               >
-                                {cellValue}
-                              </TableCell>
-                            );
-                          } else if (columns === deploymentColumns) {
-                            return (
-                              <TableCell
-                                key={col.key}
-                                onClick={() =>
-                                  handleDeploymentClick(
-                                    orig.name,
-                                    orig.namespace
-                                  )
-                                }
-                                sx={{
-                                  color: theme.palette.primary.main,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {cellValue}
-                              </TableCell>
-                            );
-                          } else if (columns === servicesColumns) {
-                            return (
-                              <TableCell
-                                key={col.key}
-                                onClick={() =>
-                                  handleServiceClick(orig.name, orig.namespace)
-                                }
-                                sx={{
-                                  color: theme.palette.primary.main,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {cellValue}
-                              </TableCell>
-                            );
-                          } else if (columns === nodesColumns) {
-                            return (
-                              <TableCell
-                                key={col.key}
-                                onClick={() => handleNodeClick(orig.name)}
-                                sx={{
-                                  color: theme.palette.primary.main,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {cellValue}
-                              </TableCell>
-                            );
-                          } else if (columns === replicaSetColumns) {
-                            // FIXED HERE
-                            return (
-                              <TableCell
-                                key={col.key}
-                                onClick={() =>
-                                  handleReplicaSetClick(
-                                    orig.name,
-                                    orig.namespace
-                                  )
-                                }
-                                sx={{
-                                  color: theme.palette.primary.main,
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                {cellValue}
-                              </TableCell>
-                            );
-                          }
+                                EXEC
+                              </Button>
+                              </Tooltip>
+                            </TableCell>
+                          );
                         }
 
-                        // status cell: show colored chip if key is "status"
+                        // 2. NAME COLUMN (Clickable Links)
+                        if (col.key === "name" && orig?.name) {
+                          let clickHandler = null;
+                          if (columns === podsColumns)
+                            clickHandler = () =>
+                              handlePodClick(orig.name, orig.namespace);
+                          else if (columns === deploymentColumns)
+                            clickHandler = () =>
+                              handleDeploymentClick(orig.name, orig.namespace);
+                          else if (columns === servicesColumns)
+                            clickHandler = () =>
+                              handleServiceClick(orig.name, orig.namespace);
+                          else if (columns === nodesColumns)
+                            clickHandler = () => handleNodeClick(orig.name);
+                          else if (columns === replicaSetColumns)
+                            clickHandler = () =>
+                              handleReplicaSetClick(orig.name, orig.namespace);
+
+                          return (
+                            <TableCell
+                              key={col.key}
+                              onClick={clickHandler}
+                              sx={{
+                                color: theme.palette.primary.main,
+                                fontWeight: 700,
+                                cursor: clickHandler ? "pointer" : "default",
+                              }}
+                            >
+                              {cellValue}
+                            </TableCell>
+                          );
+                        }
+
+                        // 3. STATUS COLUMN (Chips)
                         if (col.key === "status") {
-                          const status = cellValue || orig.status || "Unknown";
+                          const status = cellValue || orig?.status || "Unknown";
                           const chipColor =
                             status === "Running"
                               ? STATUS_COLORS.Running
                               : status === "Pending"
-                              ? STATUS_COLORS.Pending
-                              : STATUS_COLORS.Failed;
+                                ? STATUS_COLORS.Pending
+                                : STATUS_COLORS.Failed;
                           return (
                             <TableCell key={col.key}>
                               <Chip
@@ -975,9 +985,9 @@ const KubernetOverview = () => {
                           );
                         }
 
-                        // generic rendering
+                        // 4. GENERIC RENDERING
                         return (
-                          <TableCell key={col.key}>
+                          <TableCell key={col.key} align={col.align || "left"}>
                             {cellValue !== undefined ? cellValue : "-"}
                           </TableCell>
                         );
@@ -1110,448 +1120,381 @@ const KubernetOverview = () => {
   /* ----------------------------- Main Render ----------------------------- */
 
   return (
-
     <>
-    <GlobalStyles
-      styles={{
-        "@keyframes rowFlash": {
-          from: { backgroundColor: "rgba(95, 209, 19, 0.12)" },
-          to: { backgroundColor: "transparent" },
-        },
-      }}
-    />
-    <Box sx={{ p: 3, bgcolor: "background.default", minHeight: "100vh" }}>
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-        <AppBar position="static" color="transparent" elevation={0}>
-          <Toolbar sx={{ gap: 2, flexWrap: "wrap" }}>
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-              Kubernetes Overview
-            </Typography>
+      <GlobalStyles
+        styles={{
+          "@keyframes rowFlash": {
+            from: { backgroundColor: "rgba(95, 209, 19, 0.12)" },
+            to: { backgroundColor: "transparent" },
+          },
+        }}
+      />
+      <Box sx={{ p: 3, bgcolor: "background.default", minHeight: "100vh" }}>
+        <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+          <AppBar position="static" color="transparent" elevation={0}>
+            <Toolbar sx={{ gap: 2, flexWrap: "wrap" }}>
+              <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
+                Kubernetes Overview
+              </Typography>
 
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id="namespace-select-label">Namespace</InputLabel>
-              <Select
-                labelId="namespace-select-label"
-                value={selectedNamespace}
-                label="Namespace"
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id="namespace-select-label">Namespace</InputLabel>
+                <Select
+                  labelId="namespace-select-label"
+                  value={selectedNamespace}
+                  label="Namespace"
+                  onChange={(e) => {
+                    setSelectedNamespace(e.target.value);
+                    setPage(0);
+                  }}
+                >
+                  {namespaces.map((n) => (
+                    <MenuItem key={n} value={n}>
+                      {n === "all" ? "All Namespaces" : n}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <TextField
+                size="small"
+                placeholder="Search resources..."
+                value={searchQuery}
                 onChange={(e) => {
-                  setSelectedNamespace(e.target.value);
+                  setSearchQuery(e.target.value);
                   setPage(0);
                 }}
+                sx={{ minWidth: 260 }}
+              />
+
+              <Box
+                sx={{
+                  display: "flex",
+                  gap: 1,
+                  alignItems: "center",
+                  ml: "auto",
+                }}
               >
-                {namespaces.map((n) => (
-                  <MenuItem key={n} value={n}>
-                    {n === "all" ? "All Namespaces" : n}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+                <Tooltip title="Refresh data">
+                  <IconButton
+                    onClick={() => {
+                      // refresh both tables and pie data
+                      setLoadingPieChart(true);
+                      setLoadingTables(true);
+                      // trigger the effects by re-assigning state (simple way: re-call endpoints)
+                      (async () => {
+                        try {
+                          const ns =
+                            selectedNamespace === "all"
+                              ? ""
+                              : selectedNamespace;
+                          const [
+                            pieRes,
+                            svcRes,
+                            podsRes,
+                            nodesRes,
+                            depsRes,
+                            rsRes,
+                          ] = await Promise.all([
+                            safePromise(
+                              apiClient.get(`/k8s/workloads/?namespace=${ns}`),
+                            ),
+                            safePromise(apiClient.get(`/k8s/services/`)),
+                            safePromise(apiClient.get(`/k8s/pods/`)),
+                            safePromise(apiClient.get(`/k8s/nodes/`)),
+                            safePromise(apiClient.get(`/k8s/deployments/`)),
+                            safePromise(apiClient.get(`/k8s/replicasets/`)),
+                          ]);
+                          if (pieRes.status === "fulfilled")
+                            setPieData(pieRes.value.data);
+                          // reuse previous logic to filter by namespace
+                          const fetchedServices =
+                            svcRes.status === "fulfilled"
+                              ? (svcRes.value.data.services ?? [])
+                              : [];
+                          const fetchedAllPods =
+                            podsRes.status === "fulfilled"
+                              ? (podsRes.value.data.pods ?? [])
+                              : [];
+                          const fetchedNodes =
+                            nodesRes.status === "fulfilled"
+                              ? (nodesRes.value.data.nodes ?? [])
+                              : [];
+                          const fetchedAllDeployments =
+                            depsRes.status === "fulfilled"
+                              ? (depsRes.value.data ?? [])
+                              : [];
+                          const fetchedAllReplicaSets =
+                            rsRes.status === "fulfilled"
+                              ? (rsRes.value.data ?? [])
+                              : [];
 
-            <TextField
-              size="small"
-              placeholder="Search resources..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setPage(0);
-              }}
-              sx={{ minWidth: 260 }}
-            />
+                          const filteredServices =
+                            selectedNamespace === "all"
+                              ? fetchedServices
+                              : fetchedServices.filter(
+                                  (svc) => svc.namespace === selectedNamespace,
+                                );
+                          const filteredPods =
+                            selectedNamespace === "all"
+                              ? fetchedAllPods
+                              : fetchedAllPods.filter(
+                                  (pod) => pod.namespace === selectedNamespace,
+                                );
+                          const filteredDeployments =
+                            selectedNamespace === "all"
+                              ? fetchedAllDeployments
+                              : fetchedAllDeployments.filter(
+                                  (dep) => dep.namespace === selectedNamespace,
+                                );
+                          const filteredReplicaSets =
+                            selectedNamespace === "all"
+                              ? fetchedAllReplicaSets
+                              : fetchedAllReplicaSets.filter(
+                                  (rs) => rs.Namespace === selectedNamespace,
+                                );
 
-            <Box
-              sx={{ display: "flex", gap: 1, alignItems: "center", ml: "auto" }}
-            >
-              <Tooltip title="Refresh data">
-                <IconButton
-                  onClick={() => {
-                    // refresh both tables and pie data
-                    setLoadingPieChart(true);
-                    setLoadingTables(true);
-                    // trigger the effects by re-assigning state (simple way: re-call endpoints)
-                    (async () => {
-                      try {
-                        const ns =
-                          selectedNamespace === "all" ? "" : selectedNamespace;
-                        const [
-                          pieRes,
-                          svcRes,
-                          podsRes,
-                          nodesRes,
-                          depsRes,
-                          rsRes,
-                        ] = await Promise.all([
-                          safePromise(
-                            apiClient.get(`/k8s/workloads/?namespace=${ns}`)
-                          ),
-                          safePromise(apiClient.get(`/k8s/services/`)),
-                          safePromise(apiClient.get(`/k8s/pods/`)),
-                          safePromise(apiClient.get(`/k8s/nodes/`)),
-                          safePromise(apiClient.get(`/k8s/deployments/`)),
-                          safePromise(apiClient.get(`/k8s/replicasets/`)),
-                        ]);
-                        if (pieRes.status === "fulfilled")
-                          setPieData(pieRes.value.data);
-                        // reuse previous logic to filter by namespace
-                        const fetchedServices =
-                          svcRes.status === "fulfilled"
-                            ? svcRes.value.data.services ?? []
-                            : [];
-                        const fetchedAllPods =
-                          podsRes.status === "fulfilled"
-                            ? podsRes.value.data.pods ?? []
-                            : [];
-                        const fetchedNodes =
-                          nodesRes.status === "fulfilled"
-                            ? nodesRes.value.data.nodes ?? []
-                            : [];
-                        const fetchedAllDeployments =
-                          depsRes.status === "fulfilled"
-                            ? depsRes.value.data ?? []
-                            : [];
-                        const fetchedAllReplicaSets =
-                          rsRes.status === "fulfilled"
-                            ? rsRes.value.data ?? []
-                            : [];
+                          setData({
+                            services: filteredServices,
+                            allPods: fetchedAllPods,
+                            filteredPods: filteredPods,
+                            nodes: fetchedNodes,
+                            allDeployments: fetchedAllDeployments,
+                            filteredDeployments: filteredDeployments,
+                            allReplicaSets: fetchedAllReplicaSets,
+                            filteredReplicaSets: filteredReplicaSets,
+                          });
+                        } catch (err) {
+                          console.error("Refresh error:", err);
+                        } finally {
+                          setLoadingPieChart(false);
+                          setLoadingTables(false);
+                        }
+                      })();
+                    }}
+                  >
+                    <RefreshIcon />
+                  </IconButton>
+                </Tooltip>
 
-                        const filteredServices =
-                          selectedNamespace === "all"
-                            ? fetchedServices
-                            : fetchedServices.filter(
-                                (svc) => svc.namespace === selectedNamespace
-                              );
-                        const filteredPods =
-                          selectedNamespace === "all"
-                            ? fetchedAllPods
-                            : fetchedAllPods.filter(
-                                (pod) => pod.namespace === selectedNamespace
-                              );
-                        const filteredDeployments =
-                          selectedNamespace === "all"
-                            ? fetchedAllDeployments
-                            : fetchedAllDeployments.filter(
-                                (dep) => dep.namespace === selectedNamespace
-                              );
-                        const filteredReplicaSets =
-                          selectedNamespace === "all"
-                            ? fetchedAllReplicaSets
-                            : fetchedAllReplicaSets.filter(
-                                (rs) => rs.Namespace === selectedNamespace
-                              );
+                <Tooltip title="Options / Export">
+                  <IconButton
+                    onClick={(e) => setOptionsAnchor(e.currentTarget)}
+                  >
+                    <DownloadIcon />
+                  </IconButton>
+                </Tooltip>
 
-                        setData({
-                          services: filteredServices,
-                          allPods: fetchedAllPods,
-                          filteredPods: filteredPods,
-                          nodes: fetchedNodes,
-                          allDeployments: fetchedAllDeployments,
-                          filteredDeployments: filteredDeployments,
-                          allReplicaSets: fetchedAllReplicaSets,
-                          filteredReplicaSets: filteredReplicaSets,
-                        });
-                      } catch (err) {
-                        console.error("Refresh error:", err);
-                      } finally {
-                        setLoadingPieChart(false);
-                        setLoadingTables(false);
-                      }
-                    })();
-                  }}
+                <Menu
+                  open={Boolean(optionsAnchor)}
+                  anchorEl={optionsAnchor}
+                  onClose={() => setOptionsAnchor(null)}
                 >
-                  <RefreshIcon />
-                </IconButton>
-              </Tooltip>
-
-              <Tooltip title="Options / Export">
-                <IconButton onClick={(e) => setOptionsAnchor(e.currentTarget)}>
-                  <DownloadIcon />
-                </IconButton>
-              </Tooltip>
-
-              <Menu
-                open={Boolean(optionsAnchor)}
-                anchorEl={optionsAnchor}
-                onClose={() => setOptionsAnchor(null)}
-              >
-                <MUIMenuItem
-                  onClick={() => {
-                    // export current tab
-                    const resource = [
-                      "Deployments",
-                      "Pods",
-                      "Replica Sets",
-                      "Services",
-                      "Nodes",
-                    ][tabIndex];
-                    handleExportCSV(resource);
-                    setOptionsAnchor(null);
-                  }}
-                >
-                  Export current table CSV
-                </MUIMenuItem>
-                <MUIMenuItem
-                  onClick={() => {
-                    // combined export (example)
-                    handleExportCSV(
-                      [
+                  <MUIMenuItem
+                    onClick={() => {
+                      // export current tab
+                      const resource = [
                         "Deployments",
                         "Pods",
                         "Replica Sets",
                         "Services",
                         "Nodes",
-                      ][tabIndex]
-                    );
-                    setOptionsAnchor(null);
-                  }}
-                >
-                  Export (quick)
-                </MUIMenuItem>
-              </Menu>
-            </Box>
-          </Toolbar>
-        </AppBar>
-      </Paper>
+                      ][tabIndex];
+                      handleExportCSV(resource);
+                      setOptionsAnchor(null);
+                    }}
+                  >
+                    Export current table CSV
+                  </MUIMenuItem>
+                  <MUIMenuItem
+                    onClick={() => {
+                      // combined export (example)
+                      handleExportCSV(
+                        [
+                          "Deployments",
+                          "Pods",
+                          "Replica Sets",
+                          "Services",
+                          "Nodes",
+                        ][tabIndex],
+                      );
+                      setOptionsAnchor(null);
+                    }}
+                  >
+                    Export (quick)
+                  </MUIMenuItem>
+                </Menu>
+              </Box>
+            </Toolbar>
+          </AppBar>
+        </Paper>
 
-      {/* Workload Status section */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-          Workload Status
-        </Typography>
-
-        {loadingPieChart ? (
-          <Grid container spacing={2}>
-            {[1, 2, 3, 4].map((i) => (
-              <Grid item xs={12} sm={6} md={3} key={i}>
-                <Card sx={{ height: 160, borderRadius: 2, p: 2 }}>
-                  <Skeleton variant="text" width="60%" />
-                  <Skeleton
-                    variant="circular"
-                    width={80}
-                    height={80}
-                    sx={{ mx: "auto", mt: 2 }}
-                  />
-                  <Skeleton
-                    variant="text"
-                    width="40%"
-                    sx={{ mx: "auto", mt: 1 }}
-                  />
-                </Card>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Grid container spacing={2}>
-            {["Deployments", "Pods", "Replica Sets", "Stateful Sets"].map(
-              (k) => {
-                const chartData = processChartData(k);
-                const total = chartTotal(chartData);
-                return (
-                  <Grid item xs={12} sm={6} md={3} key={k}>
-                    <Card
-                      onClick={() => openBreakdownModal(k)}
-                      sx={{
-                        height: 160,
-                        borderRadius: 2,
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        cursor: "pointer",
-                        boxShadow: 2,
-                        transition: "transform 0.12s ease",
-                        "&:hover": { transform: "translateY(-6px)" },
-                      }}
-                    >
-                      <CardContent sx={{ width: "100%", textAlign: "center" }}>
-                        <Typography
-                          variant="subtitle1"
-                          sx={{ fontWeight: 700 }}
-                        >
-                          {k}
-                        </Typography>
-
-                        {chartData.length > 0 ? (
-                          <Box
-                            sx={{
-                              width: "100%",
-                              height: 100,
-                              position: "relative",
-                              mt: 1,
-                            }}
-                          >
-                            <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
-                                <Pie
-                                  data={chartData}
-                                  dataKey="value"
-                                  innerRadius={30}
-                                  outerRadius={48}
-                                  paddingAngle={4}
-                                  isAnimationActive
-                                  animationBegin={0}
-                                  animationDuration={800}
-                                  animationEasing="ease-out"
-                                >
-                                  {chartData.map((entry, idx) => (
-                                    <Cell
-                                      key={`cell-${idx}`}
-                                      fill={entry.color}
-                                    />
-                                  ))}
-                                </Pie>
-                                <ReTooltip />
-                              </PieChart>
-                            </ResponsiveContainer>
-
-                            <Box
-                              sx={{
-                                position: "absolute",
-                                left: "50%",
-                                top: "50%",
-                                transform: "translate(-50%,-50%)",
-                                textAlign: "center",
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle2"
-                                sx={{ fontWeight: 800 }}
-                              >
-                                {total}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                total
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ) : (
-                          <Typography
-                            variant="body2"
-                            color="text.secondary"
-                            sx={{ mt: 1 }}
-                          >
-                            No data
-                          </Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                );
-              }
-            )}
-          </Grid>
-        )}
-      </Box>
-
-      {/* Breakdown modal */}
-      {openBreakdown && breakdownKey && piedata && (
-        <Paper
-          sx={{
-            position: "fixed",
-            left: "50%",
-            top: "50%",
-            transform: "translate(-50%, -50%)",
-            p: 3,
-            zIndex: 1400,
-            width: 360,
-            borderRadius: 2,
-            boxShadow: 6,
-          }}
-        >
-          <Typography variant="h6" sx={{ mb: 2 }}>
-            {breakdownKey} — status breakdown
+        {/* Workload Status section */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Workload Status
           </Typography>
 
-          {(() => {
-            const raw = piedata[breakdownKey] || {};
-            const running = Number(raw.Running || 0);
-            const pending = Number(raw.Pending || 0);
-            const failed = Number(raw.Failed || 0);
-            const others = Object.entries(raw)
-              .filter(([k]) => !["Running", "Pending", "Failed"].includes(k))
-              .reduce((s, [, v]) => s + Number(v || 0), 0);
-            const total = running + pending + failed + others || 1;
-            return (
-              <>
-                <Stack spacing={1} sx={{ mb: 2 }}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        label="Running"
-                        size="small"
+          {loadingPieChart ? (
+            <Grid container spacing={2}>
+              {[1, 2, 3, 4].map((i) => (
+                <Grid item xs={12} sm={6} md={3} key={i}>
+                  <Card sx={{ height: 160, borderRadius: 2, p: 2 }}>
+                    <Skeleton variant="text" width="60%" />
+                    <Skeleton
+                      variant="circular"
+                      width={80}
+                      height={80}
+                      sx={{ mx: "auto", mt: 2 }}
+                    />
+                    <Skeleton
+                      variant="text"
+                      width="40%"
+                      sx={{ mx: "auto", mt: 1 }}
+                    />
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+          ) : (
+            <Grid container spacing={2}>
+              {["Deployments", "Pods", "Replica Sets", "Stateful Sets"].map(
+                (k) => {
+                  const chartData = processChartData(k);
+                  const total = chartTotal(chartData);
+                  return (
+                    <Grid item xs={12} sm={6} md={3} key={k}>
+                      <Card
+                        onClick={() => openBreakdownModal(k)}
                         sx={{
-                          bgcolor: STATUS_COLORS.Running,
-                          color: "#042000",
-                          fontWeight: 600,
+                          height: 160,
+                          borderRadius: 2,
+                          display: "flex",
+                          flexDirection: "column",
+                          justifyContent: "center",
+                          alignItems: "center",
+                          cursor: "pointer",
+                          boxShadow: 2,
+                          transition: "transform 0.12s ease",
+                          "&:hover": { transform: "translateY(-6px)" },
                         }}
-                      />
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {running}
-                      </Typography>
-                    </Stack>
-                    <Typography color="text.secondary">
-                      {((running / total) * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
+                      >
+                        <CardContent
+                          sx={{ width: "100%", textAlign: "center" }}
+                        >
+                          <Typography
+                            variant="subtitle1"
+                            sx={{ fontWeight: 700 }}
+                          >
+                            {k}
+                          </Typography>
 
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        label="Pending"
-                        size="small"
-                        sx={{
-                          bgcolor: STATUS_COLORS.Pending,
-                          color: "#3b2e00",
-                          fontWeight: 600,
-                        }}
-                      />
-                      <Typography sx={{ fontWeight: 600 }}>
-                        {pending}
-                      </Typography>
-                    </Stack>
-                    <Typography color="text.secondary">
-                      {((pending / total) * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
+                          {chartData.length > 0 ? (
+                            <Box
+                              sx={{
+                                width: "100%",
+                                height: 100,
+                                position: "relative",
+                                mt: 1,
+                              }}
+                            >
+                              <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                  <Pie
+                                    data={chartData}
+                                    dataKey="value"
+                                    innerRadius={30}
+                                    outerRadius={48}
+                                    paddingAngle={4}
+                                    isAnimationActive
+                                    animationBegin={0}
+                                    animationDuration={800}
+                                    animationEasing="ease-out"
+                                  >
+                                    {chartData.map((entry, idx) => (
+                                      <Cell
+                                        key={`cell-${idx}`}
+                                        fill={entry.color}
+                                      />
+                                    ))}
+                                  </Pie>
+                                  <ReTooltip />
+                                </PieChart>
+                              </ResponsiveContainer>
 
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Stack direction="row" spacing={1} alignItems="center">
-                      <Chip
-                        label="Failed"
-                        size="small"
-                        sx={{
-                          bgcolor: STATUS_COLORS.Failed,
-                          color: "#fff",
-                          fontWeight: 600,
-                        }}
-                      />
-                      <Typography sx={{ fontWeight: 600 }}>{failed}</Typography>
-                    </Stack>
-                    <Typography color="text.secondary">
-                      {((failed / total) * 100).toFixed(1)}%
-                    </Typography>
-                  </Box>
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  left: "50%",
+                                  top: "50%",
+                                  transform: "translate(-50%,-50%)",
+                                  textAlign: "center",
+                                }}
+                              >
+                                <Typography
+                                  variant="subtitle2"
+                                  sx={{ fontWeight: 800 }}
+                                >
+                                  {total}
+                                </Typography>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                >
+                                  total
+                                </Typography>
+                              </Box>
+                            </Box>
+                          ) : (
+                            <Typography
+                              variant="body2"
+                              color="text.secondary"
+                              sx={{ mt: 1 }}
+                            >
+                              No data
+                            </Typography>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Grid>
+                  );
+                },
+              )}
+            </Grid>
+          )}
+        </Box>
 
-                  {others > 0 && (
+        {/* Breakdown modal */}
+        {openBreakdown && breakdownKey && piedata && (
+          <Paper
+            sx={{
+              position: "fixed",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              p: 3,
+              zIndex: 1400,
+              width: 360,
+              borderRadius: 2,
+              boxShadow: 6,
+            }}
+          >
+            <Typography variant="h6" sx={{ mb: 2 }}>
+              {breakdownKey} — status breakdown
+            </Typography>
+
+            {(() => {
+              const raw = piedata[breakdownKey] || {};
+              const running = Number(raw.Running || 0);
+              const pending = Number(raw.Pending || 0);
+              const failed = Number(raw.Failed || 0);
+              const others = Object.entries(raw)
+                .filter(([k]) => !["Running", "Pending", "Failed"].includes(k))
+                .reduce((s, [, v]) => s + Number(v || 0), 0);
+              const total = running + pending + failed + others || 1;
+              return (
+                <>
+                  <Stack spacing={1} sx={{ mb: 2 }}>
                     <Box
                       sx={{
                         display: "flex",
@@ -1561,126 +1504,207 @@ const KubernetOverview = () => {
                     >
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Chip
-                          label="Other"
+                          label="Running"
                           size="small"
                           sx={{
-                            bgcolor: STATUS_COLORS.Other,
+                            bgcolor: STATUS_COLORS.Running,
+                            color: "#042000",
+                            fontWeight: 600,
+                          }}
+                        />
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {running}
+                        </Typography>
+                      </Stack>
+                      <Typography color="text.secondary">
+                        {((running / total) * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label="Pending"
+                          size="small"
+                          sx={{
+                            bgcolor: STATUS_COLORS.Pending,
+                            color: "#3b2e00",
+                            fontWeight: 600,
+                          }}
+                        />
+                        <Typography sx={{ fontWeight: 600 }}>
+                          {pending}
+                        </Typography>
+                      </Stack>
+                      <Typography color="text.secondary">
+                        {((pending / total) * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Chip
+                          label="Failed"
+                          size="small"
+                          sx={{
+                            bgcolor: STATUS_COLORS.Failed,
                             color: "#fff",
                             fontWeight: 600,
                           }}
                         />
                         <Typography sx={{ fontWeight: 600 }}>
-                          {others}
+                          {failed}
                         </Typography>
                       </Stack>
                       <Typography color="text.secondary">
-                        {((others / total) * 100).toFixed(1)}%
+                        {((failed / total) * 100).toFixed(1)}%
                       </Typography>
                     </Box>
-                  )}
-                </Stack>
 
-                <Box
-                  sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}
-                >
-                  <Button
-                    onClick={closeBreakdownModal}
-                    variant="outlined"
-                    size="small"
+                    {others > 0 && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Stack direction="row" spacing={1} alignItems="center">
+                          <Chip
+                            label="Other"
+                            size="small"
+                            sx={{
+                              bgcolor: STATUS_COLORS.Other,
+                              color: "#fff",
+                              fontWeight: 600,
+                            }}
+                          />
+                          <Typography sx={{ fontWeight: 600 }}>
+                            {others}
+                          </Typography>
+                        </Stack>
+                        <Typography color="text.secondary">
+                          {((others / total) * 100).toFixed(1)}%
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+
+                  <Box
+                    sx={{ display: "flex", justifyContent: "flex-end", gap: 1 }}
                   >
-                    Close
-                  </Button>
-                </Box>
-              </>
-            );
-          })()}
-        </Paper>
-      )}
+                    <Button
+                      onClick={closeBreakdownModal}
+                      variant="outlined"
+                      size="small"
+                    >
+                      Close
+                    </Button>
+                  </Box>
+                </>
+              );
+            })()}
+          </Paper>
+        )}
 
-      <Box sx={{ mt: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Kubernetes Resource Details (Namespace: {selectedNamespace})
-        </Typography>
+        <Box sx={{ mt: 3 }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            Kubernetes Resource Details (Namespace: {selectedNamespace})
+          </Typography>
 
-        <Tabs
-          value={tabIndex}
-          onChange={(_, v) => {
-            setTabIndex(v);
-            setPage(0);
-            setSortConfig({ key: null, direction: "asc" });
-          }}
-          sx={{ mb: 2 }}
-        >
-          <Tab label={`Deployments (${filteredDeploymentsForTable.length})`} />
-          <Tab label={`Pods (${filteredPodsForTable.length})`} />
-          <Tab
-            label={`Replica Sets (${filteredReplicaSetsForTable?.length || 0})`}
-          />
-          <Tab label={`Services (${filteredServicesForTable.length})`} />
-          <Tab label={`Nodes (${filteredNodesForTable.length})`} />
-        </Tabs>
+          <Tabs
+            value={tabIndex}
+            onChange={(_, v) => {
+              setTabIndex(v);
+              setPage(0);
+              setSortConfig({ key: null, direction: "asc" });
+            }}
+            sx={{ mb: 2 }}
+          >
+            <Tab
+              label={`Deployments (${filteredDeploymentsForTable.length})`}
+            />
+            <Tab label={`Pods (${filteredPodsForTable.length})`} />
+            <Tab
+              label={`Replica Sets (${filteredReplicaSetsForTable?.length || 0})`}
+            />
+            <Tab label={`Services (${filteredServicesForTable.length})`} />
+            <Tab label={`Nodes (${filteredNodesForTable.length})`} />
+          </Tabs>
 
-        {/* Tab panels */}
-        <Box>
-          {tabIndex === 0 &&
-            (loadingTables ? (
-              renderTableSkeleton(deploymentColumns)
-            ) : (
-              <Reveal loading={loadingTables}>
-                {renderTable(
-                  filteredDeploymentsForTable,
-                  deploymentColumns,
-                  "deployments"
-                )}
-              </Reveal>
-            ))}
+          {/* Tab panels */}
+          <Box>
+            {tabIndex === 0 &&
+              (loadingTables ? (
+                renderTableSkeleton(deploymentColumns)
+              ) : (
+                <Reveal loading={loadingTables}>
+                  {renderTable(
+                    filteredDeploymentsForTable,
+                    deploymentColumns,
+                    "deployments",
+                  )}
+                </Reveal>
+              ))}
 
-          {tabIndex === 1 &&
-            (loadingTables ? (
-              renderTableSkeleton(podsColumns)
-            ) : (
-              <Reveal loading={loadingTables}>
-                {renderTable(filteredPodsForTable, podsColumns, "pods")}
-              </Reveal>
-            ))}
+            {tabIndex === 1 &&
+              (loadingTables ? (
+                renderTableSkeleton(podsColumns)
+              ) : (
+                <Reveal loading={loadingTables}>
+                  {renderTable(filteredPodsForTable, podsColumns, "pods")}
+                </Reveal>
+              ))}
 
-          {tabIndex === 2 &&
-            (loadingTables ? (
-              renderTableSkeleton(replicaSetColumns)
-            ) : (
-              <Reveal loading={loadingTables}>
-                {renderTable(
-                  filteredReplicaSetsForTable,
-                  replicaSetColumns,
-                  "replicasets"
-                )}
-              </Reveal>
-            ))}
+            {tabIndex === 2 &&
+              (loadingTables ? (
+                renderTableSkeleton(replicaSetColumns)
+              ) : (
+                <Reveal loading={loadingTables}>
+                  {renderTable(
+                    filteredReplicaSetsForTable,
+                    replicaSetColumns,
+                    "replicasets",
+                  )}
+                </Reveal>
+              ))}
 
-          {tabIndex === 3 &&
-            (loadingTables ? (
-              renderTableSkeleton(servicesColumns)
-            ) : (
-              <Reveal loading={loadingTables}>
-                {renderTable(
-                  filteredServicesForTable,
-                  servicesColumns,
-                  "services"
-                )}
-              </Reveal>
-            ))}
+            {tabIndex === 3 &&
+              (loadingTables ? (
+                renderTableSkeleton(servicesColumns)
+              ) : (
+                <Reveal loading={loadingTables}>
+                  {renderTable(
+                    filteredServicesForTable,
+                    servicesColumns,
+                    "services",
+                  )}
+                </Reveal>
+              ))}
 
-          {tabIndex === 4 &&
-            (loadingTables ? (
-              renderTableSkeleton(nodesColumns)
-            ) : (
-              <Reveal loading={loadingTables}>
-                {renderTable(filteredNodesForTable, nodesColumns, "nodes")}
-              </Reveal>
-            ))}
+            {tabIndex === 4 &&
+              (loadingTables ? (
+                renderTableSkeleton(nodesColumns)
+              ) : (
+                <Reveal loading={loadingTables}>
+                  {renderTable(filteredNodesForTable, nodesColumns, "nodes")}
+                </Reveal>
+              ))}
+          </Box>
         </Box>
       </Box>
-    </Box>
     </>
   );
 };

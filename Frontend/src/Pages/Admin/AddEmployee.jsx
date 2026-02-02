@@ -25,7 +25,7 @@ import Autocomplete from "@mui/material/Autocomplete";
 import apiClient from "../../Axios";
 
 /* ✅ Hardcoded Groups */
-const GROUP_OPTIONS = ["HR", "IT", "Finance"];
+const GROUP_OPTIONS = ["HR", "IT", "Finance","Senior Management", "Operations", "Sales", "Marketing"];
 
 /* ✅ Email Regex */
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

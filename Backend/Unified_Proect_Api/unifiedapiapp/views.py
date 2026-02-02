@@ -14,6 +14,7 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 from time import sleep
+from xmlrpc import server
 from rest_framework_simplejwt.tokens import AccessToken
 
 import jwt
@@ -284,9 +285,9 @@ def get_openstack_connection():
     logging.info("AUTH_URL: %s", auth_url)  # then log it
 
     return connection.Connection(
-        auth_url=auth_url,
+        auth_url=os.getenv("AUTH_URL"),
         project_name=os.getenv("PROJECT_NAME"),
-        username="admin",
+        username=os.getenv("OPENSTACK_UNAME"),
         password=os.getenv("PASSWORD"),
         user_domain_name=os.getenv("USER_DOMAIN_NAME"),
         project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -746,8 +747,7 @@ class ListImages(APIView):
             conn = openstack.connect(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                # username=os.getenv("OPENSTACK_UNAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -1015,24 +1015,6 @@ def get_pod_metrics(metrics_api):
     except Exception:
         return {}
 
-def get_k8s_clients():
-    """Initialize Kubernetes clients (Core + Metrics)."""
-    try:
-        config.load_kube_config(config_file=KUBECONFIG_PATH)
-        return client.CoreV1Api(), client.CustomObjectsApi()
-    except Exception as e:
-        raise RuntimeError(f"Failed to load Kubernetes config: {str(e)}")
-
-
-
-def get_k8s_client2():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(BASE_DIR, "admin.conf")
-    config.load_kube_config(config_file=config_path)
-    return client.CoreV1Api(), client.AppsV1Api()  # ✅ this line must return both
-
-
-
 def humanize_age(dt):
     if not dt:
         return "N/A"
@@ -1044,48 +1026,42 @@ def humanize_age(dt):
         return "1 day ago"
     return f"{days} days ago"
     
-def get_k8s_client3():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(BASE_DIR, "admin.conf")
-    config.load_kube_config(config_file=config_path)
-    return client.AppsV1Api(), client.CoreV1Api()
 
-def get_k8s_client1():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(BASE_DIR, "admin.conf")
-    config.load_kube_config(config_file=config_path)
 
-    core_v1 = client.CoreV1Api()
-    apps_v1 = client.AppsV1Api()
-    metrics_client = client.CustomObjectsApi()
-    
-    return core_v1, apps_v1, metrics_client
 
-  
-def get_k8s_client4():
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-    config_path = os.path.join(BASE_DIR, "admin.conf")
-    config.load_kube_config(config_file=config_path)
-    return client.CoreV1Api(), client.AppsV1Api(), client.NetworkingV1Api()
-
-# -------------------------
-# GLOBAL CONFIG (FAST)
-# -------------------------
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 KUBECONFIG_PATH = os.path.join(BASE_DIR, "admin.conf")
 
-try:
-    config.load_incluster_config()
-except config.ConfigException:
-    config.load_kube_config(config_file=KUBECONFIG_PATH)
+_K8S_LOADED = False
 
-# Global Clients (Reused Across All APIs)
-v1 = client.CoreV1Api()
-apps_v1 = client.AppsV1Api()
-metrics_client = client.CustomObjectsApi()
+def load_k8s_config():
+    global _K8S_LOADED
+    if _K8S_LOADED:
+        return
 
-logger = logging.getLogger(__name__)
+    try:
+        config.load_incluster_config()
+        logger.info("Loaded in-cluster Kubernetes config")
+    except ConfigException:
+        config.load_kube_config(config_file=KUBECONFIG_PATH)
+        logger.info("Loaded kubeconfig from admin.conf")
+
+    _K8S_LOADED = True
+
+
+def get_k8s_clients():
+    """
+    Canonical client factory (SAFE for exec, metrics, REST)
+    """
+    load_k8s_config()
+    return {
+        "core": client.CoreV1Api(),
+        "apps": client.AppsV1Api(),
+        "metrics": client.CustomObjectsApi(),
+        "networking": client.NetworkingV1Api(),
+    }
 
 #-------------------------------------------------------
 
@@ -1298,9 +1274,9 @@ def get_openstack_connection():
     
     try:
         conn = connection.Connection(
-            auth_url=auth_url,
-            project_name=project_name,
-            username="admin",
+            auth_url=os.getenv("AUTH_URL"),
+            project_name=os.getenv("PROJECT_NAME"),
+            username=os.getenv("OPENSTACK_UNAME"),
             password=os.getenv("PASSWORD"),
             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -1777,7 +1753,7 @@ class ListImages(APIView):
             conn = openstack.connect(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -2041,7 +2017,7 @@ class OpenStackOverviewAPIView(APIView):
         conn = connection.Connection(
             auth_url=os.getenv("AUTH_URL"),
             project_name=os.getenv("PROJECT_NAME"),
-            username="admin",
+            username=os.getenv("OPENSTACK_UNAME"),
             password=os.getenv("PASSWORD"),
             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -2118,8 +2094,8 @@ def get_openstack_connection1(project_name=None):
     """
     return connection.Connection(
         auth_url=os.getenv("AUTH_URL"),
-        project_name=project_name or os.getenv("PROJECT_NAME"),
-        username="admin",
+        project_name=os.getenv("PROJECT_NAME"),
+        username=os.getenv("OPENSTACK_UNAME"),
         password=os.getenv("PASSWORD"),
         user_domain_name=os.getenv("USER_DOMAIN_NAME"),
         project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -2136,8 +2112,8 @@ def get_openstack_connection(project_name=None):
     """
     return connection.Connection(
         auth_url=os.getenv("AUTH_URL"),
-        project_name=project_name or os.getenv("PROJECT_NAME"),
-        username="admin",
+        project_name=os.getenv("PROJECT_NAME"),
+        username=os.getenv("OPENSTACK_UNAME"),
         password=os.getenv("PASSWORD"),
         user_domain_name=os.getenv("USER_DOMAIN_NAME"),
         project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -3512,7 +3488,7 @@ class EmployeeUpdateAPIView(APIView):
 #             conn = connection.Connection(
 #             auth_url=os.getenv('AUTH_URL'),
 #             project_name=os.getenv('PROJECT_NAME'),
-#             username="admin",
+#             username=os.getenv("OPENSTACK_UNAME"),
 #             password=os.getenv('PASSWORD'),
 #             user_domain_name=os.getenv('USER_DOMAIN_NAME'),
 #             project_domain_name=os.getenv('PROJECT_DOMAIN_NAME')
@@ -4132,7 +4108,7 @@ class VMActionAPIView(APIView):
             conn = connection.Connection(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -4249,7 +4225,7 @@ class DeleteImageAPIView(APIView):
             conn = connection.Connection(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -4304,7 +4280,7 @@ class CreateImageAPIView(APIView):
             conn = connection.Connection(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -4781,7 +4757,7 @@ class OpenStackImageCreateView(APIView):
         conn = connection.Connection(
             auth_url=os.getenv("AUTH_URL"),
             project_name=os.getenv("PROJECT_NAME"),
-            username="admin",
+            username=os.getenv("OPENSTACK_UNAME"),
             password=os.getenv("PASSWORD"),
             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -5614,14 +5590,11 @@ class EditNetworkAndSubnetAPIView(APIView):
 #         return Response(serializer.validated_data)
 
 from rest_framework_simplejwt.views import TokenObtainPairView
-
 from .serializers import CustomTokenObtainPairSerializer
-
-# class CustomTokenObtainPairView(TokenObtainPairView):
-#     permission_classes = []
-#     serializer_class = CustomTokenObtainPairSerializer
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class CustomTokenObtainPairView(TokenObtainPairView):
     permission_classes = []
     # serializer_class = None
@@ -5982,93 +5955,96 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 # ------------------Cookie----------------------------------
 
 
+@method_decorator(ensure_csrf_cookie, name="dispatch")
 class CookieTokenRefreshView(APIView):
+    """
+    Refresh JWT access token using HttpOnly refresh cookie.
+    CSRF-protected by design.
+    """
     permission_classes = []
     authentication_classes = []
 
     def post(self, request):
         refresh_cookie_name = getattr(settings, "REFRESH_COOKIE_NAME", "MDAUTH")
-        refresh_token = request.COOKIES.get(refresh_cookie_name)
-        if not refresh_token:
+        refresh_token_str = request.COOKIES.get(refresh_cookie_name)
+
+        if not refresh_token_str:
             logger.warning("No refresh token cookie found")
             return Response(
                 {"detail": "No refresh token cookie found."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
         logger.debug("Refresh token cookie received (masked)")
+
         try:
-            # ✅ Step 1: Decode refresh token payload manually
-            decoded_payload = jwt.decode(
-                refresh_token,
-                settings.SECRET_KEY,
-                algorithms=["HS256"],
-            )
-            logger.debug("Decoded refresh token payload successfully")
+            # ✅ Proper SimpleJWT validation (rotation + blacklist aware)
+            refresh = RefreshToken(refresh_token_str)
+            user_id = refresh["user_id"]
 
-            # ✅ Step 2: Get user_id from payload and fetch from DB
-            user_id = decoded_payload.get("user_id")
-            if not user_id:
-                logger.error("Refresh token payload missing user_id")
-                return Response(
-                    {"detail": "Invalid token payload."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+            # Rotate refresh token
+            new_refresh = RefreshToken.for_user(refresh.user)
+            new_access = new_refresh.access_token
 
-            from django.contrib.auth import get_user_model
-
-            User = get_user_model()
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                logger.warning("User not found for refresh token | user_id=%s", user_id)
-                return Response(
-                    {"detail": "User not found."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            # ✅ Step 3: Generate new tokens
-            serializer = CustomTokenObtainPairSerializer()
-            custom_token = serializer.get_token(user)
-            access_token = str(
-                custom_token.access_token
-            )  # This preserves custom claims
-            refresh_token = str(
-                custom_token
-            )  # Optional: use this if rotating refresh tokens
+            user = refresh.user
 
             user_data = {
                 "username": user.username,
                 "email": user.email,
-                "role": custom_token.get("role"),
-                "employee_id": custom_token.get("employee_id"),
+                "role": new_access.get("role"),
+                "employee_id": new_access.get("employee_id"),
             }
 
-            # ✅ Step 5: Build response with cookies
             response = Response(
-                {"detail": "Token refreshed successfully"}, status=status.HTTP_200_OK
-            )
-            CustomTokenObtainPairView()._set_auth_cookies(
-                response, access_token, refresh_token, user_data
+                {"detail": "Token refreshed"},
+                status=status.HTTP_200_OK,
             )
 
-            logger.info(
-                "Token refreshed successfully | username=%s role=%s",
-                user.username,
-                custom_token.get("role"),
+            # ---- Set cookies ----
+            response.set_cookie(
+                settings.ACCESS_COOKIE_NAME,
+                str(new_access),
+                max_age=settings.ACCESS_COOKIE_AGE,
+                httponly=True,
+                secure=settings.ACCESS_COOKIE_SECURE,
+                samesite=settings.ACCESS_COOKIE_SAMESITE,
+                path=settings.ACCESS_COOKIE_PATH,
             )
+
+            response.set_cookie(
+                settings.REFRESH_COOKIE_NAME,
+                str(new_refresh),
+                max_age=settings.REFRESH_COOKIE_AGE,
+                httponly=True,
+                secure=settings.REFRESH_COOKIE_SECURE,
+                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                path=settings.REFRESH_COOKIE_PATH,
+            )
+
+            # Readable user data cookie
+            response.set_cookie(
+                "UD",
+                urllib.parse.quote(json.dumps(user_data)),
+                max_age=settings.REFRESH_COOKIE_AGE,
+                httponly=False,
+                secure=settings.REFRESH_COOKIE_SECURE,
+                samesite=settings.REFRESH_COOKIE_SAMESITE,
+                path="/",
+            )
+
+            logger.info("Token refreshed successfully | user=%s", user.username)
             return response
 
         except TokenError as e:
-            logger.warning("Invalid or expired refresh token | error=%s", str(e))
+            logger.warning("Refresh token invalid/expired: %s", str(e))
             return Response(
-                {"detail": "Invalid or expired refresh token."},
+                {"detail": "Invalid or expired refresh token"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        except Exception as e:
-            logger.exception("Unexpected error during token refresh")
+        except Exception:
+            logger.exception("Unexpected refresh error")
             return Response(
-                {"detail": "Internal server error."},
+                {"detail": "Internal server error"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
@@ -6621,57 +6597,6 @@ class CheckVMNameAPIView(APIView):
             )
 
 
-# class VmRequestAPIViewAdmin(APIView):
-#     permission_classes = [IsAuthenticated]  # Add permissions as needed
-
-#     def get(self, request):
-#         """
-#         Fetch VM request details.
-#         If the `approved_by_fla` query parameter is present, list VM requests approved by FLA.
-#         """
-#         try:
-#             # Fetch role and employee ID from the token or request
-#             role = request.auth.get('role', None)
-#             employee_id = request.auth.get('employee_id', None)
-
-#             # Check if we need to filter for FLA-approved VMs
-#             approved_by_fla = request.GET.get('approved_by_fla', None)
-#             print("approved_by_fla", approved_by_fla)
-#             if role == 'ADMIN' and approved_by_fla == "true":
-#                 # Filter VMs approved by FLA
-#                 vm_requests = VmRequest.objects.filter(fla_status="Accepted")
-#                 print("vm_requests admin", vm_requests)
-#             elif role == 'ADMIN':
-#                 vm_requests = VmRequest.objects.all()
-#             elif role == 'FLA':
-#                 # Fetch employee IDs associated with this FLA
-#                 employee_ids = Employee.objects.filter(fla_employee_id=employee_id).values_list('employee_id', flat=True)
-#                 vm_requests = VmRequest.objects.filter(employee_id__in=employee_ids) | VmRequest.objects.filter(employee_id=employee_id)
-#             else:
-#                 # Default behavior for regular users
-#                 vm_requests = VmRequest.objects.filter(employee_id=Employee.objects.get(email=request.user))
-
-#             # Implement pagination
-#             page = int(request.GET.get('page', 1))
-#             size = int(request.GET.get('size', 10))  # Default to 10 items per page
-#             total_records = vm_requests.count()
-#             start = (page - 1) * size
-#             end = start + size
-#             vm_requests = vm_requests[start:end]
-
-#             # Serialize the results
-#             serializer = VmRequestSerializer(vm_requests, many=True)
-#             return Response(
-#                 {
-#                     "totalRecords": total_records,
-#                     "page": page,
-#                     "size": size,
-#                     "data": serializer.data
-#                 },
-#                 status=status.HTTP_200_OK
-#             )
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ----------------------------------------6 Feb 2025--------------------------------
@@ -7562,42 +7487,6 @@ class DeleteCdacProjectAPIView(APIView):
 
 # ---------------------------16 Dec 2024--------------------------------------
 
-# class OpenStackProjectsAPIView(APIView):
-#     """
-#     API to list OpenStack projects
-#     """
-#     permission_classes = [IsAuthenticated]
-#     def get(self, request):
-#         try:
-#             # Load credentials from environment variables or config
-#             auth_url = AUTH_URL
-#             username = USERNAME
-#             password = PASSWORD
-#             project_name = PROJECT_NAME
-#             user_domain_name = USER_DOMAIN_NAME
-#             project_domain_name = PROJECT_DOMAIN_NAME
-
-#             # Authenticate with OpenStack
-#             loader = loading.get_plugin_loader("password")
-#             auth = loader.load_from_options(
-#                 auth_url=auth_url,
-#                 username=username,
-#                 password=password,
-#                 project_name=project_name,
-#                 user_domain_name=user_domain_name,
-#                 project_domain_name=project_domain_name,
-#             )
-#             sess = session.Session(auth=auth)
-#             keystone = client.Client(session=sess)
-
-#             # Fetch all projects
-#             projects = keystone.projects.list()
-#             project_list = [{"id": project.id, "name": project.name, "description": project.description, "enabled": project.enabled} for project in projects]
-
-#             return Response(project_list, status=status.HTTP_200_OK)
-
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OpenStackProjectsAPIView(APIView):
@@ -8370,7 +8259,7 @@ class ProjectUsageAPIView(APIView):
 #         return connection.Connection(
 #             auth_url="http://your-openstack-auth-url",
 #             project_name="admin",
-#             username="admin",
+#             username=os.getenv("OPENSTACK_UNAME"),
 #             password="your-password",
 #             user_domain_id="default",
 #             project_domain_id="default"
@@ -9602,12 +9491,42 @@ class ApprovedVMsAPIView(APIView):
     - USER: Only own approved requests.
     """
 
-    def get_openstack_server(self, vm_id):
+    def get_openstack_server(self, vm_id=None, vm_name=None):
         try:
             conn = get_conn()
-            return conn.compute.get_server(vm_id)
+
+            # 1️⃣ Try by VM ID (best & fastest)
+            if vm_id:
+                server = conn.compute.get_server(vm_id)
+                if server:
+                    return server
+
+            # 2️⃣ Fallback: fetch by VM name
+            if vm_name:
+                servers = list(
+                    conn.compute.servers(
+                        name=vm_name,
+                        details=True,
+                        all_projects=True,  # IMPORTANT for ADMIN / FLA
+                    )
+                )
+
+                if not servers:
+                    return None
+
+                # Prefer ACTIVE server, else latest created
+                servers.sort(
+                    key=lambda s: (
+                        s.status != "ACTIVE",
+                        s.created_at
+                    )
+                )
+                return servers[0]
+
+            return None
+
         except Exception as e:
-            logger.error("OpenStack Fetch Error:", e)
+            logger.error(f"OpenStack Fetch Error: {str(e)}")
             return None
 
     def get(self, request):
@@ -9663,23 +9582,25 @@ class ApprovedVMsAPIView(APIView):
                 vm_info = (
                     VMInfo.objects.filter(vm_name=vm.vm_name).order_by("-id").first()
                 )
-                # vm_info = (
-                #         VMInfo.objects
-                #         .filter(vm_name=vm.vm_name)
-                #         .order_by('-id').first()
-                #         # .values("ip", "username")
-                #     )
-                if vm_info and vm_info.vm_id:
-                    server = self.get_openstack_server(vm_info.vm_id)
+                server = None
+                if vm_info:
+                    server = self.get_openstack_server(
+                        vm_id=vm_info.vm_id,
+                        vm_name=vm.vm_name
+                    )
+
 
                     if server:
                         status_val = server.status  # ACTIVE, SHUTOFF, ERROR
-                        power_state = server.power_state  # int code
+                        power_state = getattr(server, "power_state", None)
+
                         power_mapping = {
+                            0: "No State",
                             1: "Running",
-                            4: "Shutdown",
                             3: "Paused",
+                            4: "Shutdown",
                             6: "Crashed",
+                            7: "Suspended",
                         }
                         power_val = power_mapping.get(power_state, "Unknown")
                     else:
@@ -10220,7 +10141,7 @@ class OpenStackImageCreateViewUpdated(APIView):
         conn = connection.Connection(
             auth_url=os.getenv("AUTH_URL"),
             project_name=os.getenv("PROJECT_NAME"),
-            username="admin",
+            username=os.getenv("OPENSTACK_UNAME"),
             password=os.getenv("PASSWORD"),
             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -10290,7 +10211,7 @@ class OpenStackImageCreateViewUpdated1(APIView):
         conn = connection.Connection(
             auth_url=os.getenv("AUTH_URL"),
             project_name=os.getenv("PROJECT_NAME"),
-            username="admin",
+            username=os.getenv("OPENSTACK_UNAME"),
             password=os.getenv("PASSWORD"),
             user_domain_name=os.getenv("USER_DOMAIN_NAME"),
             project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -10399,7 +10320,7 @@ class OpenStackImageDownloadView(APIView):
             conn = openstack.connect(
                 auth_url=os.getenv("AUTH_URL"),
                 project_name=os.getenv("PROJECT_NAME"),
-                username="admin",
+                username=os.getenv("OPENSTACK_UNAME"),
                 password=os.getenv("PASSWORD"),
                 user_domain_name=os.getenv("USER_DOMAIN_NAME"),
                 project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
@@ -14704,12 +14625,12 @@ class ListVolumeTypesAPIView(APIView):
 class HypervisorDataAPIView(APIView):
     def get(self, request):
         auth = v3.Password(
-            auth_url="http://<your-auth-url>:5000/v3",
-            username="admin",
-            password="your_password",
-            project_name="admin",
-            user_domain_name="Default",
-            project_domain_name="Default",
+            auth_url=os.getenv("AUTH_URL"),
+            project_name=os.getenv("PROJECT_NAME"),
+            username=os.getenv("OPENSTACK_UNAME"),
+            password=os.getenv("PASSWORD"),
+            user_domain_name=os.getenv("USER_DOMAIN_NAME"),
+            project_domain_name=os.getenv("PROJECT_DOMAIN_NAME"),
         )
         sess = session.Session(auth=auth)
         nova = nova_client.Client("2.1", session=sess)
@@ -17333,9 +17254,9 @@ class EmployeeDeployedServicesAPIView(APIView):
                 deployment_url = (
                     f"http://{node_ip}:{svc.node_port}/" if svc.node_port else None
                 )
-
+                pod_base_name = f"{svc.app_name.lower()}-service-{svc.id}"
                 result.append(
-                    {
+                     {
                         "id": svc.id,
                         "service_name": svc.service_name,
                         "app_name": svc.app_name,
@@ -17347,8 +17268,14 @@ class EmployeeDeployedServicesAPIView(APIView):
                         "deployment_status": svc.deployment_status,
                         "node_port": svc.node_port,
                         "deployment_url": deployment_url,
-                        "k8s_service_name": f"{svc.app_name.lower()}-{svc.id}",
-                    }
+
+                        # ✅ SINGLE SOURCE OF TRUTH
+                        "k8s_service_name": pod_base_name,
+                        "namespace": "default",
+                        "pod_selector": {
+                            "app": pod_base_name
+                        }
+                     }
                 )
 
             return Response(
@@ -18553,84 +18480,6 @@ class ApplicationCredentialAPIView(APIView):
             )
 
 
-# ---------------------------------------
-
-
-# class NodeListView(APIView):
-#     """
-#     Fetch Kubernetes Node details with CPU/Memory requests, limits, and capacities.
-#     """
-
-#     def get(self, request):
-#         try:
-
-#             v1 = get_k8s_client()
-#             nodes = v1.list_node()
-#             node_metrics = []  # final response list
-
-#             for node in nodes.items:
-#                 # ---- Basic Info ----
-#                 name = node.metadata.name
-#                 labels = node.metadata.labels or {}
-#                 created = node.metadata.creation_timestamp
-
-#                 # ---- Node Conditions (Ready/Unknown) ----
-#                 conditions = {c.type: c.status for c in node.status.conditions}
-#                 ready_status = "True" if conditions.get("Ready") == "True" else "Unknown"
-
-#                 # ---- CPU & Memory Capacity ----
-#                 cpu_capacity = node.status.capacity.get("cpu", "0")
-#                 mem_capacity = node.status.capacity.get("memory", "0")
-#                 # convert memory from Ki to readable form
-#                 mem_capacity_bytes = humanfriendly.parse_size(mem_capacity + "i") if mem_capacity.isdigit() == False else mem_capacity
-
-#                 # ---- Requests & Limits ----
-#                 # These are typically from metrics API or scheduler stats, so we simulate from allocatable
-#                 allocatable = node.status.allocatable
-#                 cpu_requests = allocatable.get("cpu", "0")
-#                 mem_requests = allocatable.get("memory", "0")
-
-#                 # Convert CPU to millicores
-#                 def parse_cpu(cpu_str):
-#                     if cpu_str.endswith("m"):
-#                         return float(cpu_str[:-1])
-#                     return float(cpu_str) * 1000
-
-#                 def parse_memory(mem_str):
-#                     try:
-#                         return humanfriendly.parse_size(mem_str + "i")
-#                     except Exception:
-#                         return 0
-
-#                 cpu_req_cores = parse_cpu(cpu_requests)
-#                 cpu_limit_cores = 0.0  # placeholder, usually from metrics server
-#                 mem_req_bytes = parse_memory(mem_requests)
-#                 mem_limit_bytes = 0.0  # placeholder
-
-#                 # ---- Pods running on Node ----
-#                 pods = v1.list_pod_for_all_namespaces(field_selector=f"spec.nodeName={name}")
-#                 pod_count = len(pods.items)
-#                 total_pods_capacity = node.status.capacity.get("pods", "0")
-
-#                 # ---- Format response ----
-#                 node_metrics.append({
-#                     "name": name,
-#                     "labels": labels,
-#                     "ready": ready_status,
-#                     "cpu_requests_cores": f"{cpu_req_cores}m",
-#                     "cpu_limits_cores": f"{cpu_limit_cores}m",
-#                     "cpu_capacity_cores": cpu_capacity,
-#                     "memory_requests_bytes": mem_req_bytes,
-#                     "memory_limits_bytes": mem_limit_bytes,
-#                     "memory_capacity_bytes": mem_capacity_bytes,
-#                     "pods": f"{pod_count} ({(int(pod_count)/int(total_pods_capacity))*100:.2f}%)",
-#                     "created": created.strftime("%b %d, %Y"),
-#                 })
-
-#             return Response(node_metrics, status=status.HTTP_200_OK)
-
-#         except Exception as e:
-#             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ---------------------------------------10 Nov 2025----------------------------
 
@@ -18665,11 +18514,7 @@ class StorageClassListView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
   
-  
-        
- ################################################################################################################
- ##############################################################################################
- ############################################################################################################################
+
  
 #--------------------------------------------------------------------------------------------
 #                               Deployement                      

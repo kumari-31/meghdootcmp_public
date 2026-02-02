@@ -88,6 +88,27 @@ export default function DeploymentsList() {
     fontSize: 12,
   };
 
+  const openShellWindow = (d) => {
+    const params = new URLSearchParams({
+      namespace: d.namespace,
+      // Ensure this is a string! Change .name to whatever your pod name key is
+      pod: JSON.stringify(d.pod_selector),
+      container: d.k8s_service_name,
+    }).toString();
+
+    // Open a 800x600 centered popup
+    const w = 1000,
+      h = 600;
+    const left = window.screen.width / 2 - w / 2;
+    const top = window.screen.height / 2 - h / 2;
+
+    window.open(
+      `/shell?${params}`,
+      `shell-${d.k8s_service_name}`, // Unique ID for the window
+      `width=${w},height=${h},top=${top},left=${left},resizable=yes`,
+    );
+  };
+
   return (
     <Box p={3}>
       <Typography variant="h5" gutterBottom sx={{ mb: 2, fontWeight: 700 }}>
@@ -242,7 +263,7 @@ export default function DeploymentsList() {
                       </Box>
                     </CardContent>
 
-                    <Box sx={{ px: 2, pb: 2 }}>
+                    <Box sx={{ px: 2, pb: 2, display: "flex", gap: 1 }}>
                       <Button
                         fullWidth
                         variant="contained"
@@ -251,11 +272,17 @@ export default function DeploymentsList() {
                           textTransform: "none",
                           background:
                             "linear-gradient(90deg, rgba(0,140,255,0.95), rgba(123,31,162,0.95))",
-                          boxShadow: "0 8px 30px rgba(12,93,200,0.18)",
-                          "&:hover": { filter: "brightness(1.06)" },
                         }}
                       >
                         Open Service
+                      </Button>
+
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        onClick={() => openShellWindow(d)}
+                      >
+                        Open Shell
                       </Button>
                     </Box>
                   </Card>

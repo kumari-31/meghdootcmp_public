@@ -198,6 +198,37 @@ def generate_vm_names(base_name, count):
         names.append(f"{base_name}-{i}")
     return names
 
+def get_available_volume_type(preferred_type=None):
+    """
+    Returns a valid volume type.
+    - Uses preferred_type if it exists
+    - Otherwise falls back to default / first available
+    """
+    try:
+        volume_types = conn.block_storage.types()
+        available_types = [vt.name for vt in volume_types]
+
+        print("Available volume types:", available_types)
+
+        if preferred_type and preferred_type in available_types:
+            return preferred_type
+
+        # Fallback priority
+        for fallback in ["__DEFAULT__", "default", "lvmdriver-1"]:
+            if fallback in available_types:
+                return fallback
+
+        # Absolute fallback → first available
+        if available_types:
+            return available_types[0]
+
+        return None
+
+    except Exception as e:
+        print("Error fetching volume types:", e)
+        return None
+
+
 
 def vm_approve_request(id):
     try:
@@ -309,11 +340,6 @@ def vm_approve_request(id):
             if vm_req.vdi_required:
                 print(vm_req.vdi_required)
 
-                auth_url = os.getenv("AUTH_URL")
-                project_name = os.getenv("PROJECT_NAME")
-                username = "admin"
-                password = os.getenv("PASSWORD")
-
                 # Process each VM name and create corresponding VMs
                 for vm_detail in all_vm_details:
                     current_vm_name = vm_detail["vm_name"]
@@ -349,18 +375,27 @@ def vm_approve_request(id):
                     )
 
                     # Determine volume type based on designation
+                    preferred_volume_type = None
+
                     if vm_req.designation in ["HR", "Finance", "Senior Management"]:
-                        volume_type = "CEPH"
-                    else:
-                        volume_type = "__DEFAULT__"
-                    print("volume_type", volume_type)
+                        preferred_volume_type = "CEPH"
+
+                    volume_type = get_available_volume_type(preferred_volume_type)
+
+                    if not volume_type:
+                        error_message = "No valid Cinder volume type available on this OpenStack cluster"
+                        VmRequest.objects.filter(id=id).update(
+                            creation_status="Failed",
+                            creation_error_message=error_message,
+                        )
+                        return {"status": False, "message": error_message}
+
+                    print("Using volume type →", volume_type)
+
 
                     # Create bootable volume and VM
-                    created_bootable, vm_instance_id, _ignored_conn, error_message = create_bootable_volume(
-                                auth_url,
-                                project_name,
-                                username,
-                                password,
+                    result = create_bootable_volume(
+                                conn,
                                 volume_name,
                                 size_gb,
                                 volume_type,
@@ -370,55 +405,68 @@ def vm_approve_request(id):
                                 id,
                                 network_id,
                             )
+                    # 🔁 CEPH fallback
+                    if not result["status"] and volume_type == "CEPH":
+                        print("CEPH failed, retrying with __DEFAULT__")
 
-                    # Store values into vm_detail
-                    vm_detail["vm_id"] = vm_instance_id
-                    vm_detail["connection_id"] = None
+                        fallback_type = get_available_volume_type("__DEFAULT__")
 
-                    if created_bootable is None:
+                        result = create_bootable_volume(
+                            conn,
+                            volume_name + "_fallback",
+                            size_gb,
+                            fallback_type,
+                            image_id,
+                            current_vm_name,
+                            flavor_id,
+                            id,
+                            network_id,
+                        )
+
+
+
+                    if not result["status"]:
                         VmRequest.objects.filter(id=id).update(
                             creation_status="Failed",
-                            creation_error_message=error_message,
+                            creation_error_message=result["error"],
                         )
                         print(f"VM creation failed for {current_vm_name}: {error_message}")
                         return {"status": False, "message": error_message}
 
+                    # ✅ Success
+                    boot_volume_id = result["volume_id"]
+                    vm_instance_id = result["server_id"]
+                    connection_id = result.get("connection_id")
+
                     created_vm_ids.append(vm_instance_id)
-                    volume_id = ""
+                    vm_detail["vm_id"] = vm_instance_id
 
-                    # If bootable volume was created and additional storage is required
-                    if created_bootable:
-                        print("additional storage", vm_req.additional_storage)
-                        if (
-                            vm_req.storage_required
-                            and int(vm_req.additional_storage) > 0
-                        ):
-                            if vm_req.designation in [
-                                "HR",
-                                "Finance",
-                                "Senior Management",
-                            ]:
-                                data_volume_type = "CEPH"
-                            else:
-                                data_volume_type = "__DEFAULT__"
+                    data_volume_id = ""
 
-                            data_volume_name = current_vm_name + "_data_volume"
-                            volume_id = create_data_volume(
-                                int(vm_req.additional_storage),
-                                data_volume_name,
-                                data_volume_type,
+                    if vm_req.storage_required and int(vm_req.additional_storage) > 0:
+                        data_volume_type = get_available_volume_type(preferred_volume_type)
+
+                        if not data_volume_type:
+                            error_message = "No valid Cinder volume type available for data volume"
+                            VmRequest.objects.filter(id=id).update(
+                                creation_status="Failed",
+                                creation_error_message=error_message,
                             )
-                            print(
-                                f"Volume '{data_volume_name}' created with ID: {volume_id}"
-                            )
+                            return {"status": False, "message": error_message}
 
-                            # Attach the volume to the VM
-                            attach_volume_to_vm(current_vm_name, volume_id)
+                        data_volume_name = f"{current_vm_name}_data_volume"
 
-                    # Store the volume and VM details in the vm_detail dictionary
-                    vm_detail["volume_id"] = created_bootable
-                    # vm_detail["vm_id"] = vm_instance_id
-                    vm_detail["data_volume_id"] = volume_id
+                        data_volume_id = create_data_volume(
+                            int(vm_req.additional_storage),
+                            data_volume_name,
+                            data_volume_type,
+                        )
+
+                        print(f"Volume '{data_volume_name}' created with ID: {data_volume_id}")
+
+                        attach_volume_to_vm(current_vm_name, data_volume_id)
+
+                    vm_detail["data_volume_id"] = data_volume_id
 
                 # Save all VM details
                 res = run_shell_script_to_save_vm_details(all_vm_details, False)

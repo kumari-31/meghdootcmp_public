@@ -181,10 +181,7 @@ def extract_volume_error(volume):
 
 
 def create_bootable_volume(
-    auth_url,
-    project_name,
-    username,
-    password,
+    conn,
     volume_name,
     size_gb,
     volume_type,
@@ -227,7 +224,10 @@ def create_bootable_volume(
             VmRequest.objects.filter(id=vm_req_id).update(
                 creation_status="Failed", creation_error_message=error_message
             )
-            return None, None, None, error_message
+            return {
+                "status": False,
+                "error": error_message,
+            }
 
 
         # Volume ready, create VM
@@ -269,11 +269,15 @@ def create_bootable_volume(
             vm_req_obj.save()
 
             # Return connection_id now
-            return created_volume_id, server_id, None, ""
-
+            return {
+            "status": True,
+            "volume_id": created_volume_id,
+            "server_id": server_id,
+            "connection_id": connection_id,
+        }
         # Unexpected status
-        print(f"Volume {created_volume_id} is in unexpected status: {volume.status}")
-        return None, None, None, f"Volume in unexpected status: {volume.status}"
+        print(f"Volume {created_volume_id} is in unexpected status: {volume.status}")   
+
 
 
     except Exception as e:
@@ -284,8 +288,10 @@ def create_bootable_volume(
         VmRequest.objects.filter(id=vm_req_id).update(
             creation_status="Failed", creation_error_message=str(e)
         )
-        return None, None, None, str(e)
-
+        return {
+            "status": False,
+            "error": str(e),
+        }
 
 def create_data_volume(size, volume_name, data_volume_type):
     print(volume_name)
@@ -343,7 +349,7 @@ def attach_volume_to_vm(instance_name, volume_id, retries=100, delay=5):
 
 WAIT_SERVER_STATES = ["BUILD", "HARD_REBOOT", "REBOOT"]
 
-def wait_for_server_status(server, target_status="ACTIVE", retries=1800, delay=5):
+def wait_for_server_status(server, target_status="ACTIVE", timeout=1800, delay=5):
     elapsed = 0
 
     while elapsed < timeout:

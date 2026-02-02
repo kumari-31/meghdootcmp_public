@@ -66,16 +66,12 @@ const getStatusStyles = (status, powerState) => {
 
 const ApprovedvmRequest = () => {
   const [data, setData] = useState([]);
-  const [newPassword, setNewPassword] = useState("");
   const [anchorEl, setAnchorEl] = useState(null);
   const [currentVM, setCurrentVM] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0); // Current page, 0-based index
   const [rowsPerPage, setRowsPerPage] = useState(5); // VMs per page
-  // const [alertOpen, setAlertOpen] = useState(false);
-  // const [alertMessage, setAlertMessage] = useState("");
-  // const [alertSeverity, setAlertSeverity] = useState("success");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
   const [confirmVM, setConfirmVM] = useState(null);
@@ -88,6 +84,27 @@ const ApprovedvmRequest = () => {
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vmToDelete, setVmToDelete] = useState(null);
+
+  // const handleOpenVM = (vm) => {
+  //   const params = new URLSearchParams({
+  //     ip: vm.ip,
+  //     user: vm.username,
+  //     name: vm.vm_name.split("_").slice(1).join("_"),
+  //   }).toString();
+
+  //   // Center the popup window
+  //   const w = 1000,
+  //     h = 600;
+  //   const left = window.screen.width / 2 - w / 2;
+  //   const top = window.screen.height / 2 - h / 2;
+
+  //   window.open(
+  //     `/vm-shell?${params}`,
+  //     `shell-${vm.id}`,
+  //     `width=${w},height=${h},top=${top},left=${left},resizable=yes`,
+  //   );
+  //   closeMenu(); // Close the menu after clicking
+  // };
 
   const openMenu = (event, vm) => {
     setAnchorEl(event.currentTarget);
@@ -111,38 +128,42 @@ const ApprovedvmRequest = () => {
   };
 
   const handleDeleteRequest = async () => {
-  if (!vmToDelete) return;
+    if (!vmToDelete) return;
 
-  setDeleteLoading(true); // button loader starts
+    setDeleteLoading(true); // button loader starts
 
-  try {
-    const response = await apiClient.post("/vmrequests/delete/request-user/", {
-      vm_id: vmToDelete.vm_name,
-      reason: deleteReason,
-    });
+    try {
+      const response = await apiClient.post(
+        "/vmrequests/delete/request-user/",
+        {
+          vm_id: vmToDelete.vm_name,
+          reason: deleteReason,
+        },
+      );
 
-    setAlertDialog({
-      open: true,
-      message: response.data.message || "Delete request sent to admin.",
-      severity: "success",
-    });
+      setAlertDialog({
+        open: true,
+        message: response.data.message || "Delete request sent to admin.",
+        severity: "success",
+      });
 
-    closeDeleteDialog(); // 👈 close dialog only AFTER success
+      closeDeleteDialog(); // 👈 close dialog only AFTER success
 
-    const refreshedData = await apiClient.get("/vmrequests/approved-vms/user/");
-    setData(refreshedData.data.data ?? []);
-
-  } catch (err) {
-    setAlertDialog({
-      open: true,
-      message: "Failed to send delete request!",
-      severity: "error",
-    });
-    console.error("Delete Request Error:", err);
-  } finally {
-    setDeleteLoading(false);
-  }
-};
+      const refreshedData = await apiClient.get(
+        "/vmrequests/approved-vms/user/",
+      );
+      setData(refreshedData.data.data ?? []);
+    } catch (err) {
+      setAlertDialog({
+        open: true,
+        message: "Failed to send delete request!",
+        severity: "error",
+      });
+      console.error("Delete Request Error:", err);
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
   useEffect(() => {
     if (alertDialog.open) {
       const timer = setTimeout(() => {
@@ -255,7 +276,7 @@ const ApprovedvmRequest = () => {
 
       // Refresh data after action
       const refreshedData = await apiClient.get(
-        "/vmrequests/approved-vms/user/"
+        "/vmrequests/approved-vms/user/",
       );
       setData(refreshedData.data.data ?? []);
     } catch (error) {
@@ -365,6 +386,12 @@ const ApprovedvmRequest = () => {
                         open={Boolean(anchorEl) && currentVM?.id === item.id}
                         onClose={closeMenu}
                       >
+                        {/* <MenuItem
+                          onClick={() => handleOpenVM(item)}
+                          sx={{ fontWeight: "bold", color: "#253848" }}
+                        >
+                          🖥️ Open Shell
+                        </MenuItem> */}
                         <MenuItem
                           onClick={() => openConfirmDialog(item, "reboot")}
                         >
@@ -438,14 +465,16 @@ const ApprovedvmRequest = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDeleteDialog} disabled={deleteLoading}>Cancel</Button>
+          <Button onClick={closeDeleteDialog} disabled={deleteLoading}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             color="error"
             onClick={handleDeleteRequest}
-             disabled={deleteLoading}
+            disabled={deleteLoading}
           >
-           {deleteLoading ? "Processing..." : "Confirm Delete"}
+            {deleteLoading ? "Processing..." : "Confirm Delete"}
           </Button>
         </DialogActions>
       </Dialog>
@@ -461,8 +490,8 @@ const ApprovedvmRequest = () => {
                 alertDialog.severity === "success"
                   ? "green"
                   : alertDialog.severity === "error"
-                  ? "red"
-                  : "black",
+                    ? "red"
+                    : "black",
             }}
           >
             {alertDialog.message}

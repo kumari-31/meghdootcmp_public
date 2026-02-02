@@ -193,3 +193,18 @@ docker images
   531  ls
 
    docker exec -it meghdootcmp_db psql -U rootcmp -d meghdootcmp
+
+
+#manually run the new image 
+docker stop meghdootcmp_backend
+docker rm meghdootcmp_backend
+
+docker run -d \
+  --name meghdootcmp_backend \
+  --restart always \
+  --network host \
+  --env-file /opt/meghdootcmp-docker/.env \
+  -v /etc/localtime:/etc/localtime:ro \
+  -v /etc/timezone:/etc/timezone:ro \
+  -v /usr/local/admin.conf:/app/Unified_Proect_Api/unifiedapiapp/admin.conf:ro \
+  meghdootcmp-backend-image:1.1

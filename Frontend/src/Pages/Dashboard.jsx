@@ -88,45 +88,6 @@ const getLast7DaysDailySentRequests = (requests = []) => {
   return result;
 };
 
-// const getLast7DaysPendingTrend = (requests = []) => {
-//   const result = [];
-//   const today = new Date();
-
-//   for (let i = 6; i >= 0; i--) {
-//     const day = new Date(today);
-//     day.setDate(today.getDate() - i);
-//     day.setHours(23, 59, 59, 999);
-
-//     let count = 0;
-
-//     requests.forEach((req) => {
-//       if (!req.request_timestamp) return;
-
-//       const created = new Date(req.request_timestamp);
-//       const approved = req.admin_approved_timestamp
-//         ? new Date(req.admin_approved_timestamp)
-//         : null;
-
-//       const existed = created <= day;
-//       const stillPending = !approved || approved > day;
-
-//       if (existed && stillPending) {
-//         count++;
-//       }
-//     });
-
-//     result.push({
-//       date: day.toLocaleDateString("en-IN", {
-//         day: "2-digit",
-//         month: "short",
-//       }),
-//       value: count,
-//     });
-//   }
-
-//   return result;
-// };
-
 const getLast7DaysFinalStatusTrend = (data = [], status) => {
   const today = dayjs().startOf("day");
   const days = [];
@@ -221,76 +182,6 @@ const StatTile = ({ icon, title, value, sparkData = [], delta, color }) => {
   );
 };
 
-// Prepare sparkData for Recharts (array of {value})
-//   const chartData = sparkData.length
-//     ? sparkData.map((v, i) => ({ x: i, value: v }))
-//     : Array.from({ length: 12 }).map((_, i) => ({
-//         x: i,
-//         value: Math.round(Math.random() * (value || 10)),
-//       }));
-
-//   return (
-//     <GlassCard sx={{ p: 1.5, height: "100%" }}>
-//       <Stack spacing={1}>
-//         <Stack direction="row" spacing={1.5} alignItems="center">
-//           <Avatar sx={{ bgcolor: color || "#eee", width: 44, height: 44 }}>
-//             {icon}
-//           </Avatar>
-//           <Box sx={{ flex: 1 }}>
-//             <Typography variant="caption" color="text.secondary">
-//               {title}
-//             </Typography>
-//             <Typography variant="h5" sx={{ fontWeight: 800 }}>
-//               {value}
-//             </Typography>
-//           </Box>
-//           {delta && (
-//             <Typography
-//               variant="body2"
-//               sx={{
-//                 color: delta.startsWith("+") ? "success.main" : "error.main",
-//                 fontWeight: 700,
-//               }}
-//             >
-//               {delta}
-//             </Typography>
-//           )}
-//         </Stack>
-
-//         {/* Sparkline */}
-//         <Box sx={{ width: "100%", height: 44 }}>
-//           <ResponsiveContainer width="100%" height="100%">
-//             <AreaChart data={chartData}>
-//               <ReTooltip
-//                 contentStyle={{
-//                   background: "rgba(255,255,255,0.9)",
-//                   border: "none",
-//                   boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-//                 }}
-//                 cursor={false}
-//               />
-//               <Area
-//                 dataKey="value"
-//                 type="monotone"
-//                 stroke="rgba(124,77,255,0.95)"
-//                 strokeWidth={2}
-//                 fill="rgba(124,77,255,0.12)"
-//                 dot={false}
-//                 isAnimationActive={true}
-//                 animationDuration={800}
-//               />
-//             </AreaChart>
-//           </ResponsiveContainer>
-//         </Box>
-//       </Stack>
-//     </GlassCard>
-//   );
-// };
-
-/* ------------------ Segmented Radial Gauge (choice 3) ------------------ */
-/* Draws N segments in an arc from startAngle -> endAngle and fills proportionally.
-   value: 0-100, segments: integer, thickness: stroke width.
-*/
 function SegmentedGauge({
   value = 75,
   size = 140,
@@ -337,8 +228,8 @@ function SegmentedGauge({
       fillRatio >= 1
         ? segmentColor(i / segments)
         : fillRatio > 0
-        ? interpolateColor(i / segments, fillRatio)
-        : "#e6e9ee";
+          ? interpolateColor(i / segments, fillRatio)
+          : "#e6e9ee";
     gaugeSegments.push({ d: arcPath(segStart, segEnd), color, fillRatio });
   }
 
@@ -438,8 +329,8 @@ export default function Dashboard() {
     total_instances: 0,
     total_vcpus: 0,
     used_vcpus: 0,
-    total_memory_mb: 0,
-    used_memory_mb: 0,
+    total_memory_gb: 0,
+    used_memory_gb: 0,
     total_storage_gb: 0,
     used_storage_gb: 0,
   });
@@ -503,11 +394,11 @@ export default function Dashboard() {
 
     try {
       const osRes = await apiClient.get(
-        `/openstack/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+        `/openstack/requests-by-date/${formatted ? `?date=${formatted}` : ""}`,
       );
 
       const k8sRes = await apiClient.get(
-        `/kubernetes/requests-by-date/${formatted ? `?date=${formatted}` : ""}`
+        `/kubernetes/requests-by-date/${formatted ? `?date=${formatted}` : ""}`,
       );
 
       // -------------------------
@@ -550,10 +441,6 @@ export default function Dashboard() {
     fetchDashboardData(selectedDate);
   }, [selectedDate]);
 
-  
-
-  
-  
   // --------------------------------------------
   // DATE CHANGE HANDLER (Calendar Picker)
   // --------------------------------------------
@@ -561,45 +448,53 @@ export default function Dashboard() {
     setSelectedDate(newValue);
   };
 
+  const parseGB = (value) => {
+    if (!value) return 0;
+    return parseFloat(value.replace("GB", "").trim());
+  };
+
   // Fetch overview (your /overview)
   useEffect(() => {
     (async () => {
       try {
-        const resp = await apiClient.get("/overview/");
-        setOverview(resp.data || {});
+        const resp = await apiClient.get("infrastructure/hypervisors/");
+        const hosts = resp.data?.data || [];
+
+        let totalVcpus = 0;
+        let usedVcpus = 0;
+        let totalRamGB = 0;
+        let usedRamGB = 0;
+        let totalStorageGB = 0;
+        let usedStorageGB = 0;
+        let totalInstances = 0;
+
+        hosts.forEach((h) => {
+          totalVcpus += Number(h.vcpus_total || 0);
+          usedVcpus += Number(h.vcpus_used || 0);
+
+          totalRamGB += parseGB(h.ram_total);
+          usedRamGB += parseGB(h.ram_used);
+
+          totalStorageGB += parseGB(h.local_storage_total);
+          usedStorageGB += parseGB(h.local_storage_used);
+
+          totalInstances += Number(h.running_instances || 0);
+        });
+
+        setOverview({
+          total_vcpus: totalVcpus,
+          used_vcpus: usedVcpus,
+          total_memory_gb: totalRamGB,
+          used_memory_gb: usedRamGB,
+          total_storage_gb: totalStorageGB,
+          used_storage_gb: usedStorageGB,
+          total_instances: totalInstances,
+        });
       } catch (e) {
         console.error("overview err", e);
       }
     })();
   }, []);
-
-  // // OpenStack requests
-  // useEffect(() => {
-  //   (async () => {
-  //     try {
-  //       // If no date selected, fetch overall
-  //       const dateString = date ? dayjs(date).format("YYYY-MM-DD") : null;
-
-  //       // Fetch data from API
-  //       const data = await fetchVmRequests({ date: dateString });
-
-  //       // Optional: calculate today count only when no date filter
-  //       const todayCount =
-  //         !dateString && data.raw.length
-  //           ? data.raw.filter((vm) => dayjs(vm.request_timestamp).isToday())
-  //               .length
-  //           : 0;
-
-  //       // Update state
-  //       setOpenstackReq({
-  //         ...data,
-  //         today: todayCount,
-  //       });
-  //     } catch (err) {
-  //       console.error("OpenStack Requests Error:", err);
-  //     }
-  //   })();
-  // }, [date]); // <--- Important: re-run whenever 'date' changes
 
   // K8s service requests
   // Kubernetes Service Requests (Pending etc.)
@@ -638,7 +533,6 @@ export default function Dashboard() {
 
   // quick composite health metric (example: weighted)
 
-
   const smallMotion = {
     initial: { opacity: 0, y: 8 },
     animate: { opacity: 1, y: 0 },
@@ -666,67 +560,34 @@ export default function Dashboard() {
     return counts;
   };
 
-  // Last 7 days snapshot trend for all statuses
-  // OpenStack
-  // Pending (dynamic, day-wise)
-  // const openstackTrendPending =
-  //   useMemo(() => getLast7DaysPendingTrend(openstackReq.raw), [openstackReq.raw]);
-
   const openstackTrendPending = useMemo(
     () => getLast7DaysDailySentRequests(openstackReq.raw),
-    [openstackReq.raw]
+    [openstackReq.raw],
   );
 
   const k8sTrendPending = useMemo(
     () => getLast7DaysDailySentRequests(k8sReq.raw),
-    [k8sReq.raw]
+    [k8sReq.raw],
   );
-
-  // const openstackTrendPending = useMemo(
-  //   () => getLast7DaysDailyPendingSnapshot(openstackReq.raw),
-  //   [openstackReq.raw]
-  // );
-
-  // const k8sTrendPending = useMemo(
-  //   () => getLast7DaysDailyPendingSnapshot(k8sReq.raw),
-  //   [k8sReq.raw]
-  // );
-
-  // const k8sTrendPending =
-  //   useMemo(() => getLast7DaysPendingTrend(k8sReq.raw), [k8sReq.raw]);
 
   const openstackTrendAccepted = useMemo(
     () => getLast7DaysFinalStatusTrend(openstackReq.raw, "Accepted"),
-    [openstackReq.raw]
+    [openstackReq.raw],
   );
 
   const openstackTrendRejected = useMemo(
     () => getLast7DaysFinalStatusTrend(openstackReq.raw, "Rejected"),
-    [openstackReq.raw]
+    [openstackReq.raw],
   );
-
-  // const openstackTrendPending =
-  //   getLast7DaysPendingTrend(openstackReq.raw);
-
-  // const k8sTrendPending =
-  //   getLast7DaysPendingTrend(k8sReq.raw);
-
-  // Accepted (finalized per day)
 
   const k8sTrendAccepted = useMemo(
     () => getLast7DaysFinalStatusTrend(k8sReq.raw, "Accepted"),
-    [k8sReq.raw]
+    [k8sReq.raw],
   );
 
   // Rejected (finalized per day)
 
   const k8sTrendRejected = getLast7DaysFinalStatusTrend(k8sReq.raw, "Rejected");
-
-  // const openstackPendingTrend =
-  // getLast7DaysPendingTrend(openstackReq.raw);
-
-  // const k8sPendingTrend =
-  //   getLast7DaysPendingTrend(k8sReq.raw);
 
   const getDailyTrend = (data = [], status) => {
     const days = 7;
@@ -753,36 +614,32 @@ export default function Dashboard() {
   // Calculate usage percentages
   const vcpuUsage = useMemo(() => {
     if (!overview?.total_vcpus) return 0;
-    return (
-      (overview.used_vcpus / overview.total_vcpus) * 100
-    ).toFixed(1);
+    return ((overview.used_vcpus / overview.total_vcpus) * 100).toFixed(1);
   }, [overview]);
-  
+
   const memoryUsage = useMemo(() => {
-    if (!overview?.total_memory_mb) return 0;
-    return (
-      (overview.used_memory_mb / overview.total_memory_mb) * 100
-    ).toFixed(1);
+    if (!overview?.total_memory_gb) return 0;
+    return ((overview.used_memory_gb / overview.total_memory_gb) * 100).toFixed(
+      1,
+    );
   }, [overview]);
-  
+
   const storageUsage = useMemo(() => {
     if (!overview?.total_storage_gb) return 0;
     return (
-      (overview.used_storage_gb / overview.total_storage_gb) * 100
+      (overview.used_storage_gb / overview.total_storage_gb) *
+      100
     ).toFixed(1);
   }, [overview]);
-
 
   const systemHealth = useMemo(() => {
     const cpu = Number(vcpuUsage);
     const ram = Number(memoryUsage);
     const storage = Number(storageUsage);
-  
+
     const health =
-      (100 - cpu) * 0.4 +
-      (100 - ram) * 0.35 +
-      (100 - storage) * 0.25;
-  
+      (100 - cpu) * 0.4 + (100 - ram) * 0.35 + (100 - storage) * 0.25;
+
     return Math.max(0, Math.min(100, Math.round(health)));
   }, [vcpuUsage, memoryUsage, storageUsage]);
   // Determine bar color based on usage
@@ -1027,19 +884,19 @@ export default function Dashboard() {
                 {[
                   {
                     label: "vCPU",
-                    value: Number(vcpuUsage),
+                    value: Number(vcpuUsage) || 0,
                     used: overview.used_vcpus,
                     total: overview.total_vcpus,
                   },
                   {
                     label: "RAM",
-                    value: Number(memoryUsage),
-                    used: (overview.used_memory_mb / 1024).toFixed(1),
-                    total: (overview.total_memory_mb / 1024).toFixed(1),
+                    value: Number(memoryUsage) || 0,
+                    used: overview.used_memory_gb?.toFixed(1),
+                    total: overview.total_memory_gb?.toFixed(1),
                   },
                   {
                     label: "Storage",
-                    value: Number(storageUsage),
+                    value: Number(storageUsage) || 0,
                     used: overview.used_storage_gb,
                     total: overview.total_storage_gb,
                   },
@@ -1050,7 +907,7 @@ export default function Dashboard() {
                     </Typography>
 
                     {/* Animated Progress Bar with Tooltip */}
-                    <div className="bar" title={`${stat.value}%`}>
+                    <div className="bar" title={`${stat.value || 0}%`}>
                       <span
                         className="bar-fill"
                         title={`${isNaN(stat.value) ? 0 : stat.value}%`}
@@ -1062,7 +919,10 @@ export default function Dashboard() {
                     </div>
 
                     <Typography className="stat-text">
-                      <b>{stat.used}</b> Used / <b>{stat.total}</b> Total
+                      <b>{stat.used ?? 0}</b>
+                      {stat.label !== "vCPU" && " GB"} Used /{" "}
+                      <b>{stat.total ?? 0}</b>
+                      {stat.label !== "vCPU" && " GB"} Total
                     </Typography>
                   </div>
                 ))}
@@ -1084,8 +944,8 @@ export default function Dashboard() {
 
                 <div className="gauges">
                   {[
-                    { label: "vCPU", usage: Number(vcpuUsage) },
-                    { label: "RAM", usage: Number(memoryUsage) },
+                    { label: "vCPU", usage: Number(vcpuUsage) || 0 },
+                    { label: "RAM", usage: Number(memoryUsage) || 0 },
                   ].map((gauge, idx) => (
                     <div key={idx} className="gauge-container">
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -1262,7 +1122,6 @@ export default function Dashboard() {
         {/* Kubernetes Accepted */}
         <Grid item xs={12} sm={6} md={3}>
           <motion.div {...smallMotion} transition={{ delay: 0.05 }}>
-            
             <StatTile
               icon={<CheckCircleIcon />}
               title="Kubernetes Accepted Request"
@@ -1271,7 +1130,6 @@ export default function Dashboard() {
               delta={k8sCounts.accepted > 0 ? "+2%" : "-"}
               color="var(--k8s-color)"
             />
-
           </motion.div>
         </Grid>
 

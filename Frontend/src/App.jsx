@@ -60,10 +60,10 @@ const Events = lazy(() => import("./Kubernets/Events"));
 const GroupMembersManagement = lazy(() =>
   import("./Pages/Administration/GroupMembersManagement")
 );
-const Group = lazy(() => import("./Pages/ Infrastructure/Group"));
-const DRService = lazy(() => import("./Pages/ Infrastructure/DRService"));
-const Host = lazy(() => import("./Pages/ Infrastructure/Host"));
-const Hypervisors = lazy(() => import("./Pages/ Infrastructure/Hypervisors"));
+const Group = lazy(() => import("./Pages/Infrastructure/Group"));
+const DRService = lazy(() => import("./Pages/Infrastructure/DRService"));
+const Host = lazy(() => import("./Pages/Infrastructure/Host"));
+const Hypervisors = lazy(() => import("./Pages/Infrastructure/Hypervisors"));
 const Groups = lazy(() => import("./Pages/Administration/Groups"));
 const Projects = lazy(() => import("./Pages/Administration/Projects"));
 const Users = lazy(() => import("./Pages/Administration/Users"));
@@ -107,6 +107,12 @@ const ForgotPassword = lazy(() =>
 const ResetPassword = lazy(() =>
   import("./Pages/Authentication/ResetPassword")
 );
+import ShellPage from "./User/PodShellModal";
+import VMShellPage from "./User/VMShellPage";
+
+
+
+
 
 const App = () => {
   return (
@@ -115,6 +121,9 @@ const App = () => {
         <Routes>
           {/* Routes that do NOT use the layout */}
           <Route path="/" element={<LoginForm />} />
+          <Route path="/shell" element={<ShellPage />} />
+          <Route path="/vm-shell" element={<VMShellPage />} />
+
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/registration" element={<RegistrationForm />} />
@@ -139,6 +148,7 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+            
             <Route
               path="price-plan"
               element={

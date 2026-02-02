@@ -224,6 +224,24 @@ const DatabaseCard = ({ card }) => (
       <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
         {card.description}
       </Typography>
+      <Box sx={{ display: 'flex', gap: 1, width: '100%' }}>
+        <Button 
+          variant="contained" 
+          fullWidth 
+          onClick={() => handleOpen(card.name)}
+          startIcon={<RocketLaunch />}
+        >
+          Deploy
+        </Button>
+        <Button 
+          variant="outlined" 
+          fullWidth 
+          onClick={() => handleShell(card)}
+          sx={{ borderColor: '#82aaff', color: '#82aaff' }}
+        >
+          Shell
+        </Button>
+      </Box>
     </CardContent>
   </StyledCard>
 );
@@ -283,6 +301,27 @@ const Pods = () => {
     } else {
       setDisplayedCards(categorizedCards[category] || []);
     }
+  };
+
+
+  const handleShell = (card) => {
+    // You'll need the actual pod/namespace info. 
+    // If you don't have it yet, you might need a prompt or default to 'default' namespace
+    const params = new URLSearchParams({
+      namespace: "default", // Or from a state/config
+      pod: card.name,       // Usually we need the specific pod ID, but using name as fallback
+      container: card.name.toLowerCase(),
+    }).toString();
+
+    const w = 1000, h = 600;
+    const left = window.screen.width / 2 - w / 2;
+    const top = window.screen.height / 2 - h / 2;
+
+    window.open(
+      `/shell?${params}`,
+      `shell-${card.name}`,
+      `width=${w},height=${h},top=${top},left=${left},resizable=yes`
+    );
   };
 
   return (

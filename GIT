@@ -27,3 +27,5 @@ git status
 
 
 
+daphne -b 0.0.0.0 -p 8000 Unified_Proect_Api.asgi:application
+python3 manage.py collectstatic --noinput

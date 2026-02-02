@@ -37,3 +37,67 @@ urlpatterns = [
 9. Replaced this in /home/boss/Desktop/Cmp19nov25/Backend/venv/lib/python3.11/site-packages/helpdesk/templates
 Replaced {{ form|bootstrap4 }} with {% bootstrap_form form %}.
 Replaced {% load i18n bootstrap4form %} with {% load i18n bootstrap4 %}
+
+
+
+
+
+# -------------------------
+# OpenStack Credentials
+# -------------------------
+AUTH_URL=http://10.184.49.18:5000/v3/
+PROJECT_NAME=admin
+OPENSTACK_UNAME=admin
+PASSWORD=Meghd@@t123
+USER_DOMAIN_NAME=Default
+PROJECT_DOMAIN_NAME=Default
+SERVER_URL=http://10.184.49.18:8001
+
+GUACAMOLE_BASE_URL=http://10.184.49.247:9006/guacamole/api
+GUACAMOLE_UNAME=guacadmin
+GUACAMOLE_PWD=guacadmin
+
+ZABBIX_URL=http://10.184.49.247:9080/api_jsonrpc.php
+ZABBIX_USER=Admin
+ZABBIX_PASSWORD="zabbix"
+
+node_ip=10.184.49.239 //kubernetes ip
+
+# -------------------------
+# Host Mapping
+# -------------------------
+HOST_DEFAULT_IP=10.184.49.18
+
+# -------------------------
+# External APIs
+# -------------------------
+VM_INFO_API_URL=http://10.184.49.18:8001/fetch-vm-info
+
+### MFA CONFIGURATION ###
+# MFA_MODE can be set to "EMAIL", "TOTP", or "NONE"   
+MFA_MODE="EMAIL"
+
+### DATABASE ###
+
+DB_NAME=meghdootcmp
+DB_USER=rootcmp
+DB_PASSWORD=Root1234#$
+DB_HOST=localhost
+DB_PORT=5432
+
+
+### SECURITY ###
+SECRET_KEY="django-insecure-6k%sb6((@n*9s((tz(5e^nu@br^a=*-puuxw8(flw)z!biw&45"
+# DEBUG=False
+ALLOWED_HOSTS=10.184.40.36,localhost,127.0.0.1
+
+### FRONTEND/CORS ###
+CORS_ALLOWED_ORIGINS=http://10.184.40.36:3000,http://localhost:3000
+
+# Django Admin credentials
+# These credentials are used to create a superuser for the Django admin interface.
+DJANGO_ADMIN_USERNAME=admin@cdac.in
+DJANGO_ADMIN_PASSWORD='Root1234#$'
+DJANGO_ADMIN_EMAIL=admin@cdac.in
+
+
