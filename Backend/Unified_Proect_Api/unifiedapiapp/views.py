@@ -5953,13 +5953,12 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 # ------------------Cookie----------------------------------
-
+from django.contrib.auth import get_user_model
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
 class CookieTokenRefreshView(APIView):
     """
     Refresh JWT access token using HttpOnly refresh cookie.
-    CSRF-protected by design.
     """
     permission_classes = []
     authentication_classes = []
@@ -5969,23 +5968,21 @@ class CookieTokenRefreshView(APIView):
         refresh_token_str = request.COOKIES.get(refresh_cookie_name)
 
         if not refresh_token_str:
-            logger.warning("No refresh token cookie found")
             return Response(
-                {"detail": "No refresh token cookie found."},
+                {"detail": "No refresh token cookie found"},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        logger.debug("Refresh token cookie received (masked)")
 
         try:
-            # ✅ Proper SimpleJWT validation (rotation + blacklist aware)
             refresh = RefreshToken(refresh_token_str)
             user_id = refresh["user_id"]
 
-            # Rotate refresh token
-            new_refresh = RefreshToken.for_user(refresh.user)
-            new_access = new_refresh.access_token
+            User = get_user_model()
+            user = User.objects.get(id=user_id)
 
-            user = refresh.user
+            # ✅ Rotate tokens
+            new_refresh = RefreshToken.for_user(user)
+            new_access = new_refresh.access_token
 
             user_data = {
                 "username": user.username,
@@ -5999,7 +5996,6 @@ class CookieTokenRefreshView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-            # ---- Set cookies ----
             response.set_cookie(
                 settings.ACCESS_COOKIE_NAME,
                 str(new_access),
@@ -6020,7 +6016,6 @@ class CookieTokenRefreshView(APIView):
                 path=settings.REFRESH_COOKIE_PATH,
             )
 
-            # Readable user data cookie
             response.set_cookie(
                 "UD",
                 urllib.parse.quote(json.dumps(user_data)),
@@ -6034,8 +6029,13 @@ class CookieTokenRefreshView(APIView):
             logger.info("Token refreshed successfully | user=%s", user.username)
             return response
 
-        except TokenError as e:
-            logger.warning("Refresh token invalid/expired: %s", str(e))
+        except User.DoesNotExist:
+            return Response(
+                {"detail": "User not found"},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        except TokenError:
             return Response(
                 {"detail": "Invalid or expired refresh token"},
                 status=status.HTTP_401_UNAUTHORIZED,

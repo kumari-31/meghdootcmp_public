@@ -229,6 +229,66 @@ def get_available_volume_type(preferred_type=None):
         return None
 
 
+def create_student_boot_volume(conn, volume_name, image_id, size_gb=20, volume_type=None):
+    vol = conn.block_storage.create_volume(
+        name=volume_name,
+        size=size_gb,
+        image_id=image_id,
+        volume_type=volume_type,
+    )
+
+    conn.block_storage.wait_for_status(vol, status="available")
+    return vol.id
+
+
+def create_student_vm_with_volume(conn, name, flavor_id, image_id, network_id):
+    try:
+        volume_type = get_available_volume_type(None)
+        if not volume_type:
+            raise Exception("No valid volume type available")
+
+        print("Student VM → using volume type:", volume_type)
+
+        server = conn.compute.create_server(
+            name=name,
+            flavor_id=flavor_id,
+            networks=[{"uuid": network_id}],
+            block_device_mapping_v2=[{
+                "uuid": image_id,                 # ✅ IMAGE ID
+                "source_type": "image",           # ✅ MUST be image
+                "destination_type": "volume",     # ✅ Volume target
+                "boot_index": 0,
+                "volume_size": 20,                # ✅ REQUIRED
+                "delete_on_termination": True,
+                "volume_type": volume_type,       # ✅ default / lvm / ceph
+            }],
+        )
+
+        print(f"{name} creation initiated (ID: {server.id})")
+
+        # Wait for server
+        server = conn.compute.wait_for_server(server)
+
+        # Fetch attached volume
+        attachments = server.attached_volumes
+        volume_id = attachments[0]["id"] if attachments else None
+
+        if not volume_id:
+            raise Exception("Root volume not attached to student VM")
+
+        return {
+            "status": True,
+            "server_id": server.id,
+            "volume_id": volume_id,
+        }
+
+    except Exception as e:
+        print("❌ Student VM creation failed:", e)
+        return {"status": False, "error": str(e)}
+
+
+
+
 
 def vm_approve_request(id):
     try:
@@ -499,6 +559,8 @@ def vm_approve_request(id):
                     if all_vm_details[0].get("volume_id"):
                         vm_info.volume_id = all_vm_details[0]["volume_id"]
 
+                    if all_vm_details[0].get("volume_id"):
+                        vm_info.volume_id = all_vm_details[0]["volume_id"] 
                     # If there's a VM ID for the first VM
                     if all_vm_details[0].get("vm_id"):
                         vm_info.vm_id = all_vm_details[0]["vm_id"]
@@ -554,17 +616,25 @@ def vm_approve_request(id):
                 print("=====Creating VM===", current_vm_name)
 
                 # Create the VM
-                server = create_vm(
-                    new_conn, current_vm_name, flavor_id, image_id, network_id
+                server = create_student_vm_with_volume(
+                    new_conn,
+                    current_vm_name,
+                    flavor_id,
+                    image_id,
+                    network_id
                 )
+
                 print(server, "VM created for name: ", current_vm_name)
 
                 # Store the server ID in the vm_detail dictionary
                 vm_req = VmRequest.objects.get(id=int(id))
                 if server["status"]:
                     vm_detail["vm_id"] = server["server_id"]
+                    vm_detail["volume_id"] = server["volume_id"]   # ⭐ ADD THIS
+
                     vm_req.creation_status = "Created"
                     vm_req.save()
+
                 else:
                     print(f"Failed to create VM {current_vm_name}: {server['error']}")
                     vm_req.creation_status = server["error"]
@@ -607,6 +677,7 @@ def vm_approve_request(id):
                         vnc_display=res.get("vnc_display", ""),
                         ip=update_ip_by_vmname(all_vm_details[i]["vm_name"]),
                         vm_id=all_vm_details[i].get("vm_id", ""),
+                        volume_id=all_vm_details[i].get("volume_id", ""),  # ⭐ ADD THIS
                     )
                     additional_vm_info.save()
 
