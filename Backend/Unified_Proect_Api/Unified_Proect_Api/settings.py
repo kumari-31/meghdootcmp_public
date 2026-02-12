@@ -63,7 +63,11 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 # CORS_ALLOW_ALL_ORIGINS = True  # Or set to False and specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://10.184.40.216:3000",
+]
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+
 
 ROOT_URLCONF = "Unified_Proect_Api.urls"
 

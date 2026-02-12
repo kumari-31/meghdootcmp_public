@@ -50,7 +50,6 @@ const VmRequest = () => {
     purpose: "",
     purpose_of_request: "",
     project_name: "",
-    designation: "",
     vdi_required: true,
     image: "",
     flavor: "",
@@ -335,7 +334,7 @@ const VmRequest = () => {
             <Paper elevation={2} style={{ padding: "20px", marginTop: "20px" }}>
               <form onSubmit={handleSubmit}>
                 <Grid2 container spacing={2}>
-                  <Grid2 size={6}>
+                  {/* <Grid2 size={6}>
                     {" "}
                     <FormControl fullWidth required>
                       <InputLabel>Designation</InputLabel>
@@ -355,7 +354,7 @@ const VmRequest = () => {
                         <MenuItem value="Student">Student</MenuItem>
                       </Select>
                     </FormControl>
-                  </Grid2>
+                  </Grid2> */}
                   <Grid2 size={6}>
                     <div>
                       <TextField

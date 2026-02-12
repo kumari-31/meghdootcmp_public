@@ -36,11 +36,12 @@ function RegistrationForm() {
   const navigate = useNavigate();
 
   const designationOptions = [
-    "Project Engineer",
-    "Project Associate",
-    "Scientist G",
-    "Scientist E",
-    "Scientist F",
+    "HR",
+    "Finance",
+    "Senior Management",
+    "Developer",
+    "Testing",
+    "Student"
   ];
 
   const fetchEmployeeData = async (employeeId) => {

@@ -23,6 +23,7 @@ import {
   FormControl,
   InputLabel,
   Tooltip,
+  Autocomplete,
 } from "@mui/material";
 import { CheckCircle, Visibility, Edit } from "@mui/icons-material";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
@@ -38,6 +39,33 @@ const VMRequestStatus = () => {
   const [selectedVmId, setSelectedVmId] = useState("");
   const [openEditModal, setOpenEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [imageOptions, setImageOptions] = useState([]);
+  const [flavorOptions, setFlavorOptions] = useState([]);
+  const [networks, setNetworks] = useState([]);
+
+  useEffect(() => {
+    apiClient
+      .get("/images/")
+      .then((res) => setImageOptions(res.data))
+      .catch((err) => console.error("Failed to fetch images", err));
+  }, []);
+
+  useEffect(() => {
+    apiClient
+      .get("/flavors/")
+      .then((res) => setFlavorOptions(res.data))
+      .catch((err) => console.error("Failed to fetch flavors", err));
+  }, []);
+
+  useEffect(() => {
+    apiClient
+      .get("/networks/")
+      .then((res) => {
+        const internal = res.data.filter((n) => n.external === false);
+        setNetworks(internal);
+      })
+      .catch((err) => console.error("Failed to fetch networks", err));
+  }, []);
 
   useEffect(() => {
     if (user?.employee_id) {
@@ -106,6 +134,23 @@ const VMRequestStatus = () => {
     const { name, value } = e.target;
     setEditForm((prev) => ({ ...prev, [name]: value }));
   };
+
+  const allowedEditFields = [
+    "vm_name",
+    "purpose_of_request",
+    "login_disable_date",
+    "login_disable_time",
+    "cpu",
+    "ram",
+    "disk",
+    "os_disk",
+    "additional_disk",
+    "hostname",
+    "remarks",
+    "image",
+    "flavor",
+    "network_id",
+  ];
 
   const handleUpdate = async () => {
     try {
@@ -274,7 +319,6 @@ const VMRequestStatus = () => {
                   <Typography color="error" fontWeight="bold">
                     VM creation failed
                   </Typography>
-                  
                 </>
               )}
 
@@ -409,7 +453,7 @@ const VMRequestStatus = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      <Dialog
+      {/* <Dialog
         open={openEditModal}
         onClose={handleCloseEditModal}
         maxWidth="sm"
@@ -447,6 +491,8 @@ const VMRequestStatus = () => {
                   "delete_request_reason",
                   "creation_error_message",
                   "creation_status",
+                  "network_id",
+                  "purpose_of_request",
                 ].includes(key) && (
                   <Grid2 item xs={6} key={key}>
                     <TextField
@@ -469,7 +515,99 @@ const VMRequestStatus = () => {
             Close
           </Button>
         </DialogActions>
-      </Dialog>
+      </Dialog> */}
+     <Dialog
+  open={openEditModal}
+  onClose={handleCloseEditModal}
+  maxWidth="sm"
+  fullWidth
+>
+  <DialogTitle>Edit VM Request</DialogTitle>
+
+  <DialogContent sx={{ overflowY: "visible" }}>
+    <Grid2 container spacing={3} sx={{ mt: 1 }}>
+      {allowedEditFields.map((key) =>
+        key in editForm && (
+          <Grid2 size={{ xs: 12, sm: 6 }} key={key}>
+            {/* IMAGE DROPDOWN */}
+            {key === "image" ? (
+              <Autocomplete
+                fullWidth // Makes the container fill the Grid
+                options={imageOptions}
+                getOptionLabel={(option) => option.name || ""}
+                value={imageOptions.find((img) => img.name === editForm.image) || null}
+                onChange={(e, newValue) =>
+                  setEditForm((prev) => ({ ...prev, image: newValue ? newValue.name : "" }))
+                }
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="IMAGE" 
+                    fullWidth // Makes the input fill the container
+                  />
+                )}
+              />
+            ) : key === "flavor" ? (
+              /* FLAVOR DROPDOWN */
+              <Autocomplete
+                fullWidth
+                options={flavorOptions}
+                getOptionLabel={(option) => option.name || ""}
+                value={flavorOptions.find((f) => f.name === editForm.flavor) || null}
+                onChange={(e, newValue) =>
+                  setEditForm((prev) => ({ ...prev, flavor: newValue ? newValue.name : "" }))
+                }
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="FLAVOR" 
+                    fullWidth 
+                  />
+                )}
+              />
+            ) : key === "network_id" ? (
+              /* NETWORK DROPDOWN */
+              <Autocomplete
+                fullWidth
+                options={networks}
+                getOptionLabel={(option) => option.network_name || ""}
+                value={networks.find((net) => net.id === editForm.network_id) || null}
+                onChange={(e, newValue) =>
+                  setEditForm((prev) => ({ ...prev, network_id: newValue ? newValue.id : "" }))
+                }
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    label="NETWORK" 
+                    fullWidth 
+                  />
+                )}
+              />
+            ) : (
+              /* NORMAL TEXT FIELD */
+              <TextField
+                fullWidth
+                label={key.replace(/_/g, " ").toUpperCase()}
+                name={key}
+                value={editForm[key] || ""}
+                onChange={handleInputChange}
+              />
+            )}
+          </Grid2>
+        )
+      )}
+    </Grid2>
+  </DialogContent>
+
+  <DialogActions sx={{ p: 3 }}>
+    <Button onClick={handleCloseEditModal} color="inherit">
+      Cancel
+    </Button>
+    <Button onClick={handleUpdate} variant="contained" color="primary">
+      Save Changes
+    </Button>
+  </DialogActions>
+</Dialog>
     </Container>
   );
 };
