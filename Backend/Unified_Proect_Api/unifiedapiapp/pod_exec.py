@@ -20,12 +20,14 @@ class PodExecConsumer(AsyncWebsocketConsumer):
                     
                     # Handle Resize
                     if data.get("type") == "resize":
-                        if self.exec_stream and self.exec_stream.is_open():
-                            self.exec_stream.write_channel(4, json.dumps({
-                                "Height": data["rows"],
-                                "Width": data["cols"]
-                            }))
-                        return
+                        try:
+                            if self.exec_stream and self.exec_stream.is_open():
+                                self.exec_stream.write_channel(
+                                    4,
+                                    json.dumps({"Height": data["rows"], "Width": data["cols"]})
+                                )
+                        except Exception:
+                            self.exec_stream = None
 
                     # Handle Metadata (First connection)
                     if "namespace" in data:
@@ -36,8 +38,13 @@ class PodExecConsumer(AsyncWebsocketConsumer):
                     pass
 
             # If it's not a control message, it's shell input
-            if self.exec_stream and self.exec_stream.is_open():
-                self.exec_stream.write_stdin(text_data)
+            if self.exec_stream:
+                try:
+                    if self.exec_stream.is_open():
+                        self.exec_stream.write_stdin(text_data)
+                except Exception:
+                    await self.send("\r\n❌ Exec session already closed\r\n")
+                    self.exec_stream = None
 
     async def start_exec(self, data):
         namespace = data["namespace"]
@@ -104,18 +111,24 @@ class PodExecConsumer(AsyncWebsocketConsumer):
             await self.send(f"❌ Kubernetes Exec Failed: {str(e)}\n")
 
     async def read_stream(self):
-        while self.exec_stream and self.exec_stream.is_open():
-            self.exec_stream.update(timeout=1)
+        try:
+            while self.exec_stream and self.exec_stream.is_open():
+                self.exec_stream.update(timeout=1)
 
-            if self.exec_stream.peek_stdout():
-                await self.send(self.exec_stream.read_stdout())
+                if self.exec_stream.peek_stdout():
+                    await self.send(self.exec_stream.read_stdout())
 
-            if self.exec_stream.peek_stderr():
-                await self.send(self.exec_stream.read_stderr())
+                if self.exec_stream.peek_stderr():
+                    await self.send(self.exec_stream.read_stderr())
 
-            await asyncio.sleep(0.01)
+                await asyncio.sleep(0.01)
 
-    async def disconnect(self, close_code):
-        if self.exec_stream:
-            self.exec_stream.close()
-        print("❌ WebSocket disconnected")
+        except Exception as e:
+            # Kubernetes exec socket closed — NORMAL
+            await self.send("\r\n❌ Pod exec session closed\r\n")
+            print(f"⚠️ Exec stream closed: {e}")
+
+        finally:
+            if self.exec_stream:
+                self.exec_stream.close()
+                self.exec_stream = None

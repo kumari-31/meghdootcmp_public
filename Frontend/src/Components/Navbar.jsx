@@ -164,7 +164,7 @@ const Navbar = () => {
           name: "Operations",
           subMenu: [
             {
-              name: "VmRequest",
+              name: "VM Request",
               path: "/app/openstack/vmrequest",
               roles: ["FLA", "EMPLOYEE"],
             },
@@ -333,6 +333,11 @@ const Navbar = () => {
             {
               name: "Admin Approvals",
               path: "/app/kubernetes/admin-service-approval",
+              roles: ["ADMIN"],
+            },
+              {
+              name: "Admin Delete Approvals",
+              path: "/app/kubernetes/admin/delete-approvals",
               roles: ["ADMIN"],
             },
             {

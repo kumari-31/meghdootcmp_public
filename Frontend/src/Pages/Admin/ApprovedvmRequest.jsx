@@ -85,26 +85,6 @@ const ApprovedvmRequest = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vmToDelete, setVmToDelete] = useState(null);
 
-  // const handleOpenVM = (vm) => {
-  //   const params = new URLSearchParams({
-  //     ip: vm.ip,
-  //     user: vm.username,
-  //     name: vm.vm_name.split("_").slice(1).join("_"),
-  //   }).toString();
-
-  //   // Center the popup window
-  //   const w = 1000,
-  //     h = 600;
-  //   const left = window.screen.width / 2 - w / 2;
-  //   const top = window.screen.height / 2 - h / 2;
-
-  //   window.open(
-  //     `/vm-shell?${params}`,
-  //     `shell-${vm.id}`,
-  //     `width=${w},height=${h},top=${top},left=${left},resizable=yes`,
-  //   );
-  //   closeMenu(); // Close the menu after clicking
-  // };
 
   const openMenu = (event, vm) => {
     setAnchorEl(event.currentTarget);
@@ -318,8 +298,6 @@ const ApprovedvmRequest = () => {
             <TableHead>
               <TableRow>
                 <StyledTableCell>Sr. No.</StyledTableCell>{" "}
-                {/* Sr. No. data is now after the checkbox data */}
-                {/* <StyledTableCell>ID</StyledTableCell> */}
                 <StyledTableCell>VM Name</StyledTableCell>
                 <StyledTableCell>Project Name</StyledTableCell>
                 <StyledTableCell>IP</StyledTableCell>
@@ -365,7 +343,7 @@ const ApprovedvmRequest = () => {
                     </StyledTableCell>
                     <StyledTableCell>
                       <a
-                        href="https://virtuallab.bosschn.in/"
+                        href="http://10.184.49.247:9006/guacamole/#/"
                         target="_blank"
                         rel="noopener noreferrer"
                       >
@@ -386,12 +364,7 @@ const ApprovedvmRequest = () => {
                         open={Boolean(anchorEl) && currentVM?.id === item.id}
                         onClose={closeMenu}
                       >
-                        {/* <MenuItem
-                          onClick={() => handleOpenVM(item)}
-                          sx={{ fontWeight: "bold", color: "#253848" }}
-                        >
-                          🖥️ Open Shell
-                        </MenuItem> */}
+                       
                         <MenuItem
                           onClick={() => openConfirmDialog(item, "reboot")}
                         >

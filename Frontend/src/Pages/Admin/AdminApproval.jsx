@@ -154,38 +154,38 @@ const AdminApproval = () => {
   };
 
   // Handle Accept/Reject
-  const handleStatusUpdate = async (id, status, reason = "") => {
-    try {
-      // Disable this action to prevent double click
-      setDisabledActions((prev) => [...prev, id]);
-      const response = await apiClient.post("/vmrequest/status/", {
-        vm_request_id: id,
-        status,
-        admin_rejection_reason: status === "Rejected" ? reason : null,
-      });
+    const handleStatusUpdate = async (id, status, reason = "") => {
+      try {
+        // Disable this action to prevent double click
+        setDisabledActions((prev) => [...prev, id]);
+        const response = await apiClient.post("/vmrequest/status/", {
+          vm_request_id: id,
+          status,
+          admin_rejection_reason: status === "Rejected" ? reason : null,
+        });
 
-      if (response.status === 200) {
+        if (response.status === 200) {
+          setAlertDialog({
+            open: true,
+            message: `Request ${status}!`,
+            severity: "success",
+          });
+          await fetchOverview(page + 1, rowsPerPage); // Refresh immediately
+          triggerNotificationRefresh(); // Notify other components
+        } else {
+          throw new Error("Unexpected server response");
+        }
+      } catch (error) {
+        console.error("Error updating status:", error);
         setAlertDialog({
           open: true,
-          message: `Request ${status}!`,
-          severity: "success",
+          message: "Error updating request status.",
+          severity: "error",
         });
-        await fetchOverview(page + 1, rowsPerPage); // Refresh immediately
-        triggerNotificationRefresh(); // Notify other components
-      } else {
-        throw new Error("Unexpected server response");
+        // Re-enable if failed
+        setDisabledActions((prev) => prev.filter((r) => r !== id));
       }
-    } catch (error) {
-      console.error("Error updating status:", error);
-      setAlertDialog({
-        open: true,
-        message: "Error updating request status.",
-        severity: "error",
-      });
-      // Re-enable if failed
-      setDisabledActions((prev) => prev.filter((r) => r !== id));
-    }
-  };
+    };
 
  const handleBulkApprove = async () => {
   setBulkLoading(true);
@@ -461,7 +461,7 @@ const AdminApproval = () => {
                 <StyledTableCell>Sr. No.</StyledTableCell>
                 <StyledTableCell>Email</StyledTableCell>
                 <StyledTableCell>VM Name</StyledTableCell>
-                <StyledTableCell>VM Counts</StyledTableCell>
+                <StyledTableCell>VM Count</StyledTableCell>
                 <StyledTableCell>Project</StyledTableCell>
                 <StyledTableCell>Image</StyledTableCell>
                 <StyledTableCell>Flavor</StyledTableCell>
@@ -521,7 +521,7 @@ const AdminApproval = () => {
                       </Tooltip>
                     )}
                   </StyledTableCell>
-                  <StyledTableCell>{req.count_of_vms}</StyledTableCell>
+                  <StyledTableCell>{req.count_of_vms || 1}</StyledTableCell>
                   <StyledTableCell>{req.project_name}</StyledTableCell>
                   <StyledTableCell>{req.image}</StyledTableCell>
                   <StyledTableCell>{req.flavor}</StyledTableCell>
@@ -583,8 +583,8 @@ const AdminApproval = () => {
       >
         <DialogTitle>
           {statusFilter === "accepted"
-            ? "FLA Approved Requests"
-            : "FLA Rejected Requests"}
+            ? "Admin Approved Requests"
+            : "Admin Rejected Requests"}
         </DialogTitle>
         <DialogContent>
           <TableContainer>

@@ -66,6 +66,16 @@ const MeghdootLogin = () => {
     }
   };
 
+useEffect(() => {
+    // When the user is at the login screen, they shouldn't have a "selected platform" yet
+    localStorage.removeItem("selectedPlatform");
+    localStorage.removeItem("darkMode");
+
+
+  
+
+}, []);
+
 
 const handleSubmit = async (e) => {
   e.preventDefault();

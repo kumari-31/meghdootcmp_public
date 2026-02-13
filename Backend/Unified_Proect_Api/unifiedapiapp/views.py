@@ -2927,7 +2927,7 @@ class EmployeeCreateAPIView(APIView):
         data = request.data.copy()
         is_admin = user.is_staff or user.is_superuser
 
-        employee_count = Employee.objects.count()
+        employee_count = Employee.objects.count()       
         fla_exists = Employee.objects.filter(is_fla=True).exists()
 
         # --------------------------------
@@ -5976,23 +5976,37 @@ class CookieTokenRefreshView(APIView):
         try:
             refresh = RefreshToken(refresh_token_str)
             user_id = refresh["user_id"]
-
             User = get_user_model()
             user = User.objects.get(id=user_id)
 
+            employee = Employee.objects.filter(email=user.email).first()
+            
+            role = "ADMIN"
+            employee_id = None
+
+            if user.is_staff or user.is_superuser:
+                role = "ADMIN"
+            elif employee:
+                employee_id = getattr(employee, 'employee_id', None)
+                role = "FLA" if getattr(employee, 'is_fla', False) else "EMPLOYEE"
+
             # ✅ Rotate tokens
             new_refresh = RefreshToken.for_user(user)
+            new_refresh["role"] = role
+            new_refresh["employee_id"] = employee_id
+
             new_access = new_refresh.access_token
 
             user_data = {
                 "username": user.username,
                 "email": user.email,
-                "role": new_access.get("role"),
-                "employee_id": new_access.get("employee_id"),
+                "role": role,
+                "employee_id": employee_id,
             }
 
+
             response = Response(
-                {"detail": "Token refreshed"},
+                {"detail": "Token refreshed", "user_data": user_data},
                 status=status.HTTP_200_OK,
             )
 
@@ -6065,6 +6079,7 @@ class LogoutView(APIView):
         response.delete_cookie("MDSID", path="/")
         response.delete_cookie("MDAUTH", path="/")
         response.delete_cookie("UD", path="/")
+        response.delete_cookie("csrftoken", path="/")
 
         # Optional: Blacklist refresh token
         refresh_token = request.COOKIES.get("MDAUTH")
@@ -6983,6 +6998,206 @@ from django.contrib.auth.models import User
 
 
 
+# class VmRequestStatusUpdateAPIView(APIView):
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request):
+#         try:
+#             vm_request_id = request.data.get("vm_request_id")
+#             new_status = request.data.get("status")
+#             rejection_reason = (
+#             request.data.get("rejection_reason")
+#             or request.data.get("fla_rejection_reason")
+#             or "No reason provided")
+
+
+#             if not vm_request_id or not new_status:
+#                 return Response(
+#                     {"error": "VM request ID and status are required"},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             if new_status not in ["Accepted", "Rejected"]:
+#                 return Response(
+#                     {"error": "Status must be Accepted or Rejected"},
+#                     status=status.HTTP_400_BAD_REQUEST,
+#                 )
+
+#             try:
+#                 vm_request = VmRequest.objects.get(id=vm_request_id)
+#             except VmRequest.DoesNotExist:
+#                 return Response(
+#                     {"error": "VM request not found"},
+#                     status=status.HTTP_404_NOT_FOUND,
+#                 )
+
+#             employee = Employee.objects.get(employee_id=vm_request.employee_id)
+#             current_user_email = request.user.email or settings.DEFAULT_FROM_EMAIL
+#             admin_emails = get_admin_emails()
+
+#             is_admin = request.user.is_superuser or request.user.is_staff
+
+#             # =====================================================
+#             # ================= ADMIN ACTION ======================
+#             # =====================================================
+#             if is_admin:
+
+#                 if vm_request.fla_status != "Accepted":
+#                     return Response(
+#                         {"error": "FLA approval pending or rejected"},
+#                         status=status.HTTP_400_BAD_REQUEST,
+#                     )
+
+#                 # ---------- ADMIN ACCEPT ----------
+#                 if new_status == "Accepted":
+#                     vm_response = vm_approve_request(vm_request_id)
+
+#                     if not vm_response["status"]:
+#                         vm_request.creation_status = "Failed"
+#                         vm_request.creation_error_message = vm_response.get(
+#                             "message", "VM provisioning failed"
+#                         )
+#                         vm_request.save()
+
+#                         return Response(
+#                             {
+#                                 "error": "VM provisioning failed",
+#                                 "details": vm_request.creation_error_message,
+#                             },
+#                             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                         )
+
+#                     vm_request.admin_status = "Accepted"
+#                     vm_request.creation_status = "Success"
+#                     vm_request.creation_error_message = None
+#                     vm_request.admin_approved_timestamp = timezone.now()
+#                     vm_request.admin_action_timestamp = timezone.now()
+#                     vm_request.save()
+
+#                     # VM creation success email handled elsewhere
+#                     return Response(
+#                         {"message": "VM approved and created successfully"},
+#                         status=status.HTTP_200_OK,
+#                     )
+
+#                 # ---------- ADMIN REJECT ----------
+#                 vm_request.admin_status = "Rejected"
+#                 vm_request.admin_rejection_reason = rejection_reason
+#                 vm_request.admin_action_timestamp = timezone.now()
+#                 vm_request.save()
+
+#             try:
+#                 subject = "VM Request Rejected by Admin"
+#                 message = f"""
+# Dear {employee.name},
+
+# Your VM request has been rejected by the Admin.
+
+# VM Name : {vm_request.vm_name}
+# Reason  : {rejection_reason}
+
+# Regards,
+# Cloud Team
+#                 """
+
+#                 send_mail(
+#                     subject,
+#                     message,
+#                     settings.DEFAULT_FROM_EMAIL,
+#                     [employee.email],
+#                     fail_silently=True,
+#                 )
+#             except Exception as e:
+#                     print(f"Mail Server Error: {e}")
+#             return Response(
+#                     {"message": "VM request rejected by Admin and email sent"},
+#                     status=status.HTTP_200_OK,
+#                 )
+
+#             # =====================================================
+#             # ================= FLA ACTION ========================
+#             # =====================================================
+#             else:
+#                 vm_request.fla_status = new_status
+                
+#                 # ---------- FLA REJECT ----------
+#                 if new_status == "Rejected":
+#                     vm_request.fla_rejection_reason = rejection_reason
+#                     vm_request.fla_approved_timestamp = None
+#                     vm_request.save()
+#                     try:
+#                         subject = "VM Request Rejected by FLA"
+#                         message = f"""
+# Dear {employee.name},
+
+# Your VM request has been rejected by your FLA.
+
+# VM Name : {vm_request.vm_name}
+# Reason  : {rejection_reason}
+
+# Please contact your FLA for clarification.
+
+# Regards,
+# Cloud Team
+#                     """
+
+#                         send_mail(
+#                             subject,
+#                             message,
+#                             settings.DEFAULT_FROM_EMAIL,
+#                             [employee.email],
+#                             fail_silently=True,
+#                         )
+#                         except Exception as e:
+#                         print(f"Mail Server Error: {e}")
+
+#                         return Response(
+#                             {"message": "VM request rejected by FLA and email sent"},
+#                             status=status.HTTP_200_OK,
+#                         )
+
+#                 # ---------- FLA ACCEPT ----------
+#                     vm_request.fla_approved_timestamp = timezone.now()
+#                     vm_request.save()
+#                 try:
+#                     subject = "VM Request Approved by FLA – Admin Action Required"
+#                     message = f"""
+# Dear Admin,
+
+# A VM request has been approved by FLA.
+
+# Employee Name : {employee.name}
+# Employee ID   : {employee.employee_id}
+# VM Name       : {vm_request.vm_name}
+# Project       : {vm_request.project_name}
+
+# Please login to CMP dashboard and take action.
+
+# Regards,
+# Cloud Team
+#                 """
+
+#                 send_mail(
+#                     subject,
+#                     message,
+#                     settings.DEFAULT_FROM_EMAIL,
+#                     admin_emails,
+#                     fail_silently=True,
+#                 )
+#                 except Exception as e:
+#                         print(f"Mail Server Error: {e}")
+
+#                 return Response(
+#                     {"message": "VM request approved by FLA and email sent to Admin"},
+#                     status=status.HTTP_200_OK,
+#                 )
+
+#         except Exception as e:
+#             return Response(
+#                 {"error": str(e)},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             )
+
 class VmRequestStatusUpdateAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -6991,110 +7206,64 @@ class VmRequestStatusUpdateAPIView(APIView):
             vm_request_id = request.data.get("vm_request_id")
             new_status = request.data.get("status")
             rejection_reason = (
-            request.data.get("rejection_reason")
-            or request.data.get("fla_rejection_reason")
-            or "No reason provided")
+                request.data.get("rejection_reason")
+                or request.data.get("fla_rejection_reason")
+                or "No reason provided"
+            )
 
-
+            # --- Basic Validations ---
             if not vm_request_id or not new_status:
-                return Response(
-                    {"error": "VM request ID and status are required"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": "VM request ID and status are required"}, status=status.HTTP_400_BAD_REQUEST)
 
             if new_status not in ["Accepted", "Rejected"]:
-                return Response(
-                    {"error": "Status must be Accepted or Rejected"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"error": "Status must be Accepted or Rejected"}, status=status.HTTP_400_BAD_REQUEST)
 
             try:
                 vm_request = VmRequest.objects.get(id=vm_request_id)
             except VmRequest.DoesNotExist:
-                return Response(
-                    {"error": "VM request not found"},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
+                return Response({"error": "VM request not found"}, status=status.HTTP_404_NOT_FOUND)
 
             employee = Employee.objects.get(employee_id=vm_request.employee_id)
+            
+            # Use the actual person's email as the 'From' address
+            sender_email = request.user.email or settings.DEFAULT_FROM_EMAIL
             admin_emails = get_admin_emails()
-
             is_admin = request.user.is_superuser or request.user.is_staff
 
             # =====================================================
             # ================= ADMIN ACTION ======================
             # =====================================================
             if is_admin:
-
                 if vm_request.fla_status != "Accepted":
-                    return Response(
-                        {"error": "FLA approval pending or rejected"},
-                        status=status.HTTP_400_BAD_REQUEST,
-                    )
+                    return Response({"error": "FLA approval pending or rejected"}, status=status.HTTP_400_BAD_REQUEST)
 
-                # ---------- ADMIN ACCEPT ----------
                 if new_status == "Accepted":
                     vm_response = vm_approve_request(vm_request_id)
-
                     if not vm_response["status"]:
                         vm_request.creation_status = "Failed"
-                        vm_request.creation_error_message = vm_response.get(
-                            "message", "VM provisioning failed"
-                        )
+                        vm_request.creation_error_message = vm_response.get("message", "VM provisioning failed")
                         vm_request.save()
-
-                        return Response(
-                            {
-                                "error": "VM provisioning failed",
-                                "details": vm_request.creation_error_message,
-                            },
-                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        )
+                        return Response({"error": "VM provisioning failed", "details": vm_request.creation_error_message}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
                     vm_request.admin_status = "Accepted"
                     vm_request.creation_status = "Success"
-                    vm_request.creation_error_message = None
                     vm_request.admin_approved_timestamp = timezone.now()
-                    vm_request.admin_action_timestamp = timezone.now()
                     vm_request.save()
+                    return Response({"message": "VM approved and created successfully"}, status=status.HTTP_200_OK)
 
-                    # VM creation success email handled elsewhere
-                    return Response(
-                        {"message": "VM approved and created successfully"},
-                        status=status.HTTP_200_OK,
-                    )
-
-                # ---------- ADMIN REJECT ----------
+                # --- ADMIN REJECT ---
                 vm_request.admin_status = "Rejected"
                 vm_request.admin_rejection_reason = rejection_reason
-                vm_request.admin_action_timestamp = timezone.now()
                 vm_request.save()
 
-                subject = "VM Request Rejected by Admin"
-                message = f"""
-Dear {employee.name},
-
-Your VM request has been rejected by the Admin.
-
-VM Name : {vm_request.vm_name}
-Reason  : {rejection_reason}
-
-Regards,
-Cloud Team
-                """
-
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [employee.email],
-                    fail_silently=False,
-                )
-
-                return Response(
-                    {"message": "VM request rejected by Admin and email sent"},
-                    status=status.HTTP_200_OK,
-                )
+                try:
+                    subject = "VM Request Rejected by Admin"
+                    message = f"Dear {employee.name},\n\nYour VM request has been rejected by Admin.\nReason: {rejection_reason}"
+                    send_mail(subject, message, sender_email, [employee.email], fail_silently=True)
+                except Exception as e:
+                    print(f"Mail Server Error: {e}")
+                
+                return Response({"message": "VM request rejected by Admin"}, status=status.HTTP_200_OK)
 
             # =====================================================
             # ================= FLA ACTION ========================
@@ -7102,81 +7271,31 @@ Cloud Team
             else:
                 vm_request.fla_status = new_status
                 
-                # ---------- FLA REJECT ----------
                 if new_status == "Rejected":
                     vm_request.fla_rejection_reason = rejection_reason
-                    vm_request.fla_approved_timestamp = None
                     vm_request.save()
+                    try:
+                        subject = "VM Request Rejected by FLA"
+                        message = f"Dear {employee.name},\n\nYour VM request has been rejected by your FLA.\nReason: {rejection_reason}"
+                        send_mail(subject, message, sender_email, [employee.email], fail_silently=True)
+                    except Exception as e:
+                        print(f"Mail Server Error: {e}")
+                    return Response({"message": "VM request rejected by FLA"}, status=status.HTTP_200_OK)
 
-                    subject = "VM Request Rejected by FLA"
-                    message = f"""
-Dear {employee.name},
-
-Your VM request has been rejected by your FLA.
-
-VM Name : {vm_request.vm_name}
-Reason  : {rejection_reason}
-
-Please contact your FLA for clarification.
-
-Regards,
-Cloud Team
-                    """
-
-                    send_mail(
-                        subject,
-                        message,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [employee.email],
-                        fail_silently=False,
-                    )
-
-                    return Response(
-                        {"message": "VM request rejected by FLA and email sent"},
-                        status=status.HTTP_200_OK,
-                    )
-
-                # ---------- FLA ACCEPT ----------
+                # --- FLA ACCEPT ---
                 vm_request.fla_approved_timestamp = timezone.now()
                 vm_request.save()
-
-                subject = "VM Request Approved by FLA – Admin Action Required"
-                message = f"""
-Dear Admin,
-
-A VM request has been approved by FLA.
-
-Employee Name : {employee.name}
-Employee ID   : {employee.employee_id}
-VM Name       : {vm_request.vm_name}
-Project       : {vm_request.project_name}
-
-Please login to CMP dashboard and take action.
-
-Regards,
-Cloud Team
-                """
-
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    admin_emails,
-                    fail_silently=False,
-                )
-
-                return Response(
-                    {"message": "VM request approved by FLA and email sent to Admin"},
-                    status=status.HTTP_200_OK,
-                )
+                try:
+                    subject = "VM Request Approved by FLA – Admin Action Required"
+                    message = f"Dear Admin,\n\nA VM request from {employee.name} has been approved by FLA. Please take action."
+                    send_mail(subject, message, sender_email, admin_emails, fail_silently=True)
+                except Exception as e:
+                    print(f"Mail Server Error: {e}")
+                
+                return Response({"message": "VM request approved by FLA"}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # class VmRequestStatusUpdateAPIView(APIView):
 #     permission_classes = [IsAuthenticated]  # Add authentication permission
@@ -9533,34 +9652,29 @@ class ApprovedVMsAPIView(APIView):
         try:
             role = request.auth.get("role", None)
             employee_id = request.auth.get("employee_id", None)
+            user_email = request.user.email  # Assuming the user object has email
 
-            # --- Determine dataset based on role ---
+            # 1. Base Queryset starts from VMInfo
+            queryset = VMInfo.objects.all()
+
+            # --- Apply Role-Based Filtering ---
             if role == "ADMIN":
-                base_queryset = VmRequest.objects.filter(
-                    fla_status="Accepted", admin_status="Accepted"
-                )
+                # Admin sees all VMs that are "Approved"
+                queryset = queryset.filter(creation_status="Approved")
+            
             elif role == "FLA":
-                # Fetch all employees managed by this FLA
-                related_emp_ids = Employee.objects.filter(
+                # FLA sees their own VMs + VMs of employees they manage
+                managed_emails = Employee.objects.filter(
                     fla_employee_id=employee_id
-                ).values_list("employee_id", flat=True)
-                base_queryset = VmRequest.objects.filter(
-                    Q(employee_id__in=related_emp_ids) | Q(employee_id=employee_id),
-                    fla_status="Accepted",
-                    admin_status="Accepted",
+                ).values_list("email", flat=True)
+                
+                queryset = queryset.filter(
+                    Q(email__in=managed_emails) | Q(email=user_email),
+                    creation_status="Approved"
                 )
             else:
-                # Regular user → only their own accepted requests
-                base_queryset = VmRequest.objects.filter(
-                    employee_id=employee_id,
-                    fla_status="Accepted",
-                    admin_status="Accepted",
-                )
-            queryset = base_queryset.annotate(
-                has_vm=Exists(
-                    VMInfo.objects.filter(vm_name__startswith=OuterRef("vm_name"))
-                )
-            ).filter(has_vm=True)
+                # Regular User sees only their own VMs
+                queryset = queryset.filter(email=user_email, creation_status="Approved")
 
             # --- Pagination ---
             page = int(request.GET.get("page", 1))
@@ -9568,89 +9682,56 @@ class ApprovedVMsAPIView(APIView):
             total_records = queryset.count()
             start = (page - 1) * size
             end = start + size
-            queryset = queryset.order_by("-admin_approved_timestamp")[start:end]
+            
+            # Order by ID descending so newest VMs appear first
+            queryset = queryset.order_by("-id")[start:end]
 
             # --- Prepare Response Data ---
             data = []
-            for vm in queryset:
-                emp = (
-                    Employee.objects.filter(employee_id=vm.employee_id)
-                    .values("name", "fla_name", "fla_employee_id")
-                    .first()
-                )
+            for info in queryset:
+                # We find the parent request by matching the prefix of the vm_name
+                # e.g., '346814_zxcvfd-2' -> '346814_zxcvfd'
+                base_name = info.vm_name.split('-')[0]
+                parent_req = VmRequest.objects.filter(vm_name=base_name).first()
 
-                vm_info = (
-                    VMInfo.objects.filter(vm_name=vm.vm_name).order_by("-id").first()
-                )
-                server = None
-                if vm_info:
-                    server = self.get_openstack_server(
-                        vm_id=vm_info.vm_id,
-                        vm_name=vm.vm_name
-                    )
+                # Get real-time status from OpenStack
+                server = self.get_openstack_server(info.vm_id)
+                
+                status_val = "Unknown"
+                power_val = "Unknown"
 
-
-                    if server:
-                        status_val = server.status  # ACTIVE, SHUTOFF, ERROR
-                        power_state = getattr(server, "power_state", None)
-
-                        power_mapping = {
-                            0: "No State",
-                            1: "Running",
-                            3: "Paused",
-                            4: "Shutdown",
-                            6: "Crashed",
-                            7: "Suspended",
-                        }
-                        power_val = power_mapping.get(power_state, "Unknown")
-                    else:
-                        status_val = "Unknown"
-                        power_val = "Unknown"
-                else:
-                    status_val = "Unknown"
-                    power_val = "Unknown"
-
-                # Aggregate IPs correctly
-                ip = vm_info.ip if vm_info and vm_info.ip else "Not Available"
-                username = (
-                    vm_info.username
-                    if vm_info and vm_info.username
-                    else "Not Available"
-                )
-
-                data.append(
-                    {
-                        "id": vm.id,
-                        "vm_name": vm.vm_name,
-                        "employee_id": vm.employee_id,
-                        "name": emp["name"] if emp else "Unknown",
-                        "ip": vm_info.ip if vm_info else "Not Available",
-                        "username": vm_info.username if vm_info else "Not Available",
-                        "status": status_val,
-                        "power_state": power_val,
-                        "project_name": vm.project_name,
-                        "admin_status": vm.admin_status,
-                        "fla_status": vm.fla_status,
-                        "admin_approved_timestamp": vm.admin_approved_timestamp,
+                if server:
+                    status_val = server.status # ACTIVE, SHUTOFF, etc.
+                    power_mapping = {
+                        0: "No State", 1: "Running", 3: "Paused", 
+                        4: "Shutdown", 6: "Crashed", 7: "Suspended"
                     }
-                )
+                    power_val = power_mapping.get(getattr(server, "power_state", None), "Unknown")
 
-            return Response(
-                {
-                    "role": role,
-                    "total_records": total_records,
-                    "page": page,
-                    "size": size,
-                    "data": data,
-                },
-                status=status.HTTP_200_OK,
-            )
+                data.append({
+                    "id": info.id,                # VMInfo Primary Key
+                    "vm_name": info.vm_name,      # e.g., 346814_zxcvfd-2
+                    "employee_id": parent_req.employee_id if parent_req else "N/A",
+                    "project_name": parent_req.project_name if parent_req else "N/A",
+                    "ip": info.ip or "Not Available",
+                    "username": info.username or "Not Available",
+                    "status": status_val,
+                    "power_state": power_val,
+                    "connection_id": info.connection_id,
+                    "admin_approved_timestamp": parent_req.admin_approved_timestamp if parent_req else None,
+                })
+
+            return Response({
+                "role": role,
+                "total_records": total_records,
+                "page": page,
+                "size": size,
+                "data": data,
+            }, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"❌ Error in ApprovedVMsAPIView: {str(e)}")
-            return Response(
-                {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # from .openstack_client import get_conn
@@ -12984,63 +13065,63 @@ class DeployNginxHAAPIView(APIView):
 # --------------------------------12 Mar 2025---------------------------------
 
 
-# Configure logging
-logger = logging.getLogger(__name__)
+# # Configure logging
+# logger = logging.getLogger(__name__)
 
-# Load Kubernetes configuration securely
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # App directory
-KUBECONFIG_PATH = os.getenv(
-    "KUBE_CONFIG_PATH", os.path.join(BASE_DIR, "admin.conf")
-)  # Use env variable or default path
+# # Load Kubernetes configuration securely
+# BASE_DIR = os.path.dirname(os.path.abspath(__file__))  # App directory
+# KUBECONFIG_PATH = os.getenv(
+#     "KUBE_CONFIG_PATH", os.path.join(BASE_DIR, "admin.conf")
+# )  # Use env variable or default path
 
-try:
-    config.load_kube_config(config_file=KUBECONFIG_PATH)
-    logger.info("✅ Kubernetes config loaded successfully.")
-except Exception as e:
-    logger.error(f"❌ Failed to load kubeconfig: {e}")
+# try:
+#     config.load_kube_config(config_file=KUBECONFIG_PATH)
+#     logger.info("✅ Kubernetes config loaded successfully.")
+# except Exception as e:
+#     logger.error(f"❌ Failed to load kubeconfig: {e}")
 
-# Create Kubernetes API client
-v1 = client.CoreV1Api()
+# # Create Kubernetes API client
+# v1 = client.CoreV1Api()
 
-# Dictionary mapping application names to container images and ports
-APPLICATION_IMAGES = {
-    "nginx": {"image": "nginx:latest", "port": 80},
-    "apache": {"image": "httpd:latest", "port": 80},
-    "caddy": {"image": "caddy:latest", "port": 80},
-    "mysql": {
-        "image": "mysql:latest",
-        "port": 3306,
-        "env": {"MYSQL_ROOT_PASSWORD": "rootpass"},
-    },
-    "postgresql": {
-        "image": "postgres:latest",
-        "port": 5432,
-        "env": {"POSTGRES_PASSWORD": "rootpass"},
-    },
-    "mongodb": {"image": "mongo:latest", "port": 27017},
-    "redis": {"image": "redis:latest", "port": 6379},
-    "python": {"image": "python:latest"},
-    "nodejs": {"image": "node:latest"},
-    "golang": {"image": "golang:latest"},
-    "java": {"image": "openjdk:latest"},
-    "jenkins": {"image": "jenkins/jenkins:lts", "port": 8080},
-    "gitlab-runner": {"image": "gitlab/gitlab-runner:latest"},
-    "docker-dind": {"image": "docker:dind"},
-    "prometheus": {"image": "prom/prometheus:latest", "port": 9090},
-    "grafana": {"image": "grafana/grafana:latest", "port": 3000},
-    "fluentd": {"image": "fluent/fluentd:latest"},
-    "haproxy": {"image": "haproxy:latest", "port": 80},
-    "traefik": {"image": "traefik:latest", "port": 80},
-    "envoy": {"image": "envoyproxy/envoy:latest", "port": 10000},
-    "minio": {"image": "minio/minio:latest", "port": 9000},
-    "rabbitmq": {"image": "rabbitmq:latest", "port": 5672},
-    "elasticsearch": {
-        "image": "docker.elastic.co/elasticsearch/elasticsearch:latest",
-        "port": 9200,
-    },
-    "tensorflow": {"image": "tensorflow/serving:latest"},
-    "pytorch": {"image": "pytorch/pytorch:latest"},
-}
+# # Dictionary mapping application names to container images and ports
+# APPLICATION_IMAGES = {
+#     "nginx": {"image": "nginx:latest", "port": 80},
+#     "apache": {"image": "httpd:latest", "port": 80},
+#     "caddy": {"image": "caddy:latest", "port": 80},
+#     "mysql": {
+#         "image": "mysql:latest",
+#         "port": 3306,
+#         "env": {"MYSQL_ROOT_PASSWORD": "rootpass"},
+#     },
+#     "postgresql": {
+#         "image": "postgres:latest",
+#         "port": 5432,
+#         "env": {"POSTGRES_PASSWORD": "rootpass"},
+#     },
+#     "mongodb": {"image": "mongo:latest", "port": 27017},
+#     "redis": {"image": "redis:latest", "port": 6379},
+#     "python": {"image": "python:latest"},
+#     "nodejs": {"image": "node:latest"},
+#     "golang": {"image": "golang:latest"},
+#     "java": {"image": "openjdk:latest"},
+#     "jenkins": {"image": "jenkins/jenkins:lts", "port": 8080},
+#     "gitlab-runner": {"image": "gitlab/gitlab-runner:latest"},
+#     "docker-dind": {"image": "docker:dind"},
+#     "prometheus": {"image": "prom/prometheus:latest", "port": 9090},
+#     "grafana": {"image": "grafana/grafana:latest", "port": 3000},
+#     "fluentd": {"image": "fluent/fluentd:latest"},
+#     "haproxy": {"image": "haproxy:latest", "port": 80},
+#     "traefik": {"image": "traefik:latest", "port": 80},
+#     "envoy": {"image": "envoyproxy/envoy:latest", "port": 10000},
+#     "minio": {"image": "minio/minio:latest", "port": 9000},
+#     "rabbitmq": {"image": "rabbitmq:latest", "port": 5672},
+#     "elasticsearch": {
+#         "image": "docker.elastic.co/elasticsearch/elasticsearch:latest",
+#         "port": 9200,
+#     },
+#     "tensorflow": {"image": "tensorflow/serving:latest"},
+#     "pytorch": {"image": "pytorch/pytorch:latest"},
+# }
 
 
 # class DeployApplicationAPIView(APIView):
@@ -16173,30 +16254,6 @@ class ServiceRequestAPIView(APIView):
             )
 
 
-# class ServiceRequestCreateAPIView(APIView):
-#     permission_classes = [IsAuthenticated]
-
-#     def post(self, request):
-#         try:
-#             serializer = ServiceRequestSerializer(data=request.data)
-#             if serializer.is_valid():
-#                 service_request = serializer.save()
-#                 # Do NOT deploy here, just save the details
-#                 return Response(
-#                     {
-#                         "message": "Service request created successfully",
-#                         "service_request": ServiceRequestSerializer(
-#                             service_request
-#                         ).data,
-#                     },
-#                     status=status.HTTP_201_CREATED,
-#                 )
-#             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-#         except Exception as e:
-#             return Response(
-#                 {"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-#             )
-
 
 class ServiceRequestCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -16310,6 +16367,38 @@ class ServiceRequestAPIView(APIView):
             )
 
 
+def resolve_node_port(core_v1, requested_port=None):
+    """
+    Returns:
+      - int (nodePort) if fixed port should be used
+      - None if Kubernetes should auto-assign
+    Raises:
+      Exception if requested_port is unavailable
+    """
+    services = core_v1.list_service_for_all_namespaces().items
+    used_ports = {
+        p.node_port
+        for svc in services
+        if svc.spec.type == "NodePort"
+        for p in svc.spec.ports
+        if p.node_port
+    }
+
+    if requested_port:
+        requested_port = int(requested_port)
+        if requested_port < 30000 or requested_port > 32767:
+            raise Exception("NodePort must be between 30000–32767")
+
+        if requested_port in used_ports:
+            raise Exception(f"NodePort {requested_port} is already in use")
+
+        return requested_port
+
+    # Auto-assign
+    return None
+
+
+
 class ServiceRequestPendingAdminAPIView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUserPermission]
 
@@ -16353,8 +16442,9 @@ class ServiceRequestPendingAdminAPIView(APIView):
             else:  # Rejected
                 service_request.admin_approved_timestamp = None
                 service_request.admin_rejection_reason = remarks
-
-            service_request.save()
+                service_request.save()
+                return Response({"message": "Service request rejected successfully"})
+            
 
             # Retrieve app_name from service_request
             app_name = service_request.app_name
@@ -16403,130 +16493,25 @@ class ServiceRequestPendingAdminAPIView(APIView):
             apps_v1, core_v1 = get_k8s_client3()
             logger.info("service name:", service_request.service_name)
             if service_request.service_name.lower() == "nginx":
-                # if not pod_name or not isinstance(pod_name, str):
-                #     pod_name = service_request.service_name + "nginx"
-                #     print("Pod name is empty or not a string, using default name:", pod_name)
+                data = request.data
+
+                # 1️⃣ Resolve requested NodePort (optional)
+                requested_node_port = data.get("node_port")
+                if requested_node_port in ["", None]:
+                    requested_node_port = None
+
+                try:
+                    node_port = resolve_node_port(core_v1, requested_node_port)
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+
+                labels = {"app": pod_name}
+
+                # 2️⃣ Create Deployment FIRST
                 container = client.V1Container(
                     name=pod_name,
                     image="nginx:latest",
                     ports=[client.V1ContainerPort(container_port=80)],
-                )
-
-                template = client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels={"app": pod_name}),
-                    spec=client.V1PodSpec(containers=[container]),
-                )
-
-                spec = client.V1DeploymentSpec(
-                    replicas=1,
-                    selector=client.V1LabelSelector(match_labels={"app": pod_name}),
-                    template=template,
-                )
-
-                deployment = client.V1Deployment(
-                    api_version="apps/v1",
-                    kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=pod_name),
-                    spec=spec,
-                )
-
-                apps_v1.create_namespaced_deployment(
-                    namespace="default", body=deployment
-                )
-                random_node_port = random.randint(30000, 32767)
-                service = client.V1Service(
-                    metadata=client.V1ObjectMeta(name=pod_name),
-                    spec=client.V1ServiceSpec(
-                        type="NodePort",
-                        selector={"app": pod_name},
-                        ports=[
-                            client.V1ServicePort(
-                                port=80, target_port=80, node_port=random_node_port
-                            )
-                        ],
-                    ),
-                )
-
-                # Create service
-                created_service = core_v1.create_namespaced_service(
-                    namespace="default", body=service
-                )
-
-                # ⭐ Retrieve the assigned NodePort
-                node_port = created_service.spec.ports[0].node_port
-                logger.debug("Assigned NodePort:", node_port)
-
-                # Save to DB or return to frontend
-                service_request.node_port = node_port
-                service_request.save()
-
-                # ⭐⭐⭐ Set Deployment Status After Successful Deployment ⭐⭐⭐
-                service_request.deployment_status = "Deployed"
-                service_request.save()
-
-                # Send deployment success email
-                employee = Employee.objects.get(employee_id=service_request.employee_id)
-                send_deployment_email(
-                    email=employee.email,
-                    employee_name=employee.name,
-                    service_request=service_request,
-                )
-
-                serializer = ServiceRequestSerializer(service_request)
-
-                node_ip = os.getenv("node_ip")
-                deployment_url = f"http://{node_ip}:{service_request.node_port}/"
-
-                logger.info("Deployment marked as Deployed")
-                return Response(
-                    {
-                        "message": "Service request status updated successfully by admin",
-                        "data": serializer.data,
-                        "deployment_url": deployment_url,
-                        "node_port": service_request.node_port,
-                        "service_name": service_request.service_name,
-                        "app_name": service_request.app_name,
-                    },
-                    status=status.HTTP_200_OK,
-                )
-
-            elif service_request.service_name.lower() == "mongodb":
-                data = request.data
-                required_fields = [
-                    "replica",
-                    "app_name",
-                    "root_password",
-                    "username",
-                    "password",
-                    "database",
-                    "node_port",
-                ]
-                for field in required_fields:
-                    if field not in data:
-                        return Response(
-                            {"error": f"'{field}' is required."},
-                            status=status.HTTP_400_BAD_REQUEST,
-                        )
-
-                app_name = data["app_name"]
-                labels = {"app": app_name}
-
-                container = client.V1Container(
-                    name=app_name,
-                    image="mongo:latest",
-                    ports=[client.V1ContainerPort(container_port=27017)],
-                    env=[
-                        client.V1EnvVar(
-                            name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]
-                        ),
-                        client.V1EnvVar(
-                            name="MONGO_INITDB_ROOT_PASSWORD",
-                            value=data["root_password"],
-                        ),
-                        client.V1EnvVar(
-                            name="MONGO_INITDB_DATABASE", value=data["database"]
-                        ),
-                    ],
                 )
 
                 template = client.V1PodTemplateSpec(
@@ -16535,7 +16520,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 )
 
                 spec = client.V1DeploymentSpec(
-                    replicas=int(data["replica"]),
+                    replicas=1,
                     selector=client.V1LabelSelector(match_labels=labels),
                     template=template,
                 )
@@ -16543,62 +16528,205 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 deployment = client.V1Deployment(
                     api_version="apps/v1",
                     kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=app_name),
+                    metadata=client.V1ObjectMeta(name=pod_name),
                     spec=spec,
                 )
 
-                apps_v1.create_namespaced_deployment(
-                    namespace="default", body=deployment
-                )
+                try:
+                    apps_v1.create_namespaced_deployment(
+                        namespace="default", body=deployment
+                    )
+                except client.exceptions.ApiException as e:
+                    if e.status != 409:
+                        return Response(
+                            {"error": "Nginx Deployment failed", "details": e.body},
+                            status=500,
+                        )
 
+                # 3️⃣ Create Service LAST
                 service = client.V1Service(
-                    metadata=client.V1ObjectMeta(name=app_name),
+                    metadata=client.V1ObjectMeta(name=pod_name),
                     spec=client.V1ServiceSpec(
                         type="NodePort",
                         selector=labels,
                         ports=[
                             client.V1ServicePort(
-                                port=27017,
-                                target_port=27017,
-                                node_port=int(data["node_port"]),
+                                port=80,
+                                target_port=80,
+                                node_port=node_port,  # None → auto assign
                             )
                         ],
                     ),
                 )
 
-                core_v1.create_namespaced_service(namespace="default", body=service)
+                try:
+                    created_service = core_v1.create_namespaced_service(
+                        namespace="default", body=service
+                    )
+                except client.exceptions.ApiException as e:
+                    if e.status == 409:
+                        created_service = core_v1.read_namespaced_service(
+                            name=pod_name, namespace="default"
+                        )
+                    else:
+                        return Response(
+                            {"error": "Nginx Service creation failed", "details": e.body},
+                            status=500,
+                        )
 
-                ServiceRequest.objects.create(
-                    employee_id=service_request.employee_id,
-                    employee_name=Employee.objects.get(
-                        employee_id=service_request.employee_id
-                    ).name,
-                    app_name=data["app_name"],
-                    replica=data["replica"],
-                    root_password=data["root_password"],
-                    username=data["username"],
-                    password=data["password"],
-                    database=data["database"],
-                    node_port=data["node_port"],
+                # 4️⃣ ALWAYS read assigned NodePort
+                assigned_port = created_service.spec.ports[0].node_port
+
+                # 5️⃣ Update DB AFTER success
+                service_request.node_port = assigned_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
+                service_request.save()
+
+                # 6️⃣ Build access URL
+                node_ip = os.getenv("node_ip")
+                deployment_url = f"http://{node_ip}:{assigned_port}/"
+
+                serializer = ServiceRequestSerializer(service_request)
+
+                return Response(
+                    {
+                        "message": "Nginx deployed successfully",
+                        "data": serializer.data,
+                        "deployment_url": deployment_url,
+                        "node_port": assigned_port,
+                        "service_name": service_request.service_name,
+                        "app_name": service_request.app_name,
+                    },
+                    status=status.HTTP_200_OK,
                 )
 
+
+            elif service_request.service_name.lower() == "mongodb":
+                # 1️⃣ Setup Names
+                replica = service_request.replica or 1
+                db_pod_name = pod_name  # e.g., freshmongo-service-83
+                ui_pod_name = f"ui-{pod_name}" # Unique name for the Web UI
+                
+                # 2️⃣ Resolve NodePort for the Web UI (Port 8081)
+                try:
+                    ui_node_port = resolve_node_port(core_v1, service_request.node_port)
+                except Exception as e:
+                    ui_node_port = None # Auto-assign
+
+                # -------------------------------------------------------
+                # 3️⃣ DEPLOY MONGODB DATABASE (The Backend)
+                # -------------------------------------------------------
+                db_labels = {"app": db_pod_name}
+                db_container = client.V1Container(
+                    name=db_pod_name,
+                    image="mongo:4.4",
+                    ports=[client.V1ContainerPort(container_port=27017)],
+                    env=[
+                        client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=str(service_request.username)),
+                        client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=str(service_request.root_password)),
+                        client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=str(service_request.database)),
+                    ],
+                )
+                db_deployment = client.V1Deployment(
+                    api_version="apps/v1", kind="Deployment",
+                    metadata=client.V1ObjectMeta(name=db_pod_name),
+                    spec=client.V1DeploymentSpec(
+                        replicas=int(replica),
+                        selector=client.V1LabelSelector(match_labels=db_labels),
+                        template=client.V1PodTemplateSpec(
+                            metadata=client.V1ObjectMeta(labels=db_labels),
+                            spec=client.V1PodSpec(containers=[db_container])
+                        )
+                    )
+                )
+                db_service = client.V1Service(
+                    metadata=client.V1ObjectMeta(name=db_pod_name),
+                    spec=client.V1ServiceSpec(
+                        selector=db_labels,
+                        ports=[client.V1ServicePort(port=27017, target_port=27017)]
+                    )
+                )
+
+                # Execute DB Deployment
+                apps_v1.create_namespaced_deployment(namespace="default", body=db_deployment)
+                core_v1.create_namespaced_service(namespace="default", body=db_service)
+
+                # -------------------------------------------------------
+                # 4️⃣ DEPLOY MONGO-EXPRESS (The Web UI)
+                # -------------------------------------------------------
+                ui_labels = {"app": ui_pod_name}
+                ui_container = client.V1Container(
+                    name=ui_pod_name,
+                    image="mongo-express:latest",
+                    ports=[client.V1ContainerPort(container_port=8081)],
+                    env=[
+                        client.V1EnvVar(name="ME_CONFIG_MONGODB_ADMINUSERNAME", value=str(service_request.username)),
+                        client.V1EnvVar(name="ME_CONFIG_MONGODB_ADMINPASSWORD", value=str(service_request.root_password)),
+                        # Connect UI to the DB Service Name created above
+                        client.V1EnvVar(name="ME_CONFIG_MONGODB_SERVER", value=db_pod_name),
+                    ],
+                )
+                ui_deployment = client.V1Deployment(
+                    api_version="apps/v1", kind="Deployment",
+                    metadata=client.V1ObjectMeta(name=ui_pod_name),
+                    spec=client.V1DeploymentSpec(
+                        replicas=1,
+                        selector=client.V1LabelSelector(match_labels=ui_labels),
+                        template=client.V1PodTemplateSpec(
+                            metadata=client.V1ObjectMeta(labels=ui_labels),
+                            spec=client.V1PodSpec(containers=[ui_container])
+                        )
+                    )
+                )
+                ui_service = client.V1Service(
+                    metadata=client.V1ObjectMeta(name=ui_pod_name),
+                    spec=client.V1ServiceSpec(
+                        type="NodePort",
+                        selector=ui_labels,
+                        ports=[client.V1ServicePort(port=8081, target_port=8081, node_port=ui_node_port)]
+                    )
+                )
+
+                # Execute UI Deployment
+                apps_v1.create_namespaced_deployment(namespace="default", body=ui_deployment)
+                created_ui_service = core_v1.create_namespaced_service(namespace="default", body=ui_service)
+
+                # -------------------------------------------------------
+                # 5️⃣ FINALIZE & SAVE
+                # -------------------------------------------------------
+                assigned_ui_port = created_ui_service.spec.ports[0].node_port
+                
+                service_request.node_port = assigned_ui_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
+                service_request.save()
+
+                return Response({
+                    "message": "MongoDB and Web UI deployed successfully", 
+                    "node_port": assigned_ui_port
+                }, status=200)
+
             elif service_request.service_name.lower() == "postgresql":
-                # Extract data from the model instance
+
+                # 1️⃣ Extract values from ServiceRequest
                 replica = service_request.replica
                 app_name = service_request.app_name
                 username = service_request.username
                 password = service_request.password
                 database = service_request.database
-                node_port = service_request.node_port
 
-                # Validate extracted fields
+                requested_node_port = service_request.node_port
+                if requested_node_port in ["", None]:
+                    requested_node_port = None
+
+                # 2️⃣ Validate required fields (node_port NOT required)
                 required_values = {
                     "replica": replica,
                     "app_name": app_name,
                     "username": username,
                     "password": password,
                     "database": database,
-                    "node_port": node_port,
                 }
 
                 for key, value in required_values.items():
@@ -16608,9 +16736,15 @@ class ServiceRequestPendingAdminAPIView(APIView):
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
+                # 3️⃣ Resolve NodePort (manual or auto)
+                try:
+                    node_port = resolve_node_port(core_v1, requested_node_port)
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+
                 labels = {"app": app_name}
 
-                # Create the PostgreSQL container
+                # 4️⃣ Create PostgreSQL Deployment
                 container = client.V1Container(
                     name=app_name,
                     image="postgres:latest",
@@ -16622,15 +16756,13 @@ class ServiceRequestPendingAdminAPIView(APIView):
                     ],
                 )
 
-                # Pod template
                 template = client.V1PodTemplateSpec(
                     metadata=client.V1ObjectMeta(labels=labels),
                     spec=client.V1PodSpec(containers=[container]),
                 )
 
-                # Deployment spec
                 spec = client.V1DeploymentSpec(
-                    replicas=replica,
+                    replicas=int(replica),
                     selector=client.V1LabelSelector(match_labels=labels),
                     template=template,
                 )
@@ -16647,127 +16779,13 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         namespace="default", body=deployment
                     )
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "PostgreSQL Deployment failed", "details": e.body},
-                        status=500,
-                    )
-
-                # Service for PostgreSQL
-                service = client.V1Service(
-                    metadata=client.V1ObjectMeta(name=app_name),
-                    spec=client.V1ServiceSpec(
-                        type="NodePort",
-                        selector=labels,
-                        ports=[
-                            client.V1ServicePort(
-                                port=5432, target_port=5432, node_port=node_port
-                            )
-                        ],
-                    ),
-                )
-
-                try:
-                    core_v1.create_namespaced_service(namespace="default", body=service)
-                except client.exceptions.ApiException as e:
-                    return Response(
-                        {
-                            "error": "PostgreSQL Service creation failed",
-                            "details": e.body,
-                        },
-                        status=500,
-                    )
-
-                logger.info(f"PostgreSQL deployment and service created for {app_name}.")
-
-            elif service_request.service_name.lower() == "mysql":
-                # Extract data from the service request record
-                replica = service_request.replica
-                app_name = service_request.app_name
-                username = service_request.username
-                password = service_request.password
-                database = service_request.database
-                node_port = service_request.node_port
-
-                # Validate extracted fields
-                required_values = {
-                    "replica": replica,
-                    "app_name": app_name,
-                    "username": username,
-                    "password": password,
-                    "database": database,
-                    "node_port": node_port,
-                }
-                for key, value in required_values.items():
-                    if value in [None, ""]:
+                    if e.status != 409:
                         return Response(
-                            {"error": f"'{key}' is missing in the service request."},
-                            status=status.HTTP_400_BAD_REQUEST,
+                            {"error": "PostgreSQL Deployment failed", "details": e.body},
+                            status=500,
                         )
 
-                labels = {"app": app_name}
-
-                # MySQL container definition
-                container = client.V1Container(
-                    name=app_name,
-                    image="mysql:latest",
-                    ports=[client.V1ContainerPort(container_port=3306)],
-                    env=[
-                        client.V1EnvVar(name="MYSQL_ROOT_PASSWORD", value=password),
-                        client.V1EnvVar(name="MYSQL_DATABASE", value=database),
-                        client.V1EnvVar(name="MYSQL_USER", value=username),
-                        client.V1EnvVar(name="MYSQL_PASSWORD", value=password),
-                    ],
-                )
-
-                # Pod template
-                template = client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels=labels),
-                    spec=client.V1PodSpec(containers=[container]),
-                )
-
-                # Deployment spec
-                spec = client.V1DeploymentSpec(
-                    replicas=replica,
-                    selector=client.V1LabelSelector(match_labels=labels),
-                    template=template,
-                )
-
-                deployment = client.V1Deployment(
-                    api_version="apps/v1",
-                    kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=app_name),
-                    spec=spec,
-                )
-
-                try:
-                    apps_v1.create_namespaced_deployment(
-                        namespace="default", body=deployment
-                    )
-                except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "MySQL Deployment failed", "details": e.body},
-                        status=500,
-                    )
-
-                # --- Port Availability Check ---
-                existing_services = core_v1.list_service_for_all_namespaces().items
-                used_ports = [
-                    p.node_port
-                    for svc in existing_services
-                    if svc.spec.type == "NodePort"
-                    for p in svc.spec.ports
-                    if p.node_port
-                ]
-
-                port_changed = False
-                if node_port in used_ports:
-                    logger.warning(
-                        f"⚠ NodePort {node_port} is already in use. Letting Kubernetes assign a free one."
-                    )
-                    node_port = None  # Kubernetes will auto-assign
-                    port_changed = True
-
-                # MySQL Service definition
+                # 5️⃣ Create PostgreSQL Service
                 service = client.V1Service(
                     metadata=client.V1ObjectMeta(name=app_name),
                     spec=client.V1ServiceSpec(
@@ -16775,7 +16793,9 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         selector=labels,
                         ports=[
                             client.V1ServicePort(
-                                port=3306, target_port=3306, node_port=node_port
+                                port=5432,
+                                target_port=5432,
+                                node_port=node_port,  # None → auto assign
                             )
                         ],
                     ),
@@ -16786,31 +16806,175 @@ class ServiceRequestPendingAdminAPIView(APIView):
                         namespace="default", body=service
                     )
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "MySQL Service creation failed", "details": e.body},
-                        status=500,
-                    )
+                    if e.status == 409:
+                        created_service = core_v1.read_namespaced_service(
+                            name=app_name, namespace="default"
+                        )
+                    else:
+                        return Response(
+                            {
+                                "error": "PostgreSQL Service creation failed",
+                                "details": e.body,
+                            },
+                            status=500,
+                        )
 
-                # Get the assigned NodePort
+                # 6️⃣ Read the ACTUAL assigned NodePort
                 assigned_port = created_service.spec.ports[0].node_port
 
-                if port_changed:
-                    logger.info(
-                        f"✅ Requested port was busy. Assigned free port: {assigned_port}"
-                    )
-                else:
-                    logger.info(f"✅ Port {assigned_port} assigned as requested.")
-
-                # Update the model with the assigned port
+                # 7️⃣ Update DB AFTER success
                 service_request.node_port = assigned_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
                 service_request.save()
+
+                logger.info(
+                    f"PostgreSQL deployed for {app_name} on NodePort {assigned_port}"
+                )
 
                 return Response(
                     {
-                        "message": "MySQL deployment and service created successfully.",
-                        "assigned_node_port": assigned_port,
+                        "message": "PostgreSQL deployed successfully",
+                        "app_name": app_name,
+                        "node_port": assigned_port,
                     },
-                    status=status.HTTP_201_CREATED,
+                    status=status.HTTP_200_OK,
+                )
+            elif service_request.service_name.lower() == "mysql":
+
+                # 1️⃣ Extract values
+                replica = service_request.replica or 1
+                app_name = service_request.app_name
+                username = service_request.username
+                password = service_request.password
+                database = service_request.database
+
+                requested_node_port = service_request.node_port
+                if requested_node_port in ["", None]:
+                    requested_node_port = None
+
+                # 2️⃣ Validate required fields (node_port NOT required)
+                required_values = {
+                    "replica": replica,
+                    "app_name": app_name,
+                    "username": username,
+                    "password": password,
+                    "database": database,
+                }
+
+                for key, value in required_values.items():
+                    if value in [None, ""]:
+                        return Response(
+                            {"error": f"'{key}' is missing in the service request."},
+                            status=status.HTTP_400_BAD_REQUEST,
+                        )
+
+                # 3️⃣ Resolve NodePort
+                try:
+                    node_port = resolve_node_port(core_v1, requested_node_port)
+                except Exception as e:
+                    return Response({"error": str(e)}, status=400)
+
+                # ✅ UNIFIED NAMING: Use the unique pod_name (defined at the top of PUT)
+                # This ensures the Shell/Console Handshake finds the container
+                labels = {"app": pod_name}
+
+                # 4️⃣ MySQL Deployment
+                container = client.V1Container(
+                    name=pod_name,  # Must match pod_name for console support
+                    image="mysql:latest",
+                    ports=[client.V1ContainerPort(container_port=3306)],
+                    env=[
+                        client.V1EnvVar(name="MYSQL_ROOT_PASSWORD", value=str(password)),
+                        client.V1EnvVar(name="MYSQL_DATABASE", value=str(database)),
+                        client.V1EnvVar(name="MYSQL_USER", value=str(username)),
+                        client.V1EnvVar(name="MYSQL_PASSWORD", value=str(password)),
+                    ],
+                )
+
+                template = client.V1PodTemplateSpec(
+                    metadata=client.V1ObjectMeta(labels=labels),
+                    spec=client.V1PodSpec(containers=[container]),
+                )
+
+                spec = client.V1DeploymentSpec(
+                    replicas=int(replica),
+                    selector=client.V1LabelSelector(match_labels=labels),
+                    template=template,
+                )
+
+                deployment = client.V1Deployment(
+                    api_version="apps/v1",
+                    kind="Deployment",
+                    # ✅ Use unique pod_name for resource name
+                    metadata=client.V1ObjectMeta(name=pod_name),
+                    spec=spec,
+                )
+
+                try:
+                    apps_v1.create_namespaced_deployment(
+                        namespace="default", body=deployment
+                    )
+                except client.exceptions.ApiException as e:
+                    if e.status == 409:
+                        logger.info(f"Deployment {pod_name} already exists.")
+                    else:
+                        return Response(
+                            {"error": "MySQL Deployment failed", "details": e.body},
+                            status=500,
+                        )
+
+                # 5️⃣ MySQL Service
+                service = client.V1Service(
+                    metadata=client.V1ObjectMeta(name=pod_name), # Use unique pod_name
+                    spec=client.V1ServiceSpec(
+                        type="NodePort",
+                        selector=labels,
+                        ports=[
+                            client.V1ServicePort(
+                                port=3306,
+                                target_port=3306,
+                                node_port=node_port,
+                            )
+                        ],
+                    ),
+                )
+
+                try:
+                    created_service = core_v1.create_namespaced_service(
+                        namespace="default", body=service
+                    )
+                except client.exceptions.ApiException as e:
+                    if e.status == 409:
+                        created_service = core_v1.read_namespaced_service(
+                            name=pod_name, namespace="default"
+                        )
+                    else:
+                        return Response(
+                            {"error": "MySQL Service creation failed", "details": e.body},
+                            status=500,
+                        )
+
+                # 6️⃣ Read actual assigned NodePort
+                assigned_port = created_service.spec.ports[0].node_port
+
+                # 7️⃣ Update DB after success
+                service_request.node_port = assigned_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
+                service_request.save()
+
+                logger.info(
+                    f"MySQL deployed for {pod_name} on NodePort {assigned_port}"
+                )
+
+                return Response(
+                    {
+                        "message": "MySQL deployed successfully",
+                        "app_name": app_name,
+                        "node_port": assigned_port,
+                    },
+                    status=status.HTTP_200_OK,
                 )
 
             elif service_request.service_name.replace("-", "").lower() == "nginxha":
@@ -16921,6 +17085,7 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 # Save NodePort and mark deployment status
                 service_request.node_port = node_port
                 service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
                 service_request.save()
 
                 logger.info(f"🔥 NGINX-HA Deployed: {deployment_name}, NodePort={node_port}")
@@ -16950,84 +17115,77 @@ class ServiceRequestPendingAdminAPIView(APIView):
                 )
 
             elif service_request.service_name.lower() == "couchdb":
-                replica = service_request.replica
+                # 1️⃣ Extract values
+                replica = service_request.replica or 1
                 app_name = service_request.app_name
                 username = service_request.username
                 password = service_request.password
-                node_port = service_request.node_port
+                
+                requested_node_port = service_request.node_port
+                if requested_node_port in ["", None]:
+                    requested_node_port = None
 
-                for key, value in {
+                # 2️⃣ Validate required fields (node_port removed from here)
+                mandatory_fields = {
                     "replica": replica,
                     "app_name": app_name,
                     "username": username,
                     "password": password,
-                    "node_port": node_port,
-                }.items():
+                }
+                for key, value in mandatory_fields.items():
                     if value in [None, ""]:
                         return Response(
                             {"error": f"'{key}' is missing."},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
-                # Check port availability
+                # 3️⃣ Resolve NodePort (Handles manual entry or auto-assignment)
                 try:
-                    used_ports = {
-                        p.node_port
-                        for svc in core_v1.list_service_for_all_namespaces().items
-                        if svc.spec.type == "NodePort"
-                        for p in svc.spec.ports
-                    }
-                    if node_port in used_ports:
-                        node_port = get_available_node_port(core_v1)
-                        service_request.node_port = node_port
-                        service_request.save()
+                    node_port = resolve_node_port(core_v1, requested_node_port)
                 except Exception as e:
-                    return Response(
-                        {"error": "Port check failed", "details": str(e)}, status=500
-                    )
+                    return Response({"error": "Port resolution failed", "details": str(e)}, status=500)
 
-                labels = {"app": app_name}
+                # ✅ UNIFIED NAMING: Use the unique pod_name (defined at top of PUT)
+                # This ensures the Shell/Console Handshake finds the container
+                labels = {"app": pod_name}
 
+                # 4️⃣ Create Deployment
                 container = client.V1Container(
-                    name=app_name,
+                    name=pod_name,  # Must match pod_name for console support
                     image="couchdb:latest",
                     ports=[client.V1ContainerPort(container_port=5984)],
                     env=[
-                        client.V1EnvVar(name="COUCHDB_USER", value=username),
-                        client.V1EnvVar(name="COUCHDB_PASSWORD", value=password),
+                        client.V1EnvVar(name="COUCHDB_USER", value=str(username)),
+                        client.V1EnvVar(name="COUCHDB_PASSWORD", value=str(password)),
                     ],
-                )
-
-                template = client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels=labels),
-                    spec=client.V1PodSpec(containers=[container]),
-                )
-
-                spec = client.V1DeploymentSpec(
-                    replicas=replica,
-                    selector=client.V1LabelSelector(match_labels=labels),
-                    template=template,
                 )
 
                 deployment = client.V1Deployment(
                     api_version="apps/v1",
                     kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=app_name),
-                    spec=spec,
+                    metadata=client.V1ObjectMeta(name=pod_name), # Unique name
+                    spec=client.V1DeploymentSpec(
+                        replicas=int(replica),
+                        selector=client.V1LabelSelector(match_labels=labels),
+                        template=client.V1PodTemplateSpec(
+                            metadata=client.V1ObjectMeta(labels=labels),
+                            spec=client.V1PodSpec(containers=[container]),
+                        ),
+                    ),
                 )
 
+                # Handle Deployment Conflict (409)
                 try:
-                    apps_v1.create_namespaced_deployment(
-                        namespace="default", body=deployment
-                    )
+                    apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "CouchDB Deployment failed", "details": e.body},
-                        status=500,
-                    )
+                    if e.status == 409:
+                        logger.info(f"Deployment {pod_name} already exists.")
+                    else:
+                        return Response({"error": "CouchDB Deployment failed", "details": e.body}, status=500)
 
+                # 5️⃣ Create Service
                 service = client.V1Service(
-                    metadata=client.V1ObjectMeta(name=app_name),
+                    metadata=client.V1ObjectMeta(name=pod_name),
                     spec=client.V1ServiceSpec(
                         type="NodePort",
                         selector=labels,
@@ -17039,123 +17197,125 @@ class ServiceRequestPendingAdminAPIView(APIView):
                     ),
                 )
 
+                # Handle Service Conflict (409)
                 try:
-                    core_v1.create_namespaced_service(namespace="default", body=service)
+                    created_service = core_v1.create_namespaced_service(namespace="default", body=service)
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "CouchDB Service creation failed", "details": e.body},
-                        status=500,
-                    )
+                    if e.status == 409:
+                        created_service = core_v1.read_namespaced_service(name=pod_name, namespace="default")
+                    else:
+                        return Response({"error": "CouchDB Service failed", "details": e.body}, status=500)
 
-                logger.info(
-                    f"CouchDB deployment and service created for {app_name} on port {node_port}."
-                )
+                # 6️⃣ Read assigned port and update DB
+                assigned_port = created_service.spec.ports[0].node_port
+                service_request.node_port = assigned_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
+                service_request.save()
+
+                logger.info(f"CouchDB deployed for {pod_name} on port {assigned_port}.")
+
+                return Response({"message": "CouchDB deployed successfully", "node_port": assigned_port}, status=200)
+
+
 
             elif service_request.service_name.lower() == "mariadb":
-                replica = service_request.replica
+                replica = service_request.replica or 1
                 app_name = service_request.app_name
                 username = service_request.username
                 password = service_request.password
                 database = service_request.database
-                node_port = service_request.node_port
+                requested_node_port = service_request.node_port # Keep original for resolution
 
-                for key, value in {
+                # 1️⃣ Validation: Remove node_port from the mandatory check list
+                mandatory_fields = {
                     "replica": replica,
                     "app_name": app_name,
                     "username": username,
                     "password": password,
                     "database": database,
-                    "node_port": node_port,
-                }.items():
+                }
+                for key, value in mandatory_fields.items():
                     if value in [None, ""]:
                         return Response(
                             {"error": f"'{key}' is missing."},
                             status=status.HTTP_400_BAD_REQUEST,
                         )
 
-                # Check port availability
+                # 2️⃣ Resolve NodePort (Handles auto-assignment)
                 try:
-                    used_ports = {
-                        p.node_port
-                        for svc in core_v1.list_service_for_all_namespaces().items
-                        if svc.spec.type == "NodePort"
-                        for p in svc.spec.ports
-                    }
-                    if node_port in used_ports:
-                        node_port = get_available_node_port(core_v1)
-                        service_request.node_port = node_port
-                        service_request.save()
+                    node_port = resolve_node_port(core_v1, requested_node_port)
                 except Exception as e:
-                    return Response(
-                        {"error": "Port check failed", "details": str(e)}, status=500
-                    )
+                    return Response({"error": "Port resolution failed", "details": str(e)}, status=500)
 
-                labels = {"app": app_name}
+                # ✅ UNIFIED NAMING: Use the pod_name variable (defined at top of PUT)
+                # This ensures the Shell Handshake finds the container
+                labels = {"app": pod_name}
 
+                # 3️⃣ Create Deployment using unique pod_name
                 container = client.V1Container(
-                    name=app_name,
+                    name=pod_name,  # Must match pod_name for console support
                     image="mariadb:latest",
                     ports=[client.V1ContainerPort(container_port=3306)],
                     env=[
-                        client.V1EnvVar(name="MYSQL_ROOT_PASSWORD", value=password),
-                        client.V1EnvVar(name="MYSQL_DATABASE", value=database),
-                        client.V1EnvVar(name="MYSQL_USER", value=username),
-                        client.V1EnvVar(name="MYSQL_PASSWORD", value=password),
+                        client.V1EnvVar(name="MYSQL_ROOT_PASSWORD", value=str(password)),
+                        client.V1EnvVar(name="MYSQL_DATABASE", value=str(database)),
+                        client.V1EnvVar(name="MYSQL_USER", value=str(username)),
+                        client.V1EnvVar(name="MYSQL_PASSWORD", value=str(password)),
                     ],
-                )
-
-                template = client.V1PodTemplateSpec(
-                    metadata=client.V1ObjectMeta(labels=labels),
-                    spec=client.V1PodSpec(containers=[container]),
-                )
-
-                spec = client.V1DeploymentSpec(
-                    replicas=replica,
-                    selector=client.V1LabelSelector(match_labels=labels),
-                    template=template,
                 )
 
                 deployment = client.V1Deployment(
                     api_version="apps/v1",
                     kind="Deployment",
-                    metadata=client.V1ObjectMeta(name=app_name),
-                    spec=spec,
+                    metadata=client.V1ObjectMeta(name=pod_name), # Unique name
+                    spec=client.V1DeploymentSpec(
+                        replicas=int(replica),
+                        selector=client.V1LabelSelector(match_labels=labels),
+                        template=client.V1PodTemplateSpec(
+                            metadata=client.V1ObjectMeta(labels=labels),
+                            spec=client.V1PodSpec(containers=[container]),
+                        ),
+                    ),
                 )
 
+                # Handle Deployment Conflict
                 try:
-                    apps_v1.create_namespaced_deployment(
-                        namespace="default", body=deployment
-                    )
+                    apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "MariaDB Deployment failed", "details": e.body},
-                        status=500,
-                    )
+                    if e.status == 409:
+                        logger.info(f"Deployment {pod_name} already exists.")
+                    else:
+                        return Response({"error": "MariaDB Deployment failed", "details": e.body}, status=500)
 
+                # 4️⃣ Create Service using unique pod_name
                 service = client.V1Service(
-                    metadata=client.V1ObjectMeta(name=app_name),
+                    metadata=client.V1ObjectMeta(name=pod_name),
                     spec=client.V1ServiceSpec(
                         type="NodePort",
                         selector=labels,
                         ports=[
-                            client.V1ServicePort(
-                                port=3306, target_port=3306, node_port=node_port
-                            )
+                            client.V1ServicePort(port=3306, target_port=3306, node_port=node_port)
                         ],
                     ),
                 )
 
                 try:
-                    core_v1.create_namespaced_service(namespace="default", body=service)
+                    created_service = core_v1.create_namespaced_service(namespace="default", body=service)
                 except client.exceptions.ApiException as e:
-                    return Response(
-                        {"error": "MariaDB Service creation failed", "details": e.body},
-                        status=500,
-                    )
+                    if e.status == 409:
+                        created_service = core_v1.read_namespaced_service(name=pod_name, namespace="default")
+                    else:
+                        return Response({"error": "MariaDB Service failed", "details": e.body}, status=500)
 
-                logger.info(
-                    f"MariaDB deployment and service created for {app_name} on port {node_port}."
-                )
+                # 5️⃣ Update DB with the actual assigned port
+                assigned_port = created_service.spec.ports[0].node_port
+                service_request.node_port = assigned_port
+                service_request.deployment_status = "Deployed"
+                service_request.admin_status = "Accepted"
+                service_request.save()
+
+                return Response({"message": "MariaDB deployed successfully", "node_port": assigned_port}, status=200)
 
           
 
@@ -17251,32 +17411,40 @@ class EmployeeDeployedServicesAPIView(APIView):
             node_ip = os.getenv("node_ip", "0.0.0.0")
 
             for svc in deployed_services:
-                deployment_url = (
-                    f"http://{node_ip}:{svc.node_port}/" if svc.node_port else None
-                )
-                pod_base_name = f"{svc.app_name.lower()}-service-{svc.id}"
-                result.append(
-                     {
-                        "id": svc.id,
-                        "service_name": svc.service_name,
-                        "app_name": svc.app_name,
-                        "replica": svc.replica,
-                        "project_name": svc.project_name,
-                        "purpose": svc.purpose,
-                        "request_timestamp": svc.request_timestamp,
-                        "approved_timestamp": svc.admin_approved_timestamp,
-                        "deployment_status": svc.deployment_status,
-                        "node_port": svc.node_port,
-                        "deployment_url": deployment_url,
+                # 1. Determine the correct Pod Selector Label
+                if svc.service_name.lower() in ["nginx", "nginx-ha","mongodb","mariadb","mysql","couchdb"]:
+                    pod_base_name = f"{svc.app_name.lower()}-service-{svc.id}"
+                else:
+                    # Default for PostgreSQL, MySQL, MongoDB, etc.
+                    pod_base_name = svc.app_name.lower()
 
-                        # ✅ SINGLE SOURCE OF TRUTH
-                        "k8s_service_name": pod_base_name,
-                        "namespace": "default",
-                        "pod_selector": {
-                            "app": pod_base_name
-                        }
-                     }
-                )
+                # 2. Handle Deployment URL (Only for Web Services)
+                # Define which services should NOT have a URL
+                db_services = ["postgresql", "mysql", "couchdb", "mariadb", "postgres"]
+                
+                if svc.service_name.lower() in ["nginx", "nginx-ha","mongodb"] and svc.node_port:
+                    deployment_url = f"http://{node_ip}:{svc.node_port}/"
+                else:
+                    deployment_url = None  # Hide URL for databases
+
+                result.append({
+                    "id": svc.id,
+                    "service_name": svc.service_name,
+                    "app_name": svc.app_name,
+                    "replica": svc.replica,
+                    "project_name": svc.project_name,
+                    "purpose": svc.purpose,
+                    "request_timestamp": svc.request_timestamp,
+                    "approved_timestamp": svc.admin_approved_timestamp,
+                    "deployment_status": svc.deployment_status,
+                    "node_port": svc.node_port,
+                    "deployment_url": deployment_url, # Now filtered
+                    "k8s_service_name": pod_base_name,
+                    "namespace": "default",
+                    "pod_selector": {
+                        "app": pod_base_name
+                    }
+                })
 
             return Response(
                 {
@@ -19697,75 +19865,139 @@ class DeployNginxHAAPIView(APIView):
 class DeployMongoDBAPIView(APIView):
     def post(self, request):
         data = request.data
-        required_fields = ["replica", "app_name", "root_password", "username", "password", "database", "node_port"]
+
+        # ❌ node_port REMOVED from required fields
+        required_fields = [
+            "replica",
+            "app_name",
+            "root_password",
+            "username",
+            "password",
+            "database",
+        ]
 
         for field in required_fields:
-            if field not in data:
-                return Response({"error": f"'{field}' is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if field not in data or data[field] in [None, ""]:
+                return Response(
+                    {"error": f"'{field}' is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         app_name = data["app_name"]
         namespace = "default"
         labels = {"app": app_name}
 
+        # Optional node_port
+        node_port = data.get("node_port")
+        if node_port in ["", None]:
+            node_port = None
+        else:
+            node_port = int(node_port)
+
         try:
             apps_v1, core_v1 = get_k8s_client3()
 
-            # Deployment
+            # ---------------- Deployment ----------------
             container = client.V1Container(
                 name=app_name,
                 image="mongo:latest",
                 ports=[client.V1ContainerPort(container_port=27017)],
                 env=[
-                    client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=data["username"]),
-                    client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=data["root_password"]),
-                    client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=data["database"]),
-                ]
+                    client.V1EnvVar(
+                        name="MONGO_INITDB_ROOT_USERNAME",
+                        value=data["username"],
+                    ),
+                    client.V1EnvVar(
+                        name="MONGO_INITDB_ROOT_PASSWORD",
+                        value=data["root_password"],
+                    ),
+                    client.V1EnvVar(
+                        name="MONGO_INITDB_DATABASE",
+                        value=data["database"],
+                    ),
+                ],
             )
 
             template = client.V1PodTemplateSpec(
                 metadata=client.V1ObjectMeta(labels=labels),
-                spec=client.V1PodSpec(containers=[container])
+                spec=client.V1PodSpec(containers=[container]),
             )
 
             spec = client.V1DeploymentSpec(
                 replicas=int(data["replica"]),
                 selector=client.V1LabelSelector(match_labels=labels),
-                template=template
+                template=template,
             )
 
             deployment = client.V1Deployment(
                 api_version="apps/v1",
                 kind="Deployment",
                 metadata=client.V1ObjectMeta(name=app_name),
-                spec=spec
+                spec=spec,
             )
 
-            apps_v1.create_namespaced_deployment(namespace=namespace, body=deployment)
+            apps_v1.create_namespaced_deployment(
+                namespace=namespace, body=deployment
+            )
 
-            # Service
+            # ---------------- NodePort availability check ----------------
+            if node_port is not None:
+                existing_services = core_v1.list_service_for_all_namespaces().items
+                used_ports = [
+                    p.node_port
+                    for svc in existing_services
+                    if svc.spec.type == "NodePort"
+                    for p in svc.spec.ports
+                    if p.node_port
+                ]
+
+                if node_port in used_ports:
+                    node_port = None  # auto assign
+
+            # ---------------- Service ----------------
+            service_port = client.V1ServicePort(
+                port=27017,
+                target_port=27017,
+                node_port=node_port,  # None = auto-assign
+            )
+
             service = client.V1Service(
                 metadata=client.V1ObjectMeta(name=app_name),
                 spec=client.V1ServiceSpec(
                     type="NodePort",
                     selector=labels,
-                    ports=[
-                        client.V1ServicePort(
-                            port=27017,
-                            target_port=27017,
-                            node_port=int(data["node_port"])
-                        )
-                    ]
-                )
+                    ports=[service_port],
+                ),
             )
 
-            core_v1.create_namespaced_service(namespace=namespace, body=service)
+            created_service = core_v1.create_namespaced_service(
+                namespace=namespace, body=service
+            )
 
-            return Response({"message": f"MongoDB '{app_name}' deployed successfully."}, status=status.HTTP_201_CREATED)
+            assigned_port = created_service.spec.ports[0].node_port
+
+            return Response(
+                {
+                    "message": f"MongoDB '{app_name}' deployed successfully.",
+                    "assigned_node_port": assigned_port,
+                },
+                status=status.HTTP_201_CREATED,
+            )
 
         except client.exceptions.ApiException as e:
-            return Response({"error": f"Kubernetes API error: {e.reason}", "details": e.body}, status=e.status)
+            return Response(
+                {
+                    "error": "Kubernetes API error",
+                    "details": e.body,
+                },
+                status=e.status,
+            )
         except Exception as e:
-            return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": f"Unexpected error: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
 
 
 
@@ -19891,8 +20123,138 @@ class DeletePodAPIView(APIView):
                 return Response({"error": str(e)},
                                 status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from kubernetes import client, config
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Assume v1 is initialized: config.load_kube_config() -> v1 = client.CoreV1Api()
+
+class PodDeleteRequestAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        # We use the unique 'id' or 'k8s_service_name' as the identifier
+        service_id = request.data.get("id") 
+        reason = request.data.get("reason", "")
+
+        # Find the record in your Deployed Services table (e.g., ServiceRequest)
+        service = ServiceRequest.objects.filter(id=service_id).first()
+        if not service:
+            return Response({"error": "Deployed service not found"}, status=404)
+
+        # Mark as pending deletion in DB
+        service.delete_request_status = "Pending"
+        service.delete_request_reason = reason
+        service.save()
+
+        return Response({"message": "Delete request sent to admin."}, status=200)
 
 
+class PodDeleteAdminApprovalAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        service_id = request.data.get("id")
+        approve = request.data.get("approve")
+        
+        service = ServiceRequest.objects.filter(id=service_id).first()
+        if not service:
+            return Response({"error": "Service not found in Database"}, status=404)
+
+        if approve:
+            namespace = "default"
+            apps_v1 = client.AppsV1Api()
+            core_v1 = client.CoreV1Api()
+
+            # --- STEP 1: Determine the real name in K8s ---
+            # Try 3 patterns: 1. Exact app_name, 2. naming convention, 3. Label search
+            possible_names = [
+                service.app_name, 
+                f"{service.app_name}-service-{service.id}",
+                f"{service.service_name.lower()}-service-{service.id}"
+            ]
+            
+            target_deployment = None
+            for name in possible_names:
+                try:
+                    apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
+                    target_deployment = name
+                    break 
+                except:
+                    continue
+
+            if not target_deployment:
+                return Response({
+                    "error": f"Could not find a deployment matching '{service.app_name}' or naming patterns in K8s. DB preserved."
+                }, status=404)
+
+            # --- STEP 2: Delete everything linked to that name ---
+            try:
+                # Delete Deployment (cascading)
+                apps_v1.delete_namespaced_deployment(
+                    name=target_deployment,
+                    namespace=namespace,
+                    body=client.V1DeleteOptions(propagation_policy='Foreground')
+                )
+                
+                # Delete Service (usually named same as deployment or app_name)
+                try:
+                    core_v1.delete_namespaced_service(name=target_deployment, namespace=namespace)
+                except:
+                    pass # Service might have slightly different name, handled by success message
+
+                # --- STEP 3: Cleanup DB ---
+                service.delete()
+                return Response({"message": f"Successfully deleted {target_deployment} from K8s and DB."}, status=200)
+
+            except Exception as e:
+                return Response({"error": f"K8s Error: {str(e)}"}, status=500)
+
+        # Handle Rejection
+        service.delete_request_status = "Rejected"
+        service.save()
+        return Response({"message": "Rejected"}, status=200)
+
+
+
+
+class PodPendingDeleteRequestsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        pending_requests = ServiceRequest.objects.filter(delete_request_status="Pending")
+        
+        # Get a list of all current deployment names in K8s to avoid hitting the API in a loop
+        try:
+            apps_v1 = client.AppsV1Api()
+            k8s_deployments = [dep.metadata.name for dep in apps_v1.list_namespaced_deployment("default").items]
+        except Exception as e:
+            logger.error(f"Could not fetch K8s deployments: {e}")
+            k8s_deployments = []
+
+        data = []
+        for req in pending_requests:
+            # Check if the DB app_name exists in the live K8s list
+            exists = req.app_name in k8s_deployments
+            
+            data.append({
+                "id": req.id,
+                "app_name": req.app_name,
+                "service_name": req.service_name,
+                "project_name": req.project_name,
+                "requester": req.name,
+                "reason": req.delete_request_reason,
+                "requested_at": req.request_timestamp,
+                "is_exists_in_k8s": exists,  # <--- New Field
+                "k8s_status": "Found" if exists else "Not Found in Cluster"
+            })
+
+        return Response({"data": data}, status=200)
 
 
 
@@ -20598,3 +20960,103 @@ Cloud Team
             status=status.HTTP_200_OK,
         )
 
+
+
+# elif service_request.service_name.lower() == "mongodb":
+#                 # 1️⃣ Extract values from the DATABASE object
+#                 replica = service_request.replica or 1
+#                 app_name = service_request.app_name
+#                 username = service_request.username
+#                 password = service_request.password
+#                 root_password = service_request.root_password
+#                 database = service_request.database
+
+#                 # 2️⃣ Resolve NodePort (Handle the 'missing' error)
+#                 requested_node_port = service_request.node_port
+#                 try:
+#                     # If resolve_node_port fails, we use get_available_node_port as fallback
+#                     node_port = resolve_node_port(core_v1, requested_node_port)
+#                 except Exception as e:
+#                     logger.warning(f"NodePort resolution failed, auto-assigning: {e}")
+#                     node_port = None # Kubernetes will auto-assign if this is None
+
+#                 # ✅ UNIFIED NAMING: Use the pod_name variable defined at the top of your PUT method
+#                 # This ensures Shell/Console Handshake works perfectly
+#                 labels = {"app": pod_name} 
+
+#                 # 3️⃣ Create Deployment (Using mongo:4.4 for AVX compatibility)
+#                 container = client.V1Container(
+#                     name=pod_name,  # Must match pod_name for console handshake
+#                     image="mongo:4.4",
+#                     ports=[client.V1ContainerPort(container_port=27017)],
+#                     env=[
+#                         client.V1EnvVar(name="MONGO_INITDB_ROOT_USERNAME", value=str(username)),
+#                         client.V1EnvVar(name="MONGO_INITDB_ROOT_PASSWORD", value=str(root_password)),
+#                         client.V1EnvVar(name="MONGO_INITDB_DATABASE", value=str(database)),
+#                     ],
+#                 )
+
+#                 template = client.V1PodTemplateSpec(
+#                     metadata=client.V1ObjectMeta(labels=labels),
+#                     spec=client.V1PodSpec(containers=[container]),
+#                 )
+
+#                 spec = client.V1DeploymentSpec(
+#                     replicas=int(replica),
+#                     selector=client.V1LabelSelector(match_labels=labels),
+#                     template=template,
+#                 )
+
+#                 deployment = client.V1Deployment(
+#                     api_version="apps/v1",
+#                     kind="Deployment",
+#                     metadata=client.V1ObjectMeta(name=pod_name),
+#                     spec=spec,
+#                 )
+
+#                 # 1. Handle Deployment Conflict
+#                 try:
+#                     apps_v1.create_namespaced_deployment(namespace="default", body=deployment)
+#                 except client.exceptions.ApiException as e:
+#                     if e.status == 409:
+#                         logger.info(f"Deployment {pod_name} already exists.")
+#                     else:
+#                         return Response({"error": "Mongo Deployment failed", "details": e.body}, status=500)
+
+#                 # 4️⃣ Create Service
+#                 service = client.V1Service(
+#                     metadata=client.V1ObjectMeta(name=pod_name),
+#                     spec=client.V1ServiceSpec(
+#                         type="NodePort",
+#                         selector=labels,
+#                         ports=[
+#                             client.V1ServicePort(
+#                                 port=27017,
+#                                 target_port=27017,
+#                                 node_port=node_port,
+#                             )
+#                         ],
+#                     ),
+#                 )
+
+#                 # 2. Handle Service Conflict
+#                 try:
+#                     created_service = core_v1.create_namespaced_service(namespace="default", body=service)
+#                 except client.exceptions.ApiException as e:
+#                     if e.status == 409:
+#                         created_service = core_v1.read_namespaced_service(name=pod_name, namespace="default")
+#                     else:
+#                         return Response({"error": "MongoDB Service failed", "details": e.body}, status=500)
+
+#                 # 5️⃣ Read assigned NodePort and SAVE
+#                 assigned_port = created_service.spec.ports[0].node_port
+                
+#                 if not assigned_port:
+#                     return Response({"error": "Kubernetes failed to assign a NodePort"}, status=500)
+
+#                 service_request.node_port = assigned_port
+#                 service_request.deployment_status = "Deployed"
+#                 service_request.admin_status = "Accepted"
+#                 service_request.save()
+
+#                 return Response({"message": "MongoDB deployed successfully", "node_port": assigned_port}, status=200)

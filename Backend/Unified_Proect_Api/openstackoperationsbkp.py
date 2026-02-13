@@ -438,88 +438,116 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
 
         guac_connections = {}
 
-        for line, vmtime in zip(lines, vms):
-            fields = line.split(",")
-            if len(fields) != 4:
-                print("Invalid CSV line format")
-                continue
+        for line in lines:
+            try:
+                fields = line.split(",")
+                if len(fields) != 4:
+                    continue
 
-            vm_name, host_raw, parsed_instance_name, vnc_raw = fields
+                vm_name, host_raw, parsed_instance_name, vnc_raw = fields
 
-            host_name = HOST_FSPCLOUD_IP if host_raw == "fspcloud" else HOST_DEFAULT_IP
-            vnc_display = f"59{vnc_raw}" if len(vnc_raw) == 2 else f"590{vnc_raw}"
-            u_name = vmtime.get("username")
-            user_mail = vmtime.get("email")
-            print(
-                f"Parsed → Host:{host_name}, Instance:{parsed_instance_name}, VNC:{vnc_display}, User:{u_name}"
-            )
+                # Find the matching dictionary in your 'vms' input list
+                vmtime = next((v for v in vms if v['vm_name'] == vm_name), None)
+                
+                # If the VM in the CSV isn't one we are currently processing, skip it
+                if not vmtime:
+                    continue
 
-            # -------------------------------
-            # 4️⃣ CREATE GUACAMOLE CONNECTION
-            # -------------------------------
-            conn = create_connection(vm_name, vnc_display, host_name, authToken)
-            if conn.status_code != 200:
-                print(f"Failed to create connection for {vm_name}")
-                continue
+                host_name = HOST_FSPCLOUD_IP if host_raw == "fspcloud" else HOST_DEFAULT_IP
+                
+                # Fix the VNC Port Calculation
+                vnc_port = int(f"59{vnc_raw}") if len(vnc_raw) == 2 else int(f"590{vnc_raw}")
+                vnc_display = vnc_port
+                
+                u_name = vmtime.get("username")
+                user_mail = vmtime.get("email")
 
-            con_identifier = conn.json().get("identifier")
-            print("Connection ID:", con_identifier)
+                print(
+                    f"Parsed → Host:{host_name}, Instance:{parsed_instance_name}, VNC:{vnc_display}, User:{u_name}"
+                )
 
-            guac_connections[vm_name] = con_identifier
+                # -------------------------------
+                # 4️⃣ CREATE GUACAMOLE CONNECTION
+                # -------------------------------
+                # 1. Attempt to create the connection
+                conn = create_connection(vm_name, vnc_display, host_name, authToken)
 
-            # -------------------------------
-            # 5️⃣ CREATE GUACAMOLE USER
-            # -------------------------------
-            user_exists = get_guac_user(u_name, authToken)
+                con_identifier = None
+                if conn.status_code == 200:
+                    con_identifier = conn.json().get("identifier")
+                elif conn.status_code == 400:
+                    # Logic to handle if admin approves a VM that was already partially set up
+                    all_connections = get_connections_list() 
+                    con_identifier = next(
+                        (val.get('identifier') for val in all_connections.values() 
+                        if val.get('name') == vm_name), 
+                        None
+                    )
+                if not con_identifier:
+                    print(f"Error: Could not get identifier for {vm_name}")
+                    continue  
 
-            if user_exists:
-                print(f"User '{u_name}' already exists → will reuse this user.")
-                user_created = False
-            else:
-                user = create_user(u_name, u_name, authToken, vmtime)
-                user_created = user.status_code == 200
-                if user_created:
-                    print(f"New Guacamole user '{u_name}' created.")
+                guac_connections[vm_name] = con_identifier
+
+                # -------------------------------
+                # 5️⃣ CREATE GUACAMOLE USER
+                # -------------------------------
+                user_exists = get_guac_user(u_name, authToken)
+
+                if user_exists:
+                    print(f"User '{u_name}' already exists → will reuse this user.")
+                    user_created = False
                 else:
-                    print("User creation failed:", getattr(user, "text", user))
+                    user = create_user(u_name, u_name, authToken, vmtime)
+                    user_created = user.status_code == 200
+                    if user_created:
+                        print(f"New Guacamole user '{u_name}' created.")
+                    else:
+                        print("User creation failed:", getattr(user, "text", user))
 
-            # -------------------------------
-            # 6️⃣ MAP USER ↔ CONNECTION
-            # -------------------------------
-            map_resp = map_user_conn(con_identifier, u_name, authToken)
+                # -------------------------------
+                # 6️⃣ MAP USER ↔ CONNECTION
+                # -------------------------------
+                map_resp = map_user_conn(con_identifier, u_name, authToken)
 
-            if map_resp.status_code in [200, 204]:
-                print(f"Mapped VM → User '{u_name}' successfully.")
-            else:
-                print("User mapping failed:", getattr(map_resp, "text", map_resp))
+                if map_resp.status_code in [200, 204]:
+                    print(f"Mapped VM → User '{u_name}' successfully.")
+                else:
+                    print("User mapping failed:", getattr(map_resp, "text", map_resp))
 
 
-            instance_name = parsed_instance_name
-            # -------------------------------
-            # 7️⃣ SAVE VM DETAILS IN DATABASE
-            # -------------------------------
-            vm_info_obj, created = VMInfo.objects.update_or_create(
-                vm_name=vm_name,
-                defaults={
-                    "host_name": host_name,
-                    "instance_name": parsed_instance_name,
-                    "vnc_display": vnc_display,
-                    "username": u_name,
-                    "vm_access_from_date": vmtime.get("vm_access_from_date"),
-                    "vm_access_to_date": vmtime.get("vm_access_to_date"),
-                    "vm_access_from_time": vmtime.get("vm_access_from_time"),
-                    "vm_access_to_time": vmtime.get("vm_access_to_time"),
-                    "email": user_mail,
-                    "volume_id": vmtime.get("volume_id"),
-                    "data_volume_id": vmtime.get("data_volume_id"),
-                    "vm_id": vmtime.get("vm_id"),
-                    "connection_id": con_identifier,
-                },
-            )
+                instance_name = parsed_instance_name
+                # -------------------------------
+                # 7️⃣ SAVE VM DETAILS IN DATABASE
+                # -------------------------------
+                vm_info_obj= VMInfo.objects.update_or_create(
+                    vm_name=vm_name,
+                    defaults={
+                        "host_name": host_name,
+                        "instance_name": parsed_instance_name,
+                        "vnc_display": vnc_display,
+                        "username": u_name,
+                        "vm_access_from_date": vmtime.get("vm_access_from_date"),
+                        "vm_access_to_date": vmtime.get("vm_access_to_date"),
+                        "vm_access_from_time": vmtime.get("vm_access_from_time"),
+                        "vm_access_to_time": vmtime.get("vm_access_to_time"),
+                        "email": user_mail,
+                        "volume_id": vmtime.get("volume_id"),
+                        "data_volume_id": vmtime.get("data_volume_id"),
+                        "vm_id": vmtime.get("vm_id"),
+                        "connection_id": con_identifier,
+                    },
+                )
 
-            print(">>> Saved VMInfo:", vm_info_obj)
+                print(">>> Saved VMInfo:", vm_info_obj)
 
-            update_ip_by_vmname(vm_name)    
+                update_ip_by_vmname(vm_name)  
+            except Exception as e:
+                # This is your safety net!
+                print(f"❌ Critical failure on VM {vm_name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                continue  
 
             # -------------------------------
             # 8️⃣ SEND EMAIL

@@ -279,6 +279,7 @@ const Approval = () => {
                 <StyledTableCell>Sr. No.</StyledTableCell>
                 <StyledTableCell>Name</StyledTableCell>
                 <StyledTableCell>VM Name</StyledTableCell>
+                <StyledTableCell>VM Count</StyledTableCell>
                 <StyledTableCell>Project</StyledTableCell>
                 <StyledTableCell>Image</StyledTableCell>
                 <StyledTableCell>Flavor</StyledTableCell>
@@ -297,6 +298,7 @@ const Approval = () => {
                     </StyledTableCell>
                     <StyledTableCell>{req.name}</StyledTableCell>
                     <StyledTableCell>{req.vm_name.split("_").slice(1).join("_")}</StyledTableCell>
+                    <StyledTableCell>{req.count_of_vms || 1 }</StyledTableCell>
                     <StyledTableCell>{req.project_name}</StyledTableCell>
                     <StyledTableCell>{req.image}</StyledTableCell>
                     <StyledTableCell>{req.flavor}</StyledTableCell>

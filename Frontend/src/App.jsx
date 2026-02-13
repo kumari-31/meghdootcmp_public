@@ -3,18 +3,18 @@ import { Suspense, lazy } from "react";
 import PersistentVolumeDetails from "./Kubernets/PersistentVolumeDetails";
 import { ImageOutlined } from "@mui/icons-material";
 import FaqPage from "./Pages/Authentication/FaqPage";
-const K8sRequestStatus = lazy(() =>
-  import("./KubernetesRBAC/K8sRequestStatus")
+const K8sRequestStatus = lazy(
+  () => import("./KubernetesRBAC/K8sRequestStatus"),
 );
-const DeploymentDetails = lazy(() =>
-  import("./Kubernets/DeploymentDetailsComponent")
+const DeploymentDetails = lazy(
+  () => import("./Kubernets/DeploymentDetailsComponent"),
 );
 const PodDetails = lazy(() => import("./Kubernets/PodDetailsComponent"));
-const ServiceDetails = lazy(() =>
-  import("./Kubernets/ServiceDetailsComponent")
+const ServiceDetails = lazy(
+  () => import("./Kubernets/ServiceDetailsComponent"),
 );
-const ReplicaSetDetails = lazy(() =>
-  import("./Kubernets/ReplicaSetDetailsComponent")
+const ReplicaSetDetails = lazy(
+  () => import("./Kubernets/ReplicaSetDetailsComponent"),
 );
 const NodesDetails = lazy(() => import("./Kubernets/NodesDetails"));
 const Services = lazy(() => import("./Kubernets/Services"));
@@ -27,11 +27,11 @@ const DeployPods = lazy(() => import("./User/DeployPods"));
 const DeployedServices = lazy(() => import("./User/DeployedServices"));
 const AddEmployee = lazy(() => import("./Pages/Admin/AddEmployee"));
 const AddEmployeefla = lazy(() => import("./Pages/Fla/AddEmployee"));
-const FlaServiceApproval = lazy(() =>
-  import("./KubernetesRBAC/FlaServiceApproval")
+const FlaServiceApproval = lazy(
+  () => import("./KubernetesRBAC/FlaServiceApproval"),
 );
-const AdminServiceApproval = lazy(() =>
-  import("./KubernetesRBAC/AdminServiceApproval")
+const AdminServiceApproval = lazy(
+  () => import("./KubernetesRBAC/AdminServiceApproval"),
 );
 const AdminEditPage = lazy(() => import("./Pages/Admin/AdminEditPage"));
 const ProjectName = lazy(() => import("./Pages/Admin/ProjectName"));
@@ -42,11 +42,11 @@ const Instance = lazy(() => import("./Pages/Provisioning/Instance"));
 const Flavors = lazy(() => import("./Pages/Provisioning/Flavors"));
 const Images = lazy(() => import("./Pages/Provisioning/Images"));
 const LoginForm = lazy(() => import("./Pages/Authentication/LoginForm"));
-const RegistrationForm = lazy(() =>
-  import("./Pages/Authentication/RegistrationForm")
+const RegistrationForm = lazy(
+  () => import("./Pages/Authentication/RegistrationForm"),
 );
-const ApplicationCredantials = lazy(() =>
-  import("./Pages/Administration/ApplicationCredentials")
+const ApplicationCredantials = lazy(
+  () => import("./Pages/Administration/ApplicationCredentials"),
 );
 const Unauthorized = lazy(() => import("./Pages/Unauthorized"));
 const VmRequest = lazy(() => import("./User/VmRequest"));
@@ -57,8 +57,8 @@ const VMRequestStatus = lazy(() => import("./User/VMRequestStatus"));
 const KubernetOverview = lazy(() => import("./Pages/KubernetOverview"));
 const Pods = lazy(() => import("./Kubernets/Pods"));
 const Events = lazy(() => import("./Kubernets/Events"));
-const GroupMembersManagement = lazy(() =>
-  import("./Pages/Administration/GroupMembersManagement")
+const GroupMembersManagement = lazy(
+  () => import("./Pages/Administration/GroupMembersManagement"),
 );
 const Group = lazy(() => import("./Pages/Infrastructure/Group"));
 const DRService = lazy(() => import("./Pages/Infrastructure/DRService"));
@@ -73,46 +73,45 @@ const RBACpolicies = lazy(() => import("./Pages/Network/RBACpolicies"));
 const Routers = lazy(() => import("./Pages/Network/Routers"));
 const ApprovedvmRequest = lazy(() => import("./Pages/Admin/ApprovedvmRequest"));
 const VMDeleteApproval = lazy(() => import("./Pages/Admin/VMDeleteApproval"));
+const AdminK8sDeleteApprovals = lazy(
+  () => import("./Pages/Admin/AdminK8sDeleteApprovals"),
+);
 const Roles = lazy(() => import("./Pages/Administration/Roles"));
 const ReplicaSets = lazy(() => import("./Kubernets/ReplicaSets"));
-const HealthMonitoring = lazy(() =>
-  import("./Pages/Monitoring/HealthMonitoring")
+const HealthMonitoring = lazy(
+  () => import("./Pages/Monitoring/HealthMonitoring"),
 );
-const ServiceMonitoring = lazy(() =>
-  import("./Pages/Monitoring/ServiceMonitoring")
+const ServiceMonitoring = lazy(
+  () => import("./Pages/Monitoring/ServiceMonitoring"),
 );
 const LogMonitoring = lazy(() => import("./Pages/Monitoring/LogMonitoring"));
 const Darpan = lazy(() => import("./Pages/Monitoring/Darpan"));
 const NetworkTopology = lazy(() => import("./Pages/Network/NetworkTopology"));
 const Storage = lazy(() => import("./Pages/Volume/Storage"));
-const SwiftObjectStorage = lazy(() =>
-  import("./Pages/Volume/SwiftObjectStorage")
+const SwiftObjectStorage = lazy(
+  () => import("./Pages/Volume/SwiftObjectStorage"),
 );
 const Fileshare = lazy(() => import("./Pages/Volume/Fileshare"));
 const Volume = lazy(() => import("./Pages/Volume/Volume"));
 const VolumeType = lazy(() => import("./Pages/Volume/VolumeType"));
 const PricePlan = lazy(() => import("./Pages/PricePlan"));
-const AdminTicketDashboard = lazy(() =>
-  import("./Pages/Tickets/AdminTicketDashboard")
+const AdminTicketDashboard = lazy(
+  () => import("./Pages/Tickets/AdminTicketDashboard"),
 );
-const TicketCreationForm = lazy(() =>
-  import("./Pages/Tickets/TicketCreationForm")
+const TicketCreationForm = lazy(
+  () => import("./Pages/Tickets/TicketCreationForm"),
 );
 const TicketDetailView = lazy(() => import("./Pages/Tickets/TicketDetailView"));
 const TicketListPage = lazy(() => import("./Pages/Tickets/TicketListPage"));
 const HelpdeskWrapper = lazy(() => import("./HelpdeskWrapper"));
-const ForgotPassword = lazy(() =>
-  import("./Pages/Authentication/ForgotPassword")
+const ForgotPassword = lazy(
+  () => import("./Pages/Authentication/ForgotPassword"),
 );
-const ResetPassword = lazy(() =>
-  import("./Pages/Authentication/ResetPassword")
+const ResetPassword = lazy(
+  () => import("./Pages/Authentication/ResetPassword"),
 );
 import ShellPage from "./User/PodShellModal";
 import VMShellPage from "./User/VMShellPage";
-
-
-
-
 
 const App = () => {
   return (
@@ -123,7 +122,6 @@ const App = () => {
           <Route path="/" element={<LoginForm />} />
           <Route path="/shell" element={<ShellPage />} />
           <Route path="/vm-shell" element={<VMShellPage />} />
-
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/registration" element={<RegistrationForm />} />
@@ -148,7 +146,6 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-            
             <Route
               path="price-plan"
               element={
@@ -163,7 +160,7 @@ const App = () => {
                 <HelpdeskWrapper path="http://10.184.40.36:8000/helpdesk/" />
               }
             />
-             <Route
+            <Route
               path="helpdesk/submit"
               element={
                 <HelpdeskWrapper path="http://10.184.40.36:8000/helpdesk/tickets/submit/" />
@@ -444,7 +441,7 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
-             <Route
+            <Route
               path="openstack/admin/VMDeleteApproval"
               element={
                 <ProtectedRoute allowedRoles={["ADMIN"]}>
@@ -561,6 +558,14 @@ const App = () => {
               element={
                 <ProtectedRoute allowedRoles={["ADMIN"]}>
                   <AdminServiceApproval />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="kubernetes/admin/delete-approvals"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <AdminK8sDeleteApprovals />
                 </ProtectedRoute>
               }
             />

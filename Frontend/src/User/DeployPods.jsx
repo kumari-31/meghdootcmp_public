@@ -126,29 +126,31 @@ const initialButtonCategories = Object.keys(categorizedCards);
 const StyledCard = styled(Card)(({ theme }) => ({
   borderRadius: 24,
   padding: 12,
-  background: theme.palette.mode === "dark"
-  ? "linear-gradient(145deg, #1b1b1b, #262626)"
-  : "linear-gradient(145deg, #ffffff, #eef1ff)",
+  background:
+    theme.palette.mode === "dark"
+      ? "linear-gradient(145deg, #1b1b1b, #262626)"
+      : "linear-gradient(145deg, #ffffff, #eef1ff)",
   boxShadow:
-  theme.palette.mode === "dark"
-  ? "0 8px 20px rgba(0,0,0,0.35)"
-  : "0 8px 20px rgba(160, 172, 255, 0.35)",
-  border: theme.palette.mode === "dark"
-  ? "1px solid rgba(255,255,255,0.08)"
-  : "1px solid rgba(80, 100, 200, 0.15)",
+    theme.palette.mode === "dark"
+      ? "0 8px 20px rgba(0,0,0,0.35)"
+      : "0 8px 20px rgba(160, 172, 255, 0.35)",
+  border:
+    theme.palette.mode === "dark"
+      ? "1px solid rgba(255,255,255,0.08)"
+      : "1px solid rgba(80, 100, 200, 0.15)",
   backdropFilter: "blur(8px)",
   transition: "all 0.35s ease",
   transform: "translateY(0px)",
-  '&:hover': {
-  transform: "translateY(-10px) scale(1.02)",
-  boxShadow:
-  theme.palette.mode === "dark"
-  ? "0 12px 32px rgba(0,0,0,0.5)"
-  : "0 12px 32px rgba(120,140,255,0.45)",
-  borderColor:
-  theme.palette.mode === "dark"
-  ? "rgba(255,255,255,0.15)"
-  : "rgba(60,80,200,0.35)",
+  "&:hover": {
+    transform: "translateY(-10px) scale(1.02)",
+    boxShadow:
+      theme.palette.mode === "dark"
+        ? "0 12px 32px rgba(0,0,0,0.5)"
+        : "0 12px 32px rgba(120,140,255,0.45)",
+    borderColor:
+      theme.palette.mode === "dark"
+        ? "rgba(255,255,255,0.15)"
+        : "rgba(60,80,200,0.35)",
   },
 }));
 
@@ -175,70 +177,83 @@ const CategoryButton = styled(Button)(({ theme, selected }) => ({
 
 const serviceFieldConfigs = {
   mongodb: [
-    { name: "replica", label: "Replica", type: "number" },
-    { name: "app_name", label: "App Name" },
-    { name: "root_password", label: "Root Password", type: "password" },
-    { name: "username", label: "Username" },
-    { name: "password", label: "Password", type: "password" },
-    { name: "database", label: "Database" },
-    { name: "node_port", label: "Node Port", type: "number" },
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
+    { name: "app_name", label: "App Name" },
+    { name: "replica", label: "Replica", type: "number" },
+    { name: "username", label: "Username" },
+    { name: "password", label: "Password", type: "password" },
+    { name: "root_password", label: "Root Password", type: "password" },
+    { name: "database", label: "Database" },
+    { name: "node_port", label: "Node Port", type: "number" },
+    { name: "service_requirements", label: "Service Requirements" },
+    { name: "additional_notes", label: "Additional Notes" },
+  ],
+  mariadb: [
+    { name: "service_start_date", label: "Service Start Date", type: "date" },
+    { name: "service_end_date", label: "Service End Date", type: "date" },
+    { name: "app_name", label: "App Name" },
+    { name: "replica", label: "Replica", type: "number" },
+    { name: "username", label: "Username" },
+    { name: "password", label: "Password", type: "password" },
+    { name: "root_password", label: "Root Password", type: "password" },
+    { name: "database", label: "Database" },
+    { name: "node_port", label: "Node Port", type: "number" },
     { name: "service_requirements", label: "Service Requirements" },
     { name: "additional_notes", label: "Additional Notes" },
   ],
   couchdb: [
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
-    { name: "service_requirements", label: "Service Requirements" },
-    { name: "additional_notes", label: "Additional Notes" },
     { name: "app_name", label: "App Name" },
     { name: "replica", label: "Replica", type: "number" },
-    { name: "root_password", label: "Root Password", type: "password" },
     { name: "username", label: "Username" },
     { name: "password", label: "Password", type: "password" },
+    { name: "root_password", label: "Root Password", type: "password" },
     { name: "database", label: "Database" },
     { name: "node_port", label: "Node Port", type: "number" },
+    { name: "service_requirements", label: "Service Requirements" },
+    { name: "additional_notes", label: "Additional Notes" },
   ],
   postgresql: [
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
-    { name: "service_requirements", label: "Service Requirements" },
-    { name: "additional_notes", label: "Additional Notes" },
     { name: "app_name", label: "App Name" },
     { name: "replica", label: "Replica", type: "number" },
-    { name: "root_password", label: "Root Password", type: "password" },
     { name: "username", label: "Username" },
     { name: "password", label: "Password", type: "password" },
+    { name: "root_password", label: "Root Password", type: "password" },
     { name: "database", label: "Database" },
     { name: "node_port", label: "Node Port", type: "number" },
+    { name: "service_requirements", label: "Service Requirements" },
+    { name: "additional_notes", label: "Additional Notes" },
   ],
   mysql: [
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
-    { name: "service_requirements", label: "Service Requirements" },
-    { name: "additional_notes", label: "Additional Notes" },
     { name: "app_name", label: "App Name" },
     { name: "replica", label: "Replica", type: "number" },
-    { name: "root_password", label: "Root Password", type: "password" },
     { name: "username", label: "Username" },
     { name: "password", label: "Password", type: "password" },
+    { name: "root_password", label: "Root Password", type: "password" },
     { name: "database", label: "Database" },
     { name: "node_port", label: "Node Port", type: "number" },
+    { name: "service_requirements", label: "Service Requirements" },
+    { name: "additional_notes", label: "Additional Notes" },
   ],
   nginx: [
     { name: "service_start_date", label: "Service Start Date", type: "date" },
     { name: "service_end_date", label: "Service End Date", type: "date" },
+    { name: "app_name", label: "App Name" },
     { name: "service_requirements", label: "Service Requirements" },
     { name: "additional_notes", label: "Additional Notes" },
-    { name: "app_name", label: "App Name" },
   ],
   nginxha: [
+    { name: "service_start_date", label: "Service Start Date", type: "date" },
+    { name: "service_end_date", label: "Service End Date", type: "date" },
     { name: "app_name", label: "Deployment Name" },
     { name: "replica", label: "Replica", type: "number", default: 2 },
     { name: "namespace", label: "Namespace", default: "default" },
-    { name: "service_start_date", label: "Service Start Date", type: "date" },
-    { name: "service_end_date", label: "Service End Date", type: "date" },
     { name: "service_requirements", label: "Service Requirements" },
     { name: "additional_notes", label: "Additional Notes" },
   ],
@@ -251,6 +266,9 @@ const DatabaseCard = ({ card, handleOpen }) => {
     navigate("/app/openstack/vmrequest");
   };
 
+// Get the image source once to reuse for backdrop and main logo
+  const imgSource = images[`../assets/${card.logo}`]?.default;
+
   return (
     <StyledCard
       sx={{
@@ -258,8 +276,29 @@ const DatabaseCard = ({ card, handleOpen }) => {
         height: 320, // fixed height
         display: "flex",
         flexDirection: "column",
+        position: "relative", // Ensure relative for absolute backdrop positioning
+        overflow: "hidden",
       }}
     >
+    {/* --- Blurred Full-Bleed Backdrop --- */}
+      <Box
+        component="img"
+        src={imgSource || "https://via.placeholder.com/600x400?text=Service"}
+        alt=""
+        sx={{
+          position: "absolute",
+          top: -20, // Offset to cover edges after blur
+          left: -20,
+          width: "120%",
+          height: "150px", // Only cover the top half area
+          objectFit: "cover",
+          filter: "blur(12px) saturate(1.2)",
+          opacity: 0.15, // Subtle opacity for the backdrop
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      />
+
       <CardContent
         sx={{
           display: "flex",
@@ -278,15 +317,17 @@ const DatabaseCard = ({ card, handleOpen }) => {
             justifyContent: "center",
             alignItems: "center",
             mb: 2,
+            position: "relative",
           }}
         >
           <img
-            src={images[`../assets/${card.logo}`].default}
+            src={imgSource}
             alt={card.name}
             style={{
               maxWidth: "100%",
               maxHeight: "100%",
               objectFit: "contain",
+              filter: "drop-shadow(0px 4px 12px rgba(0,0,0,0.1))", // Adds depth
             }}
           />
         </Box>
@@ -310,7 +351,7 @@ const DatabaseCard = ({ card, handleOpen }) => {
             variant="outlined"
             startIcon={<RocketLaunch />}
             onClick={handleLaunchVM}
-            sx={{ mt: 2, width: "80%" }}
+            sx={{ mt: 2, width: "80%", borderRadius: '12px' }}
           >
             Launch VM
           </StyledButton>
@@ -319,7 +360,8 @@ const DatabaseCard = ({ card, handleOpen }) => {
             variant="contained"
             startIcon={<RocketLaunch />}
             onClick={() => handleOpen(card.name)}
-            sx={{ mt: 2, width: "80%" }}
+            sx={{ mt: 2, width: "80%",borderRadius: '12px',
+                background: "linear-gradient(90deg, #008cff, #7b1fa2)" }}
           >
             Deploy
           </StyledButton>
@@ -402,21 +444,20 @@ const DeployPods = () => {
       additionalFields.map((f) => [
         f.name,
         f.default !== undefined ? f.default : "",
-      ])
+      ]),
     );
-    setFormData({
-      employee_id: formData.employee_id,
-      email: formData.email,
-      name: formData.name,
-      service_name: service,
-      ...(normalized !== "mongodb" && {
-        designation: "",
-        purpose: "",
-        project_name: "",
-        purpose_of_request: "",
-      }),
-      ...dynamicData,
-    });
+   setFormData({
+    employee_id: formData.employee_id,
+    email: formData.email,
+    name: formData.name,
+    service_name: service,
+    // REMOVED the "normalized !== 'mongodb'" check here
+    designation: "",
+    purpose: "",
+    project_name: "",
+    purpose_of_request: "",
+    ...dynamicData,
+  });
     setSelectedService(service);
     setOpen(true);
   };
@@ -433,17 +474,15 @@ const DeployPods = () => {
     const normalized = normalizeServiceName(selectedService);
     const dynamicFields = serviceFieldConfigs[normalized] || [];
 
-    const requiredFields =
-      normalized === "mongodb"
-        ? dynamicFields.map((f) => f.name)
-        : [
-            "designation",
-            "purpose",
-            "project_name",
-            "purpose_of_request",
-            ...dynamicFields.map((f) => f.name),
-          ];
+    const optionalFields = ["node_port", "additional_notes"];
 
+   // 1. Determine Required Fields
+  const baseRequired = ["designation", "purpose", "project_name", "purpose_of_request"];
+  const serviceRequired = dynamicFields
+    .map((f) => f.name)
+    .filter((f) => !optionalFields.includes(f));
+
+    const requiredFields = [...baseRequired, ...serviceRequired];
     const missing = requiredFields.find((f) => !formData[f]);
 
     if (missing) {
@@ -454,20 +493,21 @@ const DeployPods = () => {
       });
     }
 
-    const apiEndpoint =
-      normalized === "mongodb"
-        ? "/k8s/deploy/mongodb/"
-        : "/service-requests/create/";
+    const apiEndpoint = "/service-requests/create/";
 
-    const submissionData =
-      normalized === "mongodb"
-        ? Object.fromEntries(
-            dynamicFields.map((f) => [f.name, formData[f.name]])
-          )
-        : formData;
+    // Use the full formData so all fields (project, employee_id) are sent.
+  const cleanedData = { ...formData, service_name: selectedService };
+
+  if (cleanedData.node_port === "") {
+    delete cleanedData.node_port;
+  }
+
+    if ("node_port" in cleanedData && cleanedData.node_port === "") {
+      delete cleanedData.node_port;
+    }
 
     try {
-      const response = await apiClient.post(apiEndpoint, submissionData);
+      const response = await apiClient.post(apiEndpoint, cleanedData);
 
       // Kubernetes-specific error returned in 200 OK response body
       if (
@@ -563,8 +603,7 @@ const DeployPods = () => {
           Request for {selectedService}
         </DialogTitle>
         <DialogContent>
-          {selectedService.toLowerCase() !== "mongodb" && (
-            <>
+          
               <FormControl fullWidth required sx={{ my: 1 }}>
                 <InputLabel>Designation</InputLabel>
                 <Select
@@ -599,7 +638,7 @@ const DeployPods = () => {
                       <MenuItem key={p} value={p}>
                         {p}
                       </MenuItem>
-                    )
+                    ),
                   )}
                 </Select>
               </FormControl>
@@ -609,7 +648,7 @@ const DeployPods = () => {
                 getOptionLabel={(o) => o.project_name || ""}
                 value={
                   projects.find(
-                    (p) => p.project_name === formData.project_name
+                    (p) => p.project_name === formData.project_name,
                   ) || null
                 }
                 onChange={(e, newValue) =>
@@ -629,8 +668,7 @@ const DeployPods = () => {
                   handleChange("purpose_of_request", e.target.value)
                 }
               />
-            </>
-          )}
+           
 
           {(serviceFieldConfigs[selectedService.toLowerCase()] || []).map(
             ({ name, label, type }) => (
@@ -643,8 +681,18 @@ const DeployPods = () => {
                 value={formData[name]}
                 onChange={(e) => handleChange(name, e.target.value)}
                 InputLabelProps={type === "date" ? { shrink: true } : {}}
+                placeholder={
+                  name === "node_port"
+                    ? "Leave empty for auto-assigned port (30000–32767)"
+                    : ""
+                }
+                helperText={
+                  name === "node_port"
+                    ? "Optional. Kubernetes will assign a free port if left empty."
+                    : ""
+                }
               />
-            )
+            ),
           )}
         </DialogContent>
         <DialogActions sx={{ justifyContent: "space-between", padding: 2 }}>

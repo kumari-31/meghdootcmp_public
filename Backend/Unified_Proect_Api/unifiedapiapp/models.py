@@ -82,35 +82,12 @@ class VmRequest(models.Model):
 
     def __str__(self):
         return self.vm_name
-    
-    # Internet Access Registration Form fields
-    # internet_access_required = models.BooleanField(default=False)
-    # internet_private_ip = models.CharField(
-    #     max_length=255, blank=True, null=True, verbose_name="Private IP Address (CDAC, Chennai)"
-    # )
-    # internet_outbound_ports = models.CharField(max_length=255, blank=True, null=True, verbose_name="Outbound Ports")
-    # internet_duration_from = models.DateTimeField(blank=True, null=True, verbose_name="Internet Duration From")
-    # internet_duration_to = models.DateTimeField(blank=True, null=True, verbose_name="Internet Duration To")
-    # internet_purpose = models.TextField(blank=True, null=True, verbose_name="Purpose of Internet Access Request")
-
-    # # Public IP Assignment Form fields
-    # public_ip_required = models.BooleanField(default=False)
-    # public_private_ip = models.CharField(
-    #     max_length=255, blank=True, null=True, verbose_name="Private IP Address"
-    # )
-    # public_inbound_ports = models.CharField(max_length=255, blank=True, null=True, verbose_name="Inbound Ports")
-    # public_duration_from = models.DateTimeField(blank=True, null=True, verbose_name="Public IP Duration From")
-    # public_duration_to = models.DateTimeField(blank=True, null=True, verbose_name="Public IP Duration To")
-    # public_vapt_certificate = models.FileField(
-    #     upload_to="vapt_certificates/", blank=True, null=True, verbose_name="VAPT – Safe to Host Certificate"
-    # )
-    # public_purpose = models.TextField(blank=True, null=True, verbose_name="Purpose of Public IP Request")
-
+ 
     
 
 
 class VMInfo(models.Model):
-    vm_name = models.CharField(max_length=255, blank=True, null=True)
+    vm_name = models.CharField(max_length=255, blank=True, null=True, unique=True)
     vm_id = models.CharField(max_length=255, blank=True, null=True)
     shutoff_status = models.BooleanField(blank=True, null=True, default=False)
     host_name = models.CharField(max_length=255, blank=True, null=True)
@@ -298,6 +275,13 @@ class ServiceRequest(models.Model):
     deployment_status = models.CharField(
         max_length=20, default="Not Deployed"
     )  # Not Deployed, Deploying, Deployed, Failed
+    # Add these to your ServiceRequest model
+    delete_request_status = models.CharField(
+        max_length=20, 
+        choices=(("Pending", "Pending"), ("Approved", "Approved"), ("Rejected", "Rejected")), 
+        null=True, blank=True
+    )
+    delete_request_reason = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.employee_id} - {self.service_name}"

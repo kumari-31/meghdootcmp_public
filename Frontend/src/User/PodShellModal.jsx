@@ -31,13 +31,13 @@ const TERMINAL_THEMES = {
   },
   light: {
     background: "#ffffff",
-    foreground: "#2e3440", // Deep charcoal for readability
+    foreground: "#2e3440", 
     cursor: "#5e81ac",
     selectionBackground: "rgba(0, 0, 0, 0.1)",
     black: "#3b4252",
-    red: "#bf616a",    // Darker red
-    green: "#434c5e",  // Darker green
-    yellow: "#d08770", // Darker orange/yellow
+    red: "#bf616a",   
+    green: "#434c5e",  
+    yellow: "#d08770", 
     blue: "#5e81ac",
     magenta: "#b48ead",
     cyan: "#88c0d0",
@@ -100,7 +100,9 @@ const ShellPage = () => {
     setTimeout(() => fitAddon.fit(), 100);
 
     const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    // const ws = new WebSocket(`${protocol}://${window.location.hostname}/ws/pods/exec/`);
     const ws = new WebSocket(`${protocol}://${window.location.hostname}:8000/ws/pods/exec/`);
+
 
     const payload = {
       namespace: params.get("namespace"),

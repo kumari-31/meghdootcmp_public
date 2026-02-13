@@ -39,13 +39,20 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await apiClient.post("/logout/", {}, { withCredentials: true });
-    } catch {}
+    } catch (err) {
+    console.error("Logout request failed", err);
+  }
 
+  // 2. Clear Storage
     localStorage.clear();
     sessionStorage.clear();
+
+    // 3. Clear memory state
     clearInactivityTimer();
     setUser(null);
-    window.location.href = "/";
+
+   // 4. Force a hard reload to the login page to wipe any remaining JS state
+  window.location.replace("/");
   };
 
   // --- Auto logout after inactivity ---

@@ -477,8 +477,6 @@ def map_user_conn(con_identifier, username, authToken):
 
 
 
-
-
 def run_shell_script_to_save_vm_details(vms, creation=True):
     print("vms in run shell script", vms)
     if not vms:
@@ -487,13 +485,6 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
 
     vm_names = [vm["vm_name"] for vm in vms]
     print("vmname++++++", vm_names)
-    # base_path = os.getenv('BASE_DIR', '/Desktop/SDC_Portal')
-    base_path = "/home/boss/Desktop/Cmp19nov25/Backend/Unified_Proect_Api/unifiedapiapp/"
-    shell_script_path = os.path.join(base_path, 'script.sh')
-    # shell_script_path = os.path.join(os.getcwd(), 'vdiapp', 'script.sh')
-    print("shell script path================>>>>>>>", shell_script_path)
-
-  
 
     # PRE-DEFINE VARIABLES SO THEY EXIST EVEN IF EXCEPTION OCCURS
     host_name = instance_name = vnc_display = u_name = None
@@ -537,8 +528,12 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
         print("AUTHtoken===========>", authToken)
 
         guac_connections = {}
+        instance_names = {}  # New mapping
+        vnc_displays = {}
+        u_name = None
 
         for line, vmtime in zip(lines, vms):
+            con_identifier = None
             fields = line.split(",")
             if len(fields) != 4:
                 print("Invalid CSV line format")
@@ -550,7 +545,6 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
             vnc_port = 5900 + int(vnc_raw)
             vnc_display = vnc_port
             u_name = vmtime.get("username")
-            user_mail = vmtime.get("email")
             print(
                 f"Parsed → Host:{host_name}, Instance:{parsed_instance_name}, VNC:{vnc_display}, User:{u_name}"
             )
@@ -575,16 +569,25 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
             # 4️⃣ CREATE GUACAMOLE CONNECTION
             # -------------------------------
             conn = create_connection(vm_name, vnc_port, host_name, authToken)
-            if conn.status_code != 200:
-                print(f"Failed to create connection for {vm_name}")
-                print("Status:", conn.status_code)
-                print("Response:", conn.text)
+            if conn.status_code == 200:
+                con_identifier = conn.json().get("identifier")
+            elif conn.status_code == 400:
+                # IMPORTANT: Handle existing connections so the loop doesn't break
+                print(f"Connection {vm_name} exists, fetching ID...")
+                # If you don't have a fetch function, you can skip or update
+                # con_identifier = get_guac_connection_id_by_name(vm_name, authToken)
+                continue 
+            else:
+                print(f"Failed to create {vm_name}: {conn.text}")
                 continue
 
-            con_identifier = conn.json().get("identifier")
-            print("Connection ID:", con_identifier)
+            # 4️⃣ Only proceed if we actually have an identifier
+            if con_identifier:
+                con_identifier = str(con_identifier)
+                guac_connections[vm_name] = con_identifier
+                instance_names[vm_name] = parsed_instance_name
+                vnc_displays[vm_name] = vnc_port
 
-            guac_connections[vm_name] = con_identifier
 
 
 
@@ -600,61 +603,7 @@ def run_shell_script_to_save_vm_details(vms, creation=True):
 
 
             instance_name = parsed_instance_name
-            # -------------------------------
-            # 7️⃣ SAVE VM DETAILS IN DATABASE
-            # -------------------------------
-            vm_info_obj, created = VMInfo.objects.update_or_create(
-                vm_name=vm_name,
-                defaults={
-                    "host_name": host_name,
-                    "instance_name": parsed_instance_name,
-                    "vnc_display": vnc_display,
-                    "username": u_name,
-                    "vm_access_from_date": vmtime.get("vm_access_from_date"),
-                    "vm_access_to_date": vmtime.get("vm_access_to_date"),
-                    "vm_access_from_time": vmtime.get("vm_access_from_time"),
-                    "vm_access_to_time": vmtime.get("vm_access_to_time"),
-                    "email": user_mail,
-                    "volume_id": vmtime.get("volume_id"),
-                    "data_volume_id": vmtime.get("data_volume_id"),
-                    "vm_id": vmtime.get("vm_id"),
-                    "connection_id": con_identifier,
-                },
-            )
-
-            print(">>> Saved VMInfo:", vm_info_obj)
-
-            update_ip_by_vmname(vm_name)    
-
-            # -------------------------------
-            # 8️⃣ SEND EMAIL
-            # -------------------------------
-            try:
-                subject = "VM Creation Successful"
-                message = f"""
-Dear {u_name},
-
-Your VM has been successfully created.
-
-Access link:
-{PORTAL_URL}
-
-Login:
-Username: {u_name}
-Password: {u_name}
-
-Thanks & Regards,
-Cloud Team
-                """
-
-                if user_created:
-                    send_mail(subject, message, EMAIL_FROM, [user_mail])
-                    print("Email sent.")
-                else:
-                    print(f"No email sent because '{u_name}' already existed.")
-
-            except Exception as e:
-                print(f"Error sending email: {e}")
+ 
 
     except Exception as e:
         traceback.print_exc()
@@ -663,12 +612,14 @@ Cloud Team
 
     return {
         "status": True,
-        "message": "VMs Created Successfully",
+        "message": "VMs processed successfully",
         "host_name": host_name,
         "instance_name": instance_name,
         "vnc_display": vnc_display,
         "username": u_name,
         "connections": guac_connections,
+        "instance_names": instance_names,
+        "vnc_displays": vnc_displays,
     }
 
 

@@ -9,7 +9,16 @@ import {
   CardContent,
   Button,
   useTheme,
+  IconButton,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  TextField,
+  DialogActions,
 } from "@mui/material";
+import { 
+  DeleteOutline  
+} from '@mui/icons-material';
 
 // load assets
 const images = import.meta.glob("../assets/*.{png,jpg,jpeg,svg}", {
@@ -41,6 +50,50 @@ export default function DeploymentsList() {
   const theme = useTheme();
   const [deployments, setDeployments] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [selectedPodForDelete, setSelectedPodForDelete] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [alertDialog, setAlertDialog] = useState({
+      open: false,
+      message: "",
+      severity: "success", // "success" | "error"
+    });
+
+  const handleOpenDelete = (pod) => {
+    setSelectedPodForDelete(pod);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteDialogOpen(false);
+    setDeleteReason("");
+  };
+
+  const submitDeleteRequest = async () => {
+    if (!deleteReason.trim()) return;
+
+    try {
+      // Note: 'id' matches your JSON data (e.g., 89, 87, etc.)
+      await apiClient.post("/k8s/delete-request/", {
+        id: selectedPodForDelete.id,
+        reason: deleteReason,
+      });
+
+      handleCloseDelete();
+      setAlertDialog({
+        open: true,
+        message: "Deletion request submitted for admin approval.",
+        severity: "success",
+      });
+    } catch (err) {
+      setAlertDialog({
+        open: true,
+        message: "Failed to submit request.",
+        severity: "error",
+      });
+    }
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -139,7 +192,8 @@ export default function DeploymentsList() {
                     <Box
                       sx={{
                         position: "relative",
-                        height: 170,
+                        height: 200,
+                        width: 350,
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -170,7 +224,11 @@ export default function DeploymentsList() {
 
                       {/* circular logo with glow */}
                       <Box
-                        onClick={() => window.open(d.deployment_url, "_blank")}
+                        onClick={
+                          d.deployment_url
+                            ? () => window.open(d.deployment_url, "_blank")
+                            : undefined
+                        }
                         sx={{
                           zIndex: 2,
                           width: 110,
@@ -184,13 +242,14 @@ export default function DeploymentsList() {
                           border: "1px solid rgba(255,255,255,0.06)",
                           boxShadow:
                             "0 8px 30px rgba(0,140,255,0.12), inset 0 1px 0 rgba(255,255,255,0.05)",
-                          cursor: "pointer",
-                          transition:
-                            "transform .25s ease, box-shadow .25s ease",
+                          cursor: d.deployment_url ? "pointer" : "default", // Change cursor if not clickable
                           "&:hover": {
-                            transform: "scale(1.08)",
-                            boxShadow:
-                              "0 18px 50px rgba(0,140,255,0.18), 0 0 24px rgba(0,140,255,0.12)",
+                            transform: d.deployment_url
+                              ? "scale(1.08)"
+                              : "none",
+                            boxShadow: d.deployment_url
+                              ? "0 18px 50px rgba(0,140,255,0.18)..."
+                              : "none",
                           },
                         }}
                       >
@@ -264,32 +323,101 @@ export default function DeploymentsList() {
                     </CardContent>
 
                     <Box sx={{ px: 2, pb: 2, display: "flex", gap: 1 }}>
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        onClick={() => window.open(d.deployment_url, "_blank")}
-                        sx={{
-                          textTransform: "none",
-                          background:
-                            "linear-gradient(90deg, rgba(0,140,255,0.95), rgba(123,31,162,0.95))",
-                        }}
-                      >
-                        Open Service
-                      </Button>
+                      {/* Only show "Open Service" if deployment_url exists */}
+                      {d.deployment_url && (
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          onClick={() =>
+                            window.open(d.deployment_url, "_blank")
+                          }
+                          sx={{
+                            textTransform: "none",
+                            background:
+                              "linear-gradient(90deg, rgba(0,140,255,0.95), rgba(123,31,162,0.95))",
+                          }}
+                        >
+                          Web Service
+                        </Button>
+                      )}
 
                       <Button
                         fullWidth
                         variant="outlined"
                         onClick={() => openShellWindow(d)}
+                        sx={{
+                          textTransform: "none",
+                        }}
                       >
-                        Open Shell
+                        Open Exec
                       </Button>
+                      {/* NEW: Delete Icon Button */}
+                      <IconButton
+                        color="error"
+                        onClick={() => handleOpenDelete(d)}
+                        sx={{
+                          border: "1px solid rgba(211, 47, 47, 0.5)",
+                          borderRadius: "8px",
+                          "&:hover": {
+                            backgroundColor: "rgba(211, 47, 47, 0.04)",
+                          },
+                        }}
+                      >
+                        <DeleteOutline />
+                      </IconButton>
                     </Box>
                   </Card>
                 </Grid2>
               );
             })}
       </Grid2>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDelete}
+        fullWidth
+        maxWidth="xs"
+      >
+        <DialogTitle
+          sx={{
+            fontWeight: "bold",
+            color: "error.main",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <DeleteOutline color="error" /> Request Deletion
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            You are requesting to delete{" "}
+            <strong>{selectedPodForDelete?.app_name}</strong>. Please provide a
+            reason for the administrator.
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            placeholder="Reason (e.g., Project completed, resource cleanup...)"
+            value={deleteReason}
+            onChange={(e) => setDeleteReason(e.target.value)}
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={handleCloseDelete} color="inherit">
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={submitDeleteRequest}
+            disabled={!deleteReason.trim()}
+          >
+            Submit Request
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

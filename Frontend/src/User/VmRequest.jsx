@@ -352,7 +352,7 @@ const VmRequest = () => {
                         </MenuItem>
                         <MenuItem value="Developer">Developer</MenuItem>
                         <MenuItem value="Testing">Testing</MenuItem>
-                        <MenuItem value="Student">Student</MenuItem>
+                        {/* <MenuItem value="Student">Student</MenuItem> */}
                       </Select>
                     </FormControl>
                   </Grid2>
@@ -424,7 +424,7 @@ const VmRequest = () => {
                   </Grid2>
                   <Grid2 size={6}>
                     <TextField
-                      label="Purpose of Request"
+                      label="Description"
                       name="purpose_of_request"
                       value={formData.purpose_of_request}
                       onChange={handleChange}

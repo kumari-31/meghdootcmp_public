@@ -60,6 +60,7 @@ MIDDLEWARE = [
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
+
 # CORS_ALLOW_ALL_ORIGINS = True  # Or set to False and specify allowed origins
 CORS_ALLOW_CREDENTIALS = True
 
@@ -228,6 +229,8 @@ SERVER_EMAIL = os.getenv("SERVER_EMAIL")
 ZABBIX_URL = os.getenv("ZABBIX_URL")
 ZABBIX_USER = os.getenv("ZABBIX_USER")
 ZABBIX_PASSWORD = os.getenv("ZABBIX_PASSWORD")
+
+PORTAL_URL = os.getenv("PORTAL_URL", "https://virtuallab.bosschn.in")
 
 
 
