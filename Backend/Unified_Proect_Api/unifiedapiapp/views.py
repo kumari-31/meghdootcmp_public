@@ -9782,19 +9782,30 @@ class VMDeleteRequestAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        vm_name = request.data.get("vm_id")
+        vm_name = request.data.get("vm_id")  # Full name: e.g., 346814_new-tejas-1
         reason = request.data.get("reason", "")
 
-        vm_request = VmRequest.objects.filter(vm_name=vm_name).first()
-        if not vm_request:
-            return Response({"message": "VM Request Not Found"}, status=404)
+        # 1. Update the specific VM instance
+        vm_info = VMInfo.objects.filter(vm_name=vm_name).first()
+        if not vm_info:
+            return Response({"message": "VM Instance Not Found"}, status=404)
 
-        # Mark as pending deletion
-        vm_request.delete_request_status = "Pending"
-        vm_request.delete_request_reason = reason
-        vm_request.save()
+        vm_info.delete_request_status = "Pending"
+        vm_info.delete_request_reason = reason
+        vm_info.save()
 
-        return Response({"message": "Delete request sent to admin."}, status=200)
+        # 2. Mark the parent request as Pending so it shows up in Admin's list
+        import re
+        base_name = re.sub(r'-\d+$', '', vm_name) 
+        vm_request = VmRequest.objects.filter(vm_name=base_name).first()
+        
+        if vm_request:
+            vm_request.delete_request_status = "Pending"
+            # We store the latest reason or a combined reason in the parent
+            vm_request.delete_request_reason = f"Request for {vm_name}: {reason}"
+            vm_request.save()
+
+        return Response({"message": "Delete request sent for this specific VM."}, status=200)
 
 
 
@@ -9804,16 +9815,14 @@ class VMDeleteAdminApprovalAPIView(APIView):
     def post(self, request):
         vm_name = request.data.get("vm_id")
         approve = request.data.get("approve")
-        admin_user = request.user.username
-
-        vm_request = VmRequest.objects.filter(vm_name=vm_name).first()
+        # 1. Find the specific VM first
         vm_info = VMInfo.objects.filter(vm_name=vm_name).first()
-
-        if not vm_request:
-            return Response({"message": "VM Request Not Found"}, status=404)
-
         if not vm_info:
             return Response({"message": "VM Info Not Found"}, status=404)
+        
+        import re
+        base_name = re.sub(r'-\d+$', '', vm_name)
+        vm_request = VmRequest.objects.filter(vm_name=base_name).first()
 
         if approve:
 
@@ -9828,25 +9837,17 @@ class VMDeleteAdminApprovalAPIView(APIView):
             
              # Prepare dynamic log data (exclude ID fields)
             log_data = {}
-
-            # Copy from VmRequest
             for field in DeletedVMLog._meta.fields:
                 if field.name in ["id", "delete_approved_by", "delete_approved_at"]:
                     continue
-                if hasattr(vm_request, field.name):
-                    log_data[field.name] = getattr(vm_request, field.name, None)
+                # Logic: Prefer data from VMInfo, fallback to VmRequest
+                if hasattr(vm_info, field.name):
+                    log_data[field.name] = getattr(vm_info, field.name)
+                elif vm_request and hasattr(vm_request, field.name):
+                    log_data[field.name] = getattr(vm_request, field.name)
 
-            # Copy from VMInfo
-            for field in DeletedVMLog._meta.fields:
-                if field.name in ["id", "delete_approved_by", "delete_approved_at"]:
-                    continue
-                if hasattr(vm_info, field.name) and field.name not in log_data:
-                    log_data[field.name] = getattr(vm_info, field.name, None)
-
-            # Add approval info
-            log_data["delete_approved_by"] = admin_user
+            log_data["delete_approved_by"] = request.user.username
             log_data["delete_approved_at"] = timezone.now()
-
             # Save logs
             DeletedVMLog.objects.create(**log_data)
 
@@ -9881,40 +9882,52 @@ class VMDeleteAdminApprovalAPIView(APIView):
             # 4️⃣ DELETE DB RECORDS
             # -----------------------------------
             vm_info.delete()
-            vm_request.delete()
 
-            return Response({"message": "VM Deleted Successfully!"}, status=200)
+            # 3. Check if any OTHER VMs exist for this base name
+            other_vms_exist = VMInfo.objects.filter(vm_name__startswith=base_name).exists()
+            
+            if not other_vms_exist:
+                if vm_request:
+                    vm_request.delete() # Last VM is gone, delete the parent request
+            else:
+                # Other VMs exist, just reset the parent status to "Approved" or "Success"
+                if vm_request:
+                    vm_request.delete_request_status = "Success" 
+                    vm_request.save()
 
-        # If deletion rejected
-        vm_request.delete_request_status = "Rejected"
-        vm_request.save()
+            return Response({"message": f"VM {vm_name} Deleted Successfully!"}, status=200)
+        
+        # If Rejected
+        vm_info.delete_request_status = "Rejected"
+        vm_info.save()
         return Response({"message": "Delete Request Rejected"}, status=200)
+            
 
 
 class VMPendingDeleteRequestsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        pending_requests = VmRequest.objects.filter(delete_request_status="Pending")
+        # Query VMInfo because it now holds the specific "Pending" status
+        pending_vms = VMInfo.objects.filter(delete_request_status="Pending")
         data = []
 
-        for req in pending_requests:
-            vm_info = VMInfo.objects.filter(vm_name=req.vm_name).first()
-            if not vm_info:
-                continue
+        for vm in pending_vms:
+            # Get parent info for project name/employee id
+            import re
+            base_name = re.sub(r'-\d+$', '', vm.vm_name)
+            parent = VmRequest.objects.filter(vm_name=base_name).first()
 
-            data.append(
-                {
-                    "id": req.id,
-                    "vm_name": req.vm_name,
-                    "project_name": req.project_name,
-                    "ip": vm_info.ip,
-                    "username": vm_info.username,
-                    "delete_request_reason": req.delete_request_reason
-                    or "Not provided",
-                    "request_time": req.request_timestamp,
-                }
-            )
+            data.append({
+                "id": vm.id, # Using VMInfo ID
+                "vm_name": vm.vm_name, # This will be the specific name like ...-1
+                "project_name": parent.project_name if parent else "N/A",
+                "employee_id": parent.employee_id if parent else "N/A",
+                "ip": vm.ip,
+                "username": vm.username,
+                "delete_request_reason": vm.delete_request_reason or "Not provided",
+                "request_time": vm.vm_access_from_date, # Or add a timestamp field to VMInfo
+            })
 
         return Response({"data": data}, status=200)
 

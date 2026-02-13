@@ -77,8 +77,7 @@ class VmRequest(models.Model):
     fla_rejection_reason = models.TextField(blank=True, null=True)
     admin_rejection_reason = models.TextField(blank=True, null=True)
     creation_error_message = models.TextField(blank=True, null=True)
-    delete_request_status = models.CharField(max_length=20, default="None")
-    delete_request_reason = models.TextField(null=True, blank=True)
+    
 
     def __str__(self):
         return self.vm_name
@@ -105,8 +104,8 @@ class VMInfo(models.Model):
     creation_status = models.CharField(max_length=255, blank=True, null=True)
     remarks = models.CharField(max_length=255, blank=True, null=True)
     volume_id = models.CharField(max_length=255, blank=True, null=True)
-    data_volume_id = models.CharField(max_length=255, blank=True, null=True)
-    zabbix_hostid = models.IntegerField(blank=True, null=True)
+    delete_request_status = models.CharField(max_length=20, default="None")
+    delete_request_reason = models.TextField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.vm_name} - {self.host_name}"
