@@ -351,10 +351,10 @@ const VmRequest = () => {
                         </MenuItem>
                         <MenuItem value="Developer">Developer</MenuItem>
                         <MenuItem value="Testing">Testing</MenuItem>
-                        {/* <MenuItem value="Student">Student</MenuItem> */}
-                      {/* </Select>
+                         <MenuItem value="Student">Student</MenuItem>
+                      </Select>
                     </FormControl>
-                  </Grid2> */} 
+                  </Grid2>  */}
                   <Grid2 size={6}>
                     <div>
                       <TextField
