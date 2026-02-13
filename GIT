@@ -23,7 +23,7 @@ pull changes from remote
 
 git pull origin dev-cmp --no-rebase 
 git log --oneline --graph --decorate --all # View commit history
-git status
+git status 
 
 
 

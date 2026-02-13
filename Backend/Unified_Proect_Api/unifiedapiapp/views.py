@@ -6383,7 +6383,7 @@ class VmRequestAPIView(APIView):
                 "purpose",
                 "project_name",
                 "vdi_required",
-                "designation",
+                # "designation",
                 "image",
                 "flavor",
                 "network_id",
@@ -6404,6 +6404,8 @@ class VmRequestAPIView(APIView):
                 if key in allowed_fields
             }
 
+            employee = Employee.objects.get(employee_id=data["employee_id"])
+            data["designation"] = employee.designation
             # Add default values for admin_status and fla_status
             data["admin_status"] = "Pending"
             data["fla_status"] = "Accepted" if role == "FLA" else "Pending"
