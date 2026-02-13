@@ -22,7 +22,8 @@ from .models import (
     Employee, 
     VmRequest, 
     CdacProject, 
-    ServiceRequest
+    ServiceRequest,
+    DeletedVMLog
 )
 
 User = get_user_model()
@@ -386,4 +387,11 @@ class LoginSerializer(serializers.Serializer):
 class ServiceRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceRequest
+        fields = "__all__"
+
+
+
+class DeletedVMLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = DeletedVMLog
         fields = "__all__"

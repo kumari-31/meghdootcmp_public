@@ -195,6 +195,11 @@ const Navbar = () => {
               roles: ["ADMIN"],
             },
             {
+              name: "Delete Logs",
+              path: "/app/openstack/deletedvmlogs",
+              roles: ["ADMIN"],
+            },
+            {
               name: "View Request Status",
               path: "/app/openstack/vmrequeststatus",
               roles: ["FLA", "EMPLOYEE"],
