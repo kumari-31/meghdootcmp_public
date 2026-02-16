@@ -63,20 +63,20 @@ from .launchvm import vm_approve_request ,create_user_with_details
 # --- Project-Specific Imports ---
 from .models import (CdacProject, CdVerifierAndNonce, Employee, ImageRecord,
                      Metric, Registration, ServiceRequest, Ticket,
-                     UserRegistrationRequest, VMInfo, VmRequest)
+                     UserRegistrationRequest, VMInfo, VmRequest ,DeletedVMLog )
 from .serializers import (CombinedDataSerializer, CombinedFormSerializer,
                           CustomTokenObtainPairSerializer, EmployeeSerializer,
                           EmployeeUpdateSerializer, FlavorSerializer,
                           MetricSerializer, ProjectSerializer,
                           RegistrationSerializer, ServiceRequestSerializer,
                           UserSerializer, VMInfoSerializer,
-                          VmRequestSerializer)
+                          VmRequestSerializer , DeletedVMLogSerializer)
 from .table_imp import *
 from django.db import transaction
 from django.db import transaction
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-
+from django.db.models import Q
 import os
 import logging
 from openstack import connection
@@ -21075,3 +21075,108 @@ Cloud Team
 #                 service_request.save()
 
 #                 return Response({"message": "MongoDB deployed successfully", "node_port": assigned_port}, status=200)
+
+
+
+
+
+
+
+# class DeletedVMLogsAPIView(APIView):
+#     permission_classes = [IsAuthenticated]  # Only logged-in users (admin)
+
+#     def get(self, request):
+
+#         try:
+#             start_date = request.GET.get("start_date")
+#             end_date = request.GET.get("end_date")
+#             search = request.GET.get("search")
+
+#             logs = DeletedVMLog.objects.all().order_by("-deleted_at")
+
+#             # 📅 Filter by start date
+#             if start_date:
+#                 logs = logs.filter(deleted_at__date__gte=parse_date(start_date))
+
+#             # 📅 Filter by end date
+#             if end_date:
+#                 logs = logs.filter(deleted_at__date__lte=parse_date(end_date))
+
+#             # 🔍 Search filter
+#             if search:
+#                 logs = logs.filter(
+#                     Q(vm_name__icontains=search) |
+#                     Q(employee_id__icontains=search) |
+#                     Q(project_name__icontains=search) |
+#                     Q(requested_by__icontains=search) |
+#                     Q(delete_approved_by__icontains=search)
+#                 )
+
+#             serializer = DeletedVMLogSerializer(logs, many=True)
+
+#             return Response(serializer.data, status=status.HTTP_200_OK)
+
+#         except Exception as e:
+#             return Response(
+#                 {"error": str(e)},
+#                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+#             )
+
+
+class DeletedVMLogsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            selected_date = request.GET.get("date")
+            search = request.GET.get("search")
+
+            # Start with the base queryset
+            logs = DeletedVMLog.objects.all().order_by("-deleted_at")
+
+            # 📅 DEFAULT: If no date and no search, show last 2 days
+            if not selected_date and not search:
+                two_days_ago = timezone.now() - timedelta(days=2)
+                logs = logs.filter(deleted_at__gte=two_days_ago)
+            
+            # 📅 FILTER: By specific date
+            elif selected_date:
+                logs = logs.filter(deleted_at__date=parse_date(selected_date))
+
+            # 🔍 SEARCH: Filter by user/vm/project
+            if search:
+                logs = logs.filter(
+                    Q(vm_name__icontains=search) |
+                    Q(employee_id__icontains=search) |
+                    Q(project_name__icontains=search)
+                )
+
+            result = []
+
+            for log in logs:
+                # Convert entire model to dictionary
+                log_data = {
+                    field.name: getattr(log, field.name)
+                    for field in log._meta.fields
+                }
+
+                # Fetch employee details
+                employee = Employee.objects.filter(
+                    employee_id=log.employee_id
+                ).first()
+
+                log_data["employee_details"] = {
+                    "name": employee.name if employee else "",
+                    "email": employee.email if employee else "",
+                    "designation": employee.designation if employee else "",
+                }
+
+                result.append(log_data)
+
+            return Response(result, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response(
+                {"error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

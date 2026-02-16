@@ -112,6 +112,7 @@ const ResetPassword = lazy(
 );
 import ShellPage from "./User/PodShellModal";
 import VMShellPage from "./User/VMShellPage";
+import DeletedVMLogs from "./Pages/Admin/DeletedVMLogs";
 
 const App = () => {
   return (
@@ -184,6 +185,8 @@ const App = () => {
                 </ProtectedRoute>
               }
             >
+             
+
               <Route
                 index
                 element={
@@ -233,6 +236,14 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+             <Route
+              path="openstack/deletedvmlogs"
+              element={
+                <ProtectedRoute allowedRoles={["ADMIN"]}>
+                  <DeletedVMLogs />
+                </ProtectedRoute>
+              }
+              />
             <Route
               path="openstack/fileshare"
               element={
