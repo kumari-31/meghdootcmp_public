@@ -104,6 +104,7 @@ class VMInfo(models.Model):
     creation_status = models.CharField(max_length=255, blank=True, null=True)
     remarks = models.CharField(max_length=255, blank=True, null=True)
     volume_id = models.CharField(max_length=255, blank=True, null=True)
+    data_volume_id = models.CharField(max_length=255, blank=True, null=True)
     delete_request_status = models.CharField(max_length=20, default="None")
     delete_request_reason = models.TextField(null=True, blank=True)
 
