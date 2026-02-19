@@ -166,7 +166,7 @@ urlpatterns = [
     path("api/vmrequests/delete/pending/", VMPendingDeleteRequestsAPIView.as_view(), name="vm-delete-pending"),
     path("api/vm-request/reject/", VmRequestRejectionReasonAPIView.as_view(), name="reject-vms"),
     path("api/openstack/requests-by-date/", OpenStackRequestsByDateAPIView.as_view(), name="openstack-requests-by-date"),
-    path("api/deleted-vm-logs/", DeletedVMLogsAPIView.as_view(),  name="delete-by-date"),
+    path("api/all-vm-logs/", AllVMLogsAPIView.as_view(),  name="vm-by-date"),
 
     # -------------------------------
     # 6️⃣ Kubernetes APIs

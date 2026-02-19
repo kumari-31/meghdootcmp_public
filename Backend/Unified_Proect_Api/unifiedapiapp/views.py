@@ -9848,6 +9848,8 @@ class VMDeleteAdminApprovalAPIView(APIView):
 
             log_data["delete_approved_by"] = request.user.username
             log_data["delete_approved_at"] = timezone.now()
+            log_data["delete_request_reason"] = vm_info.delete_request_reason
+
             # Save logs
             DeletedVMLog.objects.create(**log_data)
 
@@ -21123,7 +21125,20 @@ Cloud Team
 #             )
 
 
-class DeletedVMLogsAPIView(APIView):
+from datetime import datetime
+import re
+from django.db.models import Q
+from django.utils.dateparse import parse_date
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+from .models import DeletedVMLog, VmRequest, VMInfo, Employee
+
+
+class AllVMLogsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -21131,49 +21146,166 @@ class DeletedVMLogsAPIView(APIView):
             selected_date = request.GET.get("date")
             search = request.GET.get("search")
 
-            # Start with the base queryset
-            logs = DeletedVMLog.objects.all().order_by("-deleted_at")
+            deleted_qs = DeletedVMLog.objects.all()
+            request_qs = VmRequest.objects.all()
+            active_qs = VMInfo.objects.all()
 
-            # 📅 DEFAULT: If no date and no search, show last 2 days
-            if not selected_date and not search:
-                two_days_ago = timezone.now() - timedelta(days=2)
-                logs = logs.filter(deleted_at__gte=two_days_ago)
-            
-            # 📅 FILTER: By specific date
-            elif selected_date:
-                logs = logs.filter(deleted_at__date=parse_date(selected_date))
-
-            # 🔍 SEARCH: Filter by user/vm/project
+            # ----------------------------
+            # SEARCH FILTER
+            # ----------------------------
             if search:
-                logs = logs.filter(
+                deleted_qs = deleted_qs.filter(
                     Q(vm_name__icontains=search) |
                     Q(employee_id__icontains=search) |
                     Q(project_name__icontains=search)
                 )
 
-            result = []
+                request_qs = request_qs.filter(
+                    Q(vm_name__icontains=search) |
+                    Q(employee_id__icontains=search) |
+                    Q(project_name__icontains=search)
+                )
 
-            for log in logs:
-                # Convert entire model to dictionary
-                log_data = {
-                    field.name: getattr(log, field.name)
-                    for field in log._meta.fields
-                }
+                active_qs = active_qs.filter(
+                    Q(vm_name__icontains=search) |
+                    Q(email__icontains=search)
+                )
 
-                # Fetch employee details
-                employee = Employee.objects.filter(
-                    employee_id=log.employee_id
-                ).first()
+            # ----------------------------
+            # DATE FILTER
+            # ----------------------------
+            if selected_date:
+                parsed_date = parse_date(selected_date)
+                deleted_qs = deleted_qs.filter(deleted_at__date=parsed_date)
+                request_qs = request_qs.filter(request_timestamp__date=parsed_date)
+                active_qs = active_qs.filter(vm_access_from_date=parsed_date)
 
-                log_data["employee_details"] = {
-                    "name": employee.name if employee else "",
-                    "email": employee.email if employee else "",
-                    "designation": employee.designation if employee else "",
-                }
+            deleted_data = list(deleted_qs.values())
+            request_data = list(request_qs.values())
+            active_data = list(active_qs.values())
 
-                result.append(log_data)
+            # ----------------------------
+            # BASE NAME HELPER
+            # ----------------------------
+            def get_base_vm_name(name):
+                return re.sub(r'-\d+$', '', name)
 
-            return Response(result, status=status.HTTP_200_OK)
+            # ----------------------------
+            # CREATE LOOKUP SETS
+            # ----------------------------
+            active_base_names = {
+                get_base_vm_name(vm["vm_name"]) for vm in active_data
+            }
+
+            deleted_base_names = {
+                get_base_vm_name(vm["vm_name"]) for vm in deleted_data
+            }
+
+            # ----------------------------
+            # REQUEST MAP
+            # ----------------------------
+            request_map = {
+                req["vm_name"]: req for req in request_data
+            }
+
+            # ----------------------------
+            # MERGE FUNCTION
+            # ----------------------------
+            def merge_with_request(vm):
+                base_name = get_base_vm_name(vm.get("vm_name", ""))
+                req = request_map.get(base_name)
+
+                if req:
+                    # Flavor should come from VMInfo (so don't override)
+                    for field in [
+                        "flavor",
+                        "image",
+                        "project_name",
+                        "purpose",
+                        "network_id",
+                        "network_name",
+                        "request_timestamp",
+                        "fla_approved_timestamp",
+                        "admin_action_timestamp",
+                        "employee_id",
+                        "designation"
+                    ]:
+                        vm[field] = req.get(field)
+
+                return vm
+
+            active_data = [merge_with_request(vm) for vm in active_data]
+            deleted_data = [merge_with_request(vm) for vm in deleted_data]
+
+            # ----------------------------
+            # FILTER REQUESTS (REMOVE DUPLICATES)
+            # ----------------------------
+            filtered_request_data = []
+
+            for req in request_data:
+                base_name = req["vm_name"]
+
+                # If VM already ACTIVE or DELETED → skip
+                if base_name in active_base_names:
+                    continue
+                if base_name in deleted_base_names:
+                    continue
+
+                filtered_request_data.append(req)
+
+            # ----------------------------
+            # EMPLOYEE ATTACH
+            # ----------------------------
+            all_employee_ids = set()
+
+            for item in active_data + deleted_data + filtered_request_data:
+                if item.get("employee_id"):
+                    all_employee_ids.add(item["employee_id"])
+
+            employees = Employee.objects.filter(
+                employee_id__in=all_employee_ids
+            )
+
+            emp_map = {e.employee_id: e for e in employees}
+
+            def attach_employee(item):
+                emp = emp_map.get(item.get("employee_id"))
+                if emp:
+                    item["name"] = emp.name
+                    item["email"] = emp.email
+                    item["designation"] = emp.designation
+                return item
+
+            active_data = [attach_employee(x) for x in active_data]
+            deleted_data = [attach_employee(x) for x in deleted_data]
+            filtered_request_data = [attach_employee(x) for x in filtered_request_data]
+
+            # ----------------------------
+            # ADD STATUS
+            # ----------------------------
+            for item in active_data:
+                item["log_type"] = "ACTIVE"
+                item["timestamp"] = item.get("request_timestamp")
+
+            for item in deleted_data:
+                item["log_type"] = "DELETED"
+                item["timestamp"] = item.get("deleted_at")
+
+            for item in filtered_request_data:
+                item["log_type"] = "REQUESTED"
+                item["timestamp"] = item.get("request_timestamp")
+
+            # ----------------------------
+            # FINAL COMBINE
+            # ----------------------------
+            combined = active_data + deleted_data + filtered_request_data
+
+            combined.sort(
+                key=lambda x: x.get("timestamp") or timezone.now(),
+                reverse=True
+            )
+
+            return Response(combined, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response(

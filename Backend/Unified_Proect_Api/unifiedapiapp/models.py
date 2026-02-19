@@ -347,6 +347,7 @@ class DeletedVMLog(models.Model):
     delete_approved_at = models.DateTimeField(auto_now_add=True)
 
     # ───────── Misc ─────────
+    delete_request_reason = models.TextField(null=True, blank=True)
     remarks = models.CharField(max_length=255, blank=True, null=True)
     count_of_vms = models.IntegerField(blank=True, null=True)
     zabbix_hostid = models.IntegerField(blank=True, null=True)
