@@ -89,7 +89,7 @@ const K8sRequestStatus = () => {
         >
           {k8sRequests.map((req) => (
             <MenuItem key={req.id} value={req.id}>
-              {`${req.service_name} - ${req.project_name}`}
+              {`${req.app_name} - ${req.service_name}`}
             </MenuItem>
           ))}
         </Select>
