@@ -14,6 +14,6 @@ rm -rf "$DIST_DIR"
 
 # 2. Build React app
 # Using npx ensures it works even if vite isn't global
-npm run build || npx vite build
+npm run build
 
 echo "Build completed successfully in $DIST_DIR"
