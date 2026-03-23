@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:18-alpine AS build-stage
+FROM node:20-alpine AS build-stage
 WORKDIR /app
 COPY package*.json ./
 # If package.json is missing, we use npm init or assume vite is ready
