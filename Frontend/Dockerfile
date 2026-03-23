@@ -5,6 +5,7 @@ COPY package*.json ./
 # If package.json is missing, we use npm init or assume vite is ready
 RUN npm install
 COPY . .
+RUN ls -la
 RUN chmod +x vite_build.sh && ./vite_build.sh
 
 # Stage 2: Production
