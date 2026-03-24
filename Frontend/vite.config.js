@@ -12,18 +12,16 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
-    open: true,
-    hmr: {
-      overlay: false,
+    proxy: {
+      '/v2': {
+        target: 'http://10.184.43.88:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
     watch: {
       usePolling: true,
       interval: 100,
     },
   },
-  optimizeDeps: {
-    force: false,
-    include: [],
-    exclude: [], // depends on your stack
-  },
-});
+})
